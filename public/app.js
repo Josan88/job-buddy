@@ -60,6 +60,7 @@ function openRun(id) {
   $('#runview').hidden = false;
   $('#timeline').innerHTML = '';
   $('#result').hidden = true;
+  outcome = {};
   Object.assign(stats, { tools: 0, checks: 0, passed: 0, fixes: 0, start: 0 });
   const es = new EventSource(`/api/runs/${id}/stream`);
   es.onmessage = m => {
@@ -75,10 +76,11 @@ function renderPlan(plan) {
 }
 
 function renderStats() {
-  $('#stats').innerHTML = `<div><b>${stats.tools}</b><span>tool calls</span></div><div><b>${stats.passed}/${stats.checks}</b><span>checks passed</span></div><div><b>${stats.fixes}</b><span>self-fixes</span></div>`;
+  $('#stats').textContent = `${stats.tools} tool calls · ${stats.passed}/${stats.checks} checks passed${stats.fixes ? ` · ${stats.fixes} self-fixes` : ''}`;
 }
 
 const pending = new Map();
+let outcome = {};
 
 function add(html, cls = '') {
   const el = document.createElement('div');
@@ -116,6 +118,9 @@ function render(e) {
       pending.delete(e.tool);
       el.classList.add(e.ok ? 'ok' : 'fail');
       el.querySelector('.spin')?.remove();
+      if (e.ok && e.tool === 'screen_candidates') outcome.screen = e.result.details;
+      if (e.ok && e.tool === 'schedule_interviews') outcome.slots = (outcome.slots || []).concat(e.result.scheduled);
+      if (e.ok && e.tool === 'apply_to_job') outcome.applied = (outcome.applied || []).concat(e.result);
       el.querySelector('.out').innerHTML = pretty(e.tool, e.result, e.ok)
         + `<details><summary>Raw result</summary><pre>${esc(JSON.stringify(e.result, null, 2))}</pre></details>`;
       break;
@@ -187,14 +192,32 @@ function pretty(tool, r, ok) {
 function showResult(e) {
   const el = $('#result');
   el.hidden = false;
-  const secs = stats.start ? ((Date.now() - stats.start) / 1000) : null;
   const badge = e.verified ? '<span class="badge good">Verified</span>' : e.status === 'done' ? '<span class="badge">Done</span>' : '<span class="badge bad">Needs attention</span>';
   el.innerHTML = `<div class="card result-card ${e.verified ? 'verified' : ''}">
     <div class="result-head">${badge}<h2>Result</h2></div>
-    <p>${linkify(esc(e.summary || 'The agent stopped before finishing. See the timeline below.'))}</p>
-    <div class="links">${(e.links || []).map(l => `<a class="btn ghost" href="${esc(l.url)}" target="_blank">${esc(l.label)}</a>`).join('')}</div>
+    ${outcomeCards()}
+    <p class="muted">${linkify(esc(e.summary || 'The agent stopped before finishing. See the timeline below.'))}</p>
+    <div class="links">${(e.links || []).filter(l => !(outcome.slots?.length && l.label.startsWith('Calendar invite'))).map(l => `<a class="btn ghost" href="${esc(l.url)}" target="_blank">${esc(l.label)}</a>`).join('')}</div>
   </div>`;
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// The deliverable, front and centre: who to meet and when, or where the student applied.
+function outcomeCards() {
+  if (outcome.slots?.length) {
+    return `<h3>Your interviews are booked</h3><div class="people">${outcome.slots.map(sl => {
+      const d = (outcome.screen || []).find(x => x.id === sl.candidateId) || {};
+      const quote = (d.evidence || []).find(ev => ev.required && ev.source === 'bio');
+      return `<div class="person"><div class="person-top"><b>${esc(sl.name)}</b><span class="score-pill">${d.score ?? ''}/100</span></div>
+        <div class="when">${esc(sl.when)}</div>
+        ${quote ? `<p class="quote">“${esc(quote.quote)}”</p>` : ''}
+        <a href="${esc(sl.icsUrl)}">Add to calendar</a></div>`;
+    }).join('')}</div>`;
+  }
+  if (outcome.applied?.length) {
+    return `<h3>You've applied to</h3><div class="people">${outcome.applied.map(a => `<div class="person"><b>${esc(a.job)}</b><div class="when">${esc(a.business)}</div><p class="muted small">Business notified</p></div>`).join('')}</div>`;
+  }
+  return '';
 }
 
 async function loadRecent() {
