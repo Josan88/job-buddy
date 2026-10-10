@@ -62,6 +62,7 @@ steps.hirebuddy_1_understand = {
     properties: {
       prompt: { type: 'string', description: 'The user\'s words, unchanged' },
       handoff: { type: 'string', description: 'The HireBuddy handoff code (ho-...) if the request contains one' },
+      daily: { type: 'boolean', description: 'true for the scheduled background check: look only for NEW jobs and book up to 3 new interviews; a day with nothing new is a normal result' },
       listings: { type: 'array', maxItems: 20, description: 'Optional: jobs you found on real job sites, copied as written (title, employer, site, url, pay, location, hours, description). Leave out anything you did not see.', items: { type: 'object' } },
     },
     required: ['prompt'],
@@ -91,8 +92,12 @@ steps.hirebuddy_1_understand = {
     const s = student(ctx);
     run.search = { maxDistanceKm: 25, minPay: p.minPay || 0, maxWalkMin: p.needs?.maxWalkMin, askAboutTech: false };
     run.walkStated = !!p.needs?.walkStated;
-    // Interviews already booked (a rehearsal or a second visit) still count toward the goal.
-    const kept = store.db.interviews.filter(i => i.studentId === s.id && i.status !== 'declined' && new Date(i.start) > new Date()).slice(0, GOAL);
+    // Interviews already booked (a rehearsal or a second visit) still count toward the goal,
+    // except in the daily background check, which only looks for new ones.
+    const upcoming = store.db.interviews.filter(i => i.studentId === s.id && i.status !== 'declined' && new Date(i.start) > new Date());
+    run.daily = !!args.daily || /hirebuddy daily check/i.test(String(args.prompt || ''));
+    run.alreadyBooked = upcoming.map(i => i.id);
+    const kept = run.daily ? [] : upcoming.slice(0, GOAL);
     run.interviews = kept.map(i => i.id);
     store.save();
     const n = s.needs;
@@ -216,8 +221,10 @@ steps.hirebuddy_4_verify = {
     }
     const check = await agent.callTool(ctx, 'verify_applications', { studentId: s.id });
     const lines = ivs.map((iv, i) => { const j = store.db.jobs.find(x => x.id === iv.jobId); return `${i + 1}. ${j.title} at ${j.business}, ${iv.whenLong}, ${iv.format}${s.needs?.interviewFormat && iv.format !== s.needs.interviewFormat ? ` (they only offer ${(j.access?.interviewFormats || []).join(' or ')})` : ''}. ${iv.howToJoin}`; });
-    const summary = (ivs.length ? `You have ${ivs.length} interview${ivs.length === 1 ? '' : 's'}.\n${lines.join('\n')}\nEach one is in your email with the time first and a calendar invite.`
-      : 'No job on HireBuddy suits you right now, so I booked nothing.') + agent.decisionSummary(ctx) + outside.summarise(run.outside || []) + ` ${check.passed} of ${check.total} checks passed.`;
+    const summary = (ivs.length ? `${run.daily ? 'Daily check: new interviews booked. ' : ''}You have ${ivs.length} ${run.daily ? 'new ' : ''}interview${ivs.length === 1 ? '' : 's'}.\n${lines.join('\n')}\nEach one is in your email with the time first and a calendar invite.`
+      : run.daily ? 'Daily check: no new job suits you today, so I booked nothing new.' : 'No job on HireBuddy suits you right now, so I booked nothing.')
+      + (run.daily && (run.alreadyBooked || []).length ? ` You still have ${run.alreadyBooked.length} interview${run.alreadyBooked.length === 1 ? '' : 's'} booked from before.` : '')
+      + (run.daily ? '' : agent.decisionSummary(ctx)) + outside.summarise(run.outside || []) + ` ${check.passed} of ${check.total} checks passed.`;
     if (check.pass) await agent.callTool(ctx, 'finish', { summary });
     run.status = run.done ? 'done' : 'incomplete';
     ctx.emit({ type: 'final', status: run.status, verified: run.verified, summary: run.summary, plan: run.plan, links: agent.links(run, baseUrl) });
@@ -238,7 +245,9 @@ steps.hirebuddy_4_verify = {
       selfChecks: check.checks.map(c => `${c.pass ? 'PASS' : 'FAIL'} ${c.name}`),
       saveToComputer: { folder: `Documents/${folder}`, files },
       runLog: `${baseUrl}/runs/${run.id}`,
-      next: check.pass
+      next: check.pass && run.daily
+        ? `Daily check done. Save every file in saveToComputer into the user's Documents folder, replacing the old ones. Then tell the user in one or two short sentences only what is new today (or that nothing new suits them yet). Do not ask anything.`
+        : check.pass
         ? `Save every file in saveToComputer into the user's Documents folder (write each file's content exactly as given), and open Results.html in your preview if you can. Then give the user the summary in short plain sentences for a screen reader: interviews first, one line each, then the jobs from other sites (drafted, not sent), then "${check.passed} of ${check.total} checks passed" and where the files are. Do not ask anything else.`
         : 'Tell the user which checks failed, in one sentence each.',
     };

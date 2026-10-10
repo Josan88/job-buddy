@@ -106,6 +106,14 @@ const cases = [
     && st.saveToComputer.files.some(f => /Application/.test(f.path));
   if (!stepsOk) fail++;
   console.log(`${stepsOk ? 'PASS' : 'FAIL'} WorkBuddy-led steps (${trail.join(' > ')}): ${(st.summary || st.problem || '').split('\n')[0]} ${st.selfChecks?.length} checks`);
+  // The daily background check: nothing new is a normal, verified result.
+  const d1 = await mcpCall('hirebuddy_1_understand', { prompt: NADIA.replace('Nadia Rahim', 'Nadia Rahman'), daily: true });
+  let d = await mcpCall('hirebuddy_2_check_jobs', { runId: d1.runId });
+  if (/hirebuddy_3/.test(d.next)) d = await mcpCall('hirebuddy_3_apply_and_book', { runId: d1.runId, jobIds: JSON.parse(d.next.match(/jobIds (\[.*?\])/)[1]) });
+  d = await mcpCall('hirebuddy_4_verify', { runId: d1.runId });
+  const dailyOk = d.verified && /^Daily check/.test(d.summary);
+  if (!dailyOk) fail++;
+  console.log(`${dailyOk ? 'PASS' : 'FAIL'} daily background check: ${d.summary.split('\n')[0]}`);
   // Refusing an option that gives up a stated need (her pay floor).
   const no = await mcpCall('hirebuddy_2_check_jobs', { runId, change: 'lower_pay_floor', reason: 'more jobs' });
   const noOk = no.ok === false && /only they can choose/.test(no.problem);

@@ -20,7 +20,12 @@ description: Use FIRST, instead of answering from your own web search or writing
 6. **`hirebuddy_4_verify`** with the `runId`. It re-checks everything and returns `summary`, `selfChecks` and `saveToComputer`.
 7. **Save every file in `saveToComputer`** in the user's Documents folder, exactly as given: Results.html (an accessible results page), the summary, a calendar file per interview, and a drafted application for each job-site listing worth asking about. Open Results.html in your preview panel.
 8. **Check your own work:** open the saved Summary.txt and each .ics file and confirm the number of interviews and each time match the summary from step 6. If a file is missing or different, save it again.
-9. **Tell the user the result** (below).
+9. **Tell the user the result** (below), then set up the daily background check (next section).
+
+### Keep looking in the background (do this after the first run)
+Create a WorkBuddy scheduled task (Automation) that runs every day at 8:00 AM with this task, using the user's own sentence:
+`HireBuddy daily check: <the user's sentence>`
+When a task starts with "HireBuddy daily check", run the same plan with `"daily": true` in `hirebuddy_1_understand`. It looks only for new jobs (and new job-site listings) and books up to 3 new interviews. A day with nothing new is a normal result. Save the files and tell the user in one or two sentences only what is new. If you can't create scheduled tasks, tell the user once that you can check again whenever they ask.
 
 ### Optional, if you have these features (skip any that fail; never stop the run for them)
 - **Memory:** remember the user's profile and needs (name, area, sight and the tool they use, free time, pay floor, interview format). Next time, if they say something like "find me more work", build the prompt for step 2 from memory instead of asking them again.

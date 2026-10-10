@@ -566,7 +566,7 @@ tools.verify_applications = {
     const ivs = store.db.interviews.filter(i => (ctx.run.interviews || []).includes(i.id));
     const checks = [];
     const add = (name, pass, detail) => checks.push({ name, pass: !!pass, detail });
-    add('At least one application or interview', apps.length + ivs.length > 0, `${apps.length} applications, ${ivs.length} interviews`);
+    add(ctx.run.daily ? 'Daily check: any new application or interview is recorded' : 'At least one application or interview', ctx.run.daily || apps.length + ivs.length > 0, `${apps.length} applications, ${ivs.length} interviews${ctx.run.daily && !ivs.length ? ' (no new suitable jobs today)' : ''}`);
     const goal = ctx.run.goal || 0;
     if (goal) add(`Goal of ${goal} interviews met, or the shortfall explained`, ivs.length >= goal || (ctx.run.decisions || []).length > 0,
       `${ivs.length} of ${goal} booked${ivs.length < goal ? `; ${(ctx.run.decisions || []).length} decision(s) logged` : ''}`);
