@@ -69,6 +69,20 @@ function setPersona(p) {
   });
 }
 
+// A real button opens and closes the full sentence examples. Keeping focus on the
+// toggle lets keyboard users decide when to move into the examples with Tab.
+$('#examples-toggle').addEventListener('click', () => {
+  const button = $('#examples-toggle');
+  const examples = $('#examples');
+  const opening = button.getAttribute('aria-expanded') !== 'true';
+  button.setAttribute('aria-expanded', String(opening));
+  examples.hidden = !opening;
+  button.textContent = opening ? 'Hide full examples' : 'See a full example';
+  window.HB.readControl(opening
+    ? 'Full sentence examples opened. Press Tab to hear the first example button.'
+    : 'Full sentence examples closed.');
+});
+
 // Add the idea's opening words on a new line and put the cursor where the person carries on typing.
 // A blank in the phrase ("RM an hour") puts the cursor right after "RM".
 function addIdea([label, phrase]) {

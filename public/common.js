@@ -163,7 +163,7 @@ window.HB = {
     const title = main.querySelector('h1')?.textContent?.trim() || document.title;
     const intro = main.querySelector('.lede, h1 + p, #job-help')?.textContent?.trim() || '';
     const sections = [...main.querySelectorAll('h2')].filter(h => h.getClientRects().length).map(h => h.textContent.trim());
-    const expandableSections = [...main.querySelectorAll('details:not([hidden]) > summary')]
+    const expandableSections = [...main.querySelectorAll('details:not([hidden]) > summary, button[aria-expanded][aria-controls]')]
       .filter(el => el.getClientRects().length)
       .map(el => el.textContent.trim());
     const tabs = [...document.querySelectorAll('header nav a, header nav summary')]
