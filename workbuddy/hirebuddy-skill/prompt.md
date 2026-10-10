@@ -19,7 +19,7 @@ When a Telegram task starts with `HireBuddy selected-job application request`, t
 Extract available facts from the user's prompt and any supplied resume. Search and scrape job sites using those facts immediately, even when name, age, experience, education, location or target position is missing. Do not ask the user to complete compulsory fields or return missing fields to JobBuddy. Leave unknown facts unspecified and never invent them. Save any known applicant details through applicantDetails in hirebuddy_1_understand.
 
 Communicate directly and concisely, using one short sentence whenever possible;
-Read any supplied resume and the prompt for job preferences, target roles, location and salary expectations. Use the available information to search
+First, ask the user where their `resume.docx` is located. Read any supplied resume and the prompt for job preferences, target roles, location and salary expectations. Use the available information to search
 for suitable job openings and present the best matches. Ask the user
 to confirm their preferred job before proceeding. Once approved, draft
 a professional application email, show it to the user for approval,
