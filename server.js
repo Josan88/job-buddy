@@ -54,7 +54,7 @@ function readBody(req) {
 // Find work and My details are for the person; the rest are demo pages, folded into a menu.
 const NAV = [['/', 'Find work'], ['/me', 'My details']];
 const DEMO_NAV = [['/me?switch=1', 'Switch person'], ['/jobs', 'Jobs'], ['/outbox', 'Emails'], ['/about', 'How it works']];
-function page(title, inner, { current = '', scripts = '', description = 'HireBuddy: say what work you want in one sentence. An agent finds jobs that suit blind and low-vision people, applies, books interviews and checks its own work.' } = {}) {
+function page(title, inner, { current = '', scripts = '', description = 'HireBuddy: say what work you want in one sentence. An agent finds jobs that suit blind and low-vision people, finds suitable jobs and checks its own work.' } = {}) {
   const link = ([href, label]) => `<li><a href="${href}"${href === current ? ' aria-current="page"' : ''}>${label}</a></li>`;
   const nav = NAV.map(link).join('') + `<li><details class="menu"${DEMO_NAV.some(([h]) => h === current) ? ' data-current' : ''}><summary aria-label="Demo menu"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg> Demo</summary><ul>${DEMO_NAV.map(link).join('')}</ul></details></li>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -96,7 +96,6 @@ function accessFacts(j) {
   if (mode !== 'remote') rows.push(['Getting there', a.transit ? `${a.transit.walkMin}-minute walk from ${a.transit.station}` : 'No train or bus stop listed']);
   rows.push(['Screen readers', a.computerWork === false ? 'Not needed: no computer work' : (a.assistiveTech || []).length ? `Supported: ${a.assistiveTech.join(', ')}` : 'Not stated. HireBuddy asks the employer for you']);
   rows.push(['Tasks that need sight', (a.sightTasks || []).length ? a.sightTasks.join('; ') : 'None listed']);
-  rows.push(['Interview', (a.interviewFormats || ['in person']).join(', ')]);
   return `<dl class="facts">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
 }
 
@@ -122,7 +121,7 @@ function jobView(j, base) {
 </article>
 <section aria-labelledby="apply-title">
   <h2 id="apply-title">Apply</h2>
-  <p>Or let HireBuddy apply for you from <a href="/">one sentence</a>.</p>
+  <p>Find suitable jobs with HireBuddy from <a href="/">one sentence</a>.</p>
   <form method="post" action="/jobs/${esc(j.id)}/apply">
     <p><label for="f-name">Name</label><input id="f-name" name="name" type="text" autocomplete="name" required></p>
     <p><label for="f-email">Email</label><input id="f-email" name="email" type="email" autocomplete="email" required></p>
@@ -347,14 +346,7 @@ async function route(req, res) {
   }
   // A student answers an interview request. Declining hands the slot back to the agent, which books the next best candidate.
   if ((m = p.match(/^\/api\/interviews\/([\w-]+)\/(accept|decline)$/)) && req.method === 'POST') {
-    const iv = store.db.interviews.find(i => i.id === m[1]);
-    if (!iv) return json(res, 404, { error: 'not found' });
-    if (iv.status === 'declined') return json(res, 409, { error: 'already declined', runId: iv.replanRunId || null });
-    if (m[2] === 'accept') { iv.status = 'accepted'; store.save(); return json(res, 200, { ok: true, status: iv.status }); }
-    iv.status = 'declined';
-    iv.declinedAt = new Date().toISOString();
-    const run = iv.bookedBy === 'seeker' ? agent.rescheduleAfterDecline(iv, base) : agent.replanAfterDecline(iv, base);
-    return json(res, 200, { ok: true, status: iv.status, runId: run.id, url: `${base}/runs/${run.id}` });
+    return json(res, 410, { error: 'Interview booking has been removed.' });
   }
   if (p === '/api/emails') return json(res, 200, store.db.emails.slice(-100).reverse());
   if ((m = p.match(/^\/api\/runs\/([\w-]+)\/listings\/(\d+)\/apply$/)) && req.method === 'POST') {
