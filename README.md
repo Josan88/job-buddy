@@ -1,36 +1,37 @@
 # HireBuddy
 
-**Say the work you want in one sentence. HireBuddy finds jobs that suit you, applies, books interviews and checks everything.**
+**Say the work you want in one sentence. HireBuddy finds jobs that suit you, checks them, and helps you choose where to apply.**
 
 HireBuddy is an autonomous job agent built first for **blind and low-vision job seekers in Malaysia**. It runs inside **WorkBuddy** (as an MCP server and a Skill) and as a web app that works fully with a screen reader and a keyboard alone.
 
-> *"I'm Nadia Rahim. I'm blind and use NVDA. I live in Subang Jaya and take the LRT. I did customer service calls at a bank hotline for a year and type fast in English and Malay. Free weekdays 9am to 5pm, at least RM12 an hour, phone interviews please."*
+> *"I'm Nadia Rahim. I'm blind and use NVDA. I live in Subang Jaya and take the LRT. I did customer service calls at a bank hotline for a year and type fast in English and Malay. Free weekdays 9am to 5pm, at least RM12 an hour."*
 
 From that one sentence, with no further questions, HireBuddy:
 
 1. **Plans** the work as a checklist, where each step names the tool that completes it.
-2. **Saves her profile and needs**: blind, uses NVDA, up to a 10-minute walk from a stop, phone interviews, at least RM12 an hour.
-3. **Checks every open job** against the law (Minimum Wages Order 2024, RM8.72 an hour) and against her needs: remote or a short walk from a train or bus stop, screen reader support stated, no tasks that need sight (for example riding a motorcycle), an interview format she can use. It says why each unsuitable job is left out.
-4. **Applies** with a short note naming the job and her real skills. The employer also receives her interview needs ("send documents as Word or plain text, not scanned images").
-5. **Books interviews** inside the employer's interview hours and her free time, never overlapping, by phone where offered. In-person interviews must be reachable by public transport.
-6. **Emails her each interview** in plain text with the time on line one and how to join on line two.
-7. **Verifies everything** (25 checks in the Nadia demo run) and is **not allowed to finish** until they pass. Then it gives a summary written to be heard on a screen reader.
+2. **Saves her profile and needs**: blind, uses NVDA, up to a 10-minute walk from a stop, and at least RM12 an hour.
+3. **Checks every open job** against the law (Minimum Wages Order 2024, RM8.72 an hour) and against her needs: remote or a short walk from a train or bus stop, screen reader support, suitable working hours, and no tasks that require sight (for example riding a motorcycle). It says why each unsuitable job is left out.
+4. **Prepares applications without sending them automatically.** Suitable jobs appear as keyboard-focusable cards so she can choose one herself.
+5. **Sends only the selected application.** Pressing Enter on a job card asks WorkBuddy through Telegram to email the application to the configured demo inbox. WorkBuddy reports whether it was actually delivered.
+6. **Verifies the search and application preparation** before it can finish, then gives a concise result designed to be heard.
+
+HireBuddy does **not** book interviews, send interview invitations, or create interview reminders.
 
 ## What makes it an agent, not a button
 
-- **It adapts toward a goal.** The goal is 3 interviews. When too few jobs suit her, it tries each possible change on paper, picks the one that adds jobs without giving up anything she asked for, logs the decision with its reason, and searches again. In the Nadia demo it includes a clinic job whose listing doesn't mention screen readers and asks the employer about it in the application. It never lowers her pay floor or her walking limit itself: it tells her what that would add and leaves the choice to her.
-- **"I can't make it".** On her page, one button hands the interview back to the agent. It finds another time with the same employer (or the next best job), emails her the new time, tells the employer and re-verifies.
+- **It adapts toward a goal.** The goal is to find suitable jobs without giving up anything the person asked for. When too few jobs suit her, it evaluates safe ways to widen the search and records the reason for its choice. It never lowers her pay floor or walking limit by itself.
+- **The user stays in control of applications.** A search never submits applications. The user reviews the suitable jobs, focuses a job card with Tab, and presses Enter only on the job they want WorkBuddy to send.
 - **It refuses illegal pay** from both sides: it never applies to an underpaid job, and an employer who types "RM55 a day, 8-hour shifts" is refused before anything is published.
 - **With `LLM_API_KEY`** the model makes these choices itself, judged by the same tools and checks. Without a key, the rule-based planner runs the same loop.
 
 ## Built for screen readers and low vision
 
 - Skip link, landmarks and a clear heading structure on every page; the current page is announced in the menu.
-- While the agent works, one polite live-region update per step ("Step 3 of 8: Apply, with your interview needs"), not a flood. When it finishes, focus moves to the result.
+- While the agent works, one polite live-region update per step and a quiet periodic tone indicate that processing is still underway. When it finishes, a distinct chime plays and focus moves to the result.
 - Keyboard only throughout, with a thick yellow focus ring. Buttons are at least 48 pixels high.
 - AAA-contrast colours, Atkinson Hyperlegible (the Braille Institute's typeface for low vision), a remembered text-size control (up to 150%), dark mode, reduced motion respected.
 - Status always in words ("Suits you", "Not suitable", "Passed"), never colour alone. Tables have captions and header cells.
-- "Read aloud" speaks the result for people who don't use a screen reader; "Speak instead" takes the sentence by voice where the browser supports it (press Enter to stop).
+- The completed result is read automatically, including the Tab-and-Enter instructions when application cards are available. "Speak instead" takes the person's introduction by voice where the browser supports it (press Enter to stop).
 - Automated check: axe-core reports 0 WCAG 2.2 AA violations on every page, in light and dark mode, on desktop and phone widths.
 
 ## Try it
@@ -38,19 +39,19 @@ From that one sentence, with no further questions, HireBuddy:
 **Live app: https://hirebuddy-k543.onrender.com** (free tier, so the first load after idle can take about a minute)
 
 - **Web app:** type a sentence on the home page, or pick an example.
-- **My details (`/me`):** pick who you are, with no password (switch person from the Demo menu). A job seeker hears their interviews first (when, how to join), can accept or say they can't make it, edits how they describe themselves, uploads a resume, then sees jobs that suit them and why others don't. An employer sees their jobs and booked interviews.
+- **My details (`/me`):** pick who you are, with no password (switch person from the Demo menu). A job seeker can edit how they describe themselves, upload a resume, review application status, and see which jobs suit them and why others do not. An employer sees their jobs and applicants.
 - **Demo menu:** Jobs, Emails and How it works are demo pages, folded into the menu in the header.
 - **From WorkBuddy:** see [WorkBuddy setup](#workbuddy-setup).
 - **From a terminal:** `node workbuddy/hirebuddy-skill/scripts/hirebuddy.js "<your sentence>"`
 
-The employer side still works too: `Need a weekend barista for MIXUE in Subang, RM12/hr, start next week` publishes the job, screens candidates with quoted evidence and books interviews; `Need 3 weekend baristas in Cyberjaya, must have latte art and Mandarin, RM13/hr` shows it widening the search and relaxing a requirement.
+The employer side still works too: `Need a weekend barista for MIXUE in Subang, RM12/hr, start next week` publishes the job and screens candidates with quoted evidence; `Need 3 weekend baristas in Cyberjaya, must have latte art and Mandarin, RM13/hr` shows it widening the search and relaxing a requirement.
 
 ## Architecture
 
 ```
 WorkBuddy ──(Skill / MCP)──┐
                            ▼
-Web console ──REST/SSE──▶ Agent ──▶ Tools ──▶ store (jobs, students, applications, interviews, emails, runs)
+Web console ──REST/SSE──▶ Agent ──▶ Tools ──▶ store (jobs, students, applications, emails, runs)
                            │          │
                     LLM planner or    ├─ public job pages + apply form
                     rule autopilot    ├─ email (Resend) / outbox
@@ -58,7 +59,7 @@ Web console ──REST/SSE──▶ Agent ──▶ Tools ──▶ store (jobs,
 ```
 
 - **Agent** (`src/agent.js`): with `LLM_API_KEY` set, an OpenAI-compatible model (OpenAI, DeepSeek, Groq, Tencent Hunyuan…) plans and calls tools in a loop. It has a stuck-loop guard and a finish gate. Without a key, a rule-based **autopilot** drives the same tools, so the demo never depends on a network call to a model.
-- **Tools** (`src/tools.js`): deterministic and auditable. Each returns either a result or a list of specific `problems`, and the agent fixes those and retries. The timeline shows each fix as "Caught a problem, fixing it".
+- **Tools** (`src/tools.js`): deterministic and auditable. Each returns either a result or a list of specific `problems`, and the agent fixes those and retries before presenting the verified result.
 - **Scoring** (`src/lib.js`): must-have skills 35, nice-to-have 5, shift-availability overlap 25, distance 15 (Haversine over Klang Valley areas), experience 15, pay fit 5.
 - **MCP server** (`src/mcp.js`): Streamable HTTP at `/mcp`. By default it exposes only `hirebuddy_run` (the whole job from one prompt, returning only when it is verified) plus two read tools. That way a client's model can't stop halfway. Add `?tools=all` to the URL, or set `HIREBUDDY_MCP_TOOLS=all` for the bridge, to expose every step tool as well.
 - **One optional dependency.** Plain Node 20+. The Telegram client (`telegram`, gramjs) is loaded only when the Telegram hand-off is set up.
@@ -109,13 +110,13 @@ WorkBuddy is Tencent's desktop AI agent. HireBuddy plugs into it in two ways:
 
 `hirebuddy-mcp.js` is a zero-dependency stdio-to-HTTP bridge. Clients that support remote MCP can point straight at `https://hirebuddy-k543.onrender.com/mcp`. Restart WorkBuddy, then type the one prompt. WorkBuddy calls `hirebuddy_run` and shows the verified result, the self-checks and the links.
 
-**WorkBuddy runs the steps.** For a job seeker the Skill has WorkBuddy run the job itself: it searches job sites, then calls `hirebuddy_1_understand`, `hirebuddy_2_check_jobs`, `hirebuddy_3_apply_and_book` and `hirebuddy_4_verify` in turn. When there are fewer than 3 interviews, WorkBuddy chooses how to widen the search (HireBuddy refuses any option that gives up something the user asked for). At the end it saves the summary and drafted applications on the user's computer. Every step result has a `next` field so the client never stops to ask. `hirebuddy_run` remains the one-call backup and the employer flow.
+**WorkBuddy runs the steps.** For a job seeker the Skill has WorkBuddy run the job itself: it searches job sites, then calls `hirebuddy_1_understand`, `hirebuddy_2_check_jobs`, the legacy-named `hirebuddy_3_apply_and_book` step, and `hirebuddy_4_verify` in turn. Despite its legacy name, step 3 does not apply or book anything; it prepares suitable jobs for manual selection. When there are fewer than 3 suitable jobs, WorkBuddy chooses how to widen the search, and HireBuddy refuses any option that gives up something the user asked for. At the end it saves the summary and drafted applications on the user's computer. Every step result has a `next` field so the client never stops to ask. `hirebuddy_run` remains the one-call backup and the employer flow.
 
-**Jobs on real sites.** For a job seeker, the Skill tells WorkBuddy to search JobStreet, Indeed, Hiredly or Maukerja on the user's own machine first and pass what it found as `listings` in the same single call. HireBuddy never fetches those sites itself. It checks each listing the same way as its own jobs (legal pay, the seeker's pay floor, tasks that need sight, screen reader support, hours, travel) and drafts an application with the questions the listing leaves open. It can't apply or book on those sites, so nothing is sent there; the self-check confirms that. With no listings, the flow is unchanged.
+**Jobs on real sites.** For a job seeker, the Skill tells WorkBuddy to search JobStreet, Indeed, Hiredly or Maukerja on the user's own machine first and pass what it found as `listings` in the same single call. HireBuddy never fetches those sites itself. It checks each listing the same way as its own jobs (legal pay, the seeker's pay floor, tasks that need sight, screen reader support, hours, travel) and drafts an application with the questions the listing leaves open. It does not submit those applications automatically; nothing is sent until the user selects a supported job card. With no listings, the flow is unchanged.
 
 **B. Skill.** Import `workbuddy/hirebuddy-skill/` (which contains `SKILL.md`, `skill.yaml` and `scripts/hirebuddy.js`) through WorkBuddy's Skills panel. The skill tells WorkBuddy when to use HireBuddy, how to call it (MCP, or the script as a fallback), and what to report back.
 
-**C. HireBuddy hands the task to WorkBuddy through Telegram.** WorkBuddy's built-in Assistant channel connects it to a Telegram bot that you own. HireBuddy can't message that bot itself, because Telegram bots never see messages from other bots. So HireBuddy's server sends it as a Telegram *user* account. When you press "Hand it to WorkBuddy" in a paired browser, the server sends the task to the bot, WorkBuddy runs it, and the HireBuddy page follows the run live and reads out each step. Nobody pastes or presses Send. WorkBuddy replies to that account in plain text ending with the run log link.
+**C. HireBuddy hands the task to WorkBuddy through Telegram.** WorkBuddy's built-in Assistant channel connects it to a Telegram bot that you own. HireBuddy can't message that bot itself, because Telegram bots never see messages from other bots. So HireBuddy's server sends it as a Telegram *user* account. When you press "Hand it to WorkBuddy" in a paired browser, the server sends the task to the bot, WorkBuddy runs it, and the HireBuddy page follows the run live and announces its progress. Nobody pastes or presses Send. When the result arrives, the page plays a completion chime and reads the result automatically.
 
 1. In Telegram, message **@BotFather**, send `/newbot`, give it a name and a username that is hard to guess (it must end in `bot`), and copy the token it returns.
 2. Still in BotFather, send `/setjoingroups`, pick the bot and choose **Disable**, so nobody can add it to a group.
@@ -144,7 +145,7 @@ MIT
 
 On Jobs and My details, use Tab to focus a job card and Enter to request an application through WorkBuddy's Telegram connection. Select your job seeker profile on My details and pair the browser using the Telegram hand-off key on Find work first. The public Jobs page falls back to the fictional Nadia demo profile when no profile has been selected.
 
-Application requests instruct WorkBuddy to send only to `stephanieshinhuiyeo@gmail.com`. The original company email is placed first in the subject and retained in the email body and stored application data, together with the job details, applicant profile, availability, accessibility/interview needs, and resume link when available. A successful Telegram hand-off does not confirm email delivery; WorkBuddy reports the actual send result through Telegram. Failed hand-offs can be retried.
+Application requests instruct WorkBuddy to send only to `stephanieshinhuiyeo@gmail.com`. The original company email is placed first in the subject and retained in the email body and stored application data, together with the job details, applicant profile, availability, accessibility needs, and resume link when available. A successful Telegram hand-off does not confirm email delivery; WorkBuddy reports the actual send result through Telegram. Failed hand-offs can be retried.
 
 Outside-site jobs in the completed search result also support Tab and Enter. They use the applicant profile belonging to that search. Only listings assessed as worth asking about offer the application action.
 
