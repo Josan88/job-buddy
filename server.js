@@ -57,6 +57,7 @@ function page(title, inner, { current = '', scripts = '', description = 'HireBud
 <nav aria-label="Main"><ul>${nav}</ul></nav>
 <div class="textsize" role="group" aria-label="Text size"><span aria-hidden="true">Text size</span>
 <button type="button" class="secondary" data-size="normal" aria-label="Normal text">A</button><button type="button" class="secondary" data-size="large" aria-label="Large text">A+</button><button type="button" class="secondary" data-size="larger" aria-label="Largest text">A++</button></div>
+<button type="button" class="secondary" id="speak-toggle" aria-pressed="true" title="Turn off if you use a screen reader">Speak out loud</button>
 </div></header>
 <main id="main" tabindex="-1">${inner}</main>
 <footer><p>Built to work with screen readers (NVDA, JAWS, VoiceOver, TalkBack), with a keyboard alone, and at large text sizes. People and employers in this demo are fictional.</p></footer>

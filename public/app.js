@@ -310,7 +310,8 @@ function showResult(e, live) {
   });
   if (live) {
     $('#result-title').focus();
-    announce(`${ok ? 'Done' : 'Stopped'}. ${head}`);
+    // With Speak out loud on, say the whole result, not just the headline.
+    announce(`${ok ? 'Done' : 'Stopped'}. ${window.HB_SPEAK && e.summary ? e.summary.replace(/https?:\/\/\S+/g, 'the link') : head}`);
   }
 }
 
