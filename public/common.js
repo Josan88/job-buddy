@@ -40,6 +40,7 @@ window.HB = {
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(String(text || '').replace(/\s+/g, ' ').trim());
     u.lang = 'en-GB'; u.rate = 1;
+    speechSynthesis.resume();
     speechSynthesis.speak(u);
   },
   // Listen until the person presses Enter (or the button again). Escape cancels. Calls done(text), with ''
