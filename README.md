@@ -144,7 +144,7 @@ MIT
 
 On Jobs and My details, use Tab to focus a job card and Enter to request an application through WorkBuddy's Telegram connection. Select your job seeker profile on My details and pair the browser using the Telegram hand-off key on Find work first. The public Jobs page falls back to the fictional Nadia demo profile when no profile has been selected.
 
-Application requests instruct WorkBuddy to send only to `stephanieshinhuiyeo@gmail.com`. The original company email is placed first in the subject and retained in the email body and stored application data, together with the job details, applicant profile, availability, accessibility/interview needs, and resume link when available. A successful Telegram hand-off does not confirm email delivery; WorkBuddy reports the actual send result through Telegram. Failed hand-offs can be retried.
+Application requests instruct WorkBuddy to send only to `stephanieshinhuiyeo@gmail.com`. The original company email is placed first in the subject and retained in the email body and stored application data, together with the job details, applicant profile, availability, accessibility/interview needs. When no company email exists, a demo address is generated from the company name, for example `Example Company` becomes `examplecompany@gmail.com`. Resume attachments are not requested. A successful Telegram hand-off does not confirm email delivery; WorkBuddy reports the actual send result through Telegram. Failed hand-offs can be retried.
 
 Outside-site jobs in the completed search result also support Tab and Enter. They use the applicant profile belonging to that search. Only listings assessed as worth asking about offer the application action.
 
