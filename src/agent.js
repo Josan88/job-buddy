@@ -209,7 +209,6 @@ function decisionSummary(ctx) {
 async function autopilotHirer(ctx) {
   if (ctx.run.options?.replaceInterviewId) return autopilotReplace(ctx);
   const spec = { ...parse.hirer(ctx.run.prompt), ...(ctx.run.options || {}) };
-  if (!spec.area) return say(ctx, `Where is the job? Tell me the area, for example "Need a weekend barista in Petaling Jaya, RM12/hr", and run me again. I won't guess the location.`);
   const goal = Math.max(3, spec.hires);
   ctx.run.goal = goal;
   say(ctx, `Understood the brief: ${spec.title} in ${spec.area}, RM${spec.pay}/${spec.payUnit}, ${L.describeSchedule(spec.schedule)}, start ${spec.startDate}. Must have: ${spec.requirements.join(', ')}. Goal: ${goal} interviews booked.`);
@@ -476,14 +475,14 @@ function systemPrompt(persona, baseUrl, GOAL = 3) {
   const now = new Date();
   const today = L.fmtMyt(now);
   const common = `You are HireBuddy, an autonomous hiring agent for Malaysian small businesses and students. Today is ${today} (Malaysia time, UTC+8). The app runs at ${baseUrl}.
-Work fully autonomously from the single user prompt. Never ask the user questions; pick sensible defaults and state them.
+Work fully autonomously from the single user prompt. Never ask the user questions; pick sensible defaults and state them. The one exception is location: never invent an area the user did not name.
 1. First call set_plan with your steps, each naming the tool that completes it.
 2. Execute with tools. When a tool returns ok:false with problems, fix exactly those problems and call it again.
 3. Before finishing you MUST run the final verify tool and it must pass. Then call finish with a short plain-language summary including links.
 Weekly schedules use day keys Mon Tue Wed Thu Fri Sat Sun with 24h ranges, e.g. {"Sat":["08:00-14:00"]}. Skills are short lowercase phrases.`;
   if (persona === 'student') return `${common}
 User: a job seeker, often blind or low vision. Goal: ${GOAL} booked interviews for jobs that truly suit them.
-Steps: register_student (bio built only from what they said; fill needs with their sight loss, the tool they use (e.g. NVDA), remote-only, longest walk from a stop, preferred interview format), search_jobs (each result has access.fit and suitable), apply_to_job to suitable jobs only (personal cover note naming the job and a real skill), book_interview for each, send_email each interview to the seeker with interviewId (plain text; line 1 the exact "when", line 2 how to join, then the rest), and keep going until ${GOAL} are booked.
+Steps: register_student (leave area out if they did not say where they live; bio built only from what they said; fill needs with their sight loss, the tool they use (e.g. NVDA), remote-only, longest walk from a stop, preferred interview format), search_jobs (each result has access.fit and suitable), apply_to_job to suitable jobs only (personal cover note naming the job and a real skill), book_interview for each, send_email each interview to the seeker with interviewId (plain text; line 1 the exact "when", line 2 how to join, then the rest), and keep going until ${GOAL} are booked.
 If too few jobs suit them, call log_decision with the real options (askAboutTech to include jobs that do not state screen reader support, maxWalkMin 15, maxDistanceKm 60, lower minPay to the legal minimum, or stop), choose the one that adds suitable jobs without giving up a need they stated, then search again. Never apply to a job with access blockers or illegal pay.
 If the message says WorkBuddy found jobs on other sites, call check_outside_listings once before verify_applications and include its result in the summary: which are worth asking about (drafted, not sent) and which do not suit and why. Say plainly that you cannot apply or book on other sites.
 If the message has rescheduleInterviewId, they can't make that interview: log_decision, book_interview again for the same job (a new time is found automatically), email them, verify_applications, finish.
@@ -564,7 +563,10 @@ async function execute(run, baseUrl) {
   live.set(run.id, ctx);
   ctx.emit({ type: 'start', prompt: run.prompt, persona: run.persona, mode: run.mode });
   try {
-    if (llm.enabled()) {
+    // A job with no stated area: ask, before either planner can guess one.
+    const noArea = run.persona === 'hirer' && !run.options?.replaceInterviewId && !run.options?.area && !parse.hirer(run.prompt).area;
+    if (noArea) say(ctx, `Where is the job? Tell me the area, for example "Need a weekend barista in Petaling Jaya, RM12/hr", and run me again. I won't guess the location.`);
+    else if (llm.enabled()) {
       try {
         await llmLoop(ctx);
       } catch (e) {
@@ -573,7 +575,7 @@ async function execute(run, baseUrl) {
         run.mode = 'Autopilot (LLM fallback)';
       }
     }
-    if (!run.done && !run.events.some(ev => ev.type === 'tool_call' && ev.tool !== 'set_plan')) {
+    if (!noArea && !run.done && !run.events.some(ev => ev.type === 'tool_call' && ev.tool !== 'set_plan')) {
       run.plan = [];
       await (run.persona === 'student' ? autopilotStudent(ctx) : autopilotHirer(ctx));
     }

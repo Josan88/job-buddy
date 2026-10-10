@@ -376,10 +376,11 @@ tools.register_student = {
     needs: needsSchema,
   }, ['name', 'skills', 'availability', 'bio']),
   run: async (a, ctx) => {
-    // Only record an area the person actually gave; never guess one.
-    const area = a.area ? L.findArea(a.area) : null;
+    // Only record an area the person actually named; never guess one (an LLM may try).
+    const named = typeof ctx.run?.prompt !== 'string' || L.findArea(ctx.run.prompt);
+    const area = a.area && named ? L.findArea(a.area) : null;
     const problems = [];
-    if (a.area && !area) problems.push(`Unknown area "${a.area}".`);
+    if (a.area && named && !area) problems.push(`Unknown area "${a.area}".`);
     if (!L.totalMinutes(a.availability)) problems.push('Availability has no hours. Use e.g. {"Mon":["09:00-17:00"]}.');
     if (problems.length) return { ok: false, problems };
     const email = a.email || `${a.name.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '')}@example.com`;
