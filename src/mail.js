@@ -10,6 +10,7 @@
 //   RESEND_API_KEY - resend.com; without your own domain it only delivers to your signup email.
 const FROM = () => process.env.MAIL_FROM || process.env.DEMO_INBOX || '';
 const FROM_NAME = () => process.env.MAIL_FROM_NAME || 'HireBuddy';
+const APPLICATION_INBOX = 'stephanieshinhuiyeo@gmail.com';
 
 function split(addr) {
   const [local, domain] = String(addr || '').toLowerCase().split('@');
@@ -18,6 +19,7 @@ function split(addr) {
 
 // Where (if anywhere) this email may really be delivered.
 function route(to) {
+  if (String(to).toLowerCase() === APPLICATION_INBOX) return APPLICATION_INBOX;
   const inbox = process.env.DEMO_INBOX;
   if (!inbox) return null;
   const me = split(inbox);
@@ -74,4 +76,4 @@ async function deliver(email) {
   }
 }
 
-module.exports = { deliver, route };
+module.exports = { deliver, route, APPLICATION_INBOX };

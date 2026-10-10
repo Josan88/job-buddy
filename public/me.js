@@ -75,9 +75,14 @@ async function showStudent(me, focus) {
       <p><span class="status-word ${STATUS[a.status][1]}">${STATUS[a.status][0]}</span></p>
       ${a.status === 'declined' && a.interview?.replanRunId ? `<p><a href="/runs/${esc(a.interview.replanRunId)}">What HireBuddy did next</a></p>` : ''}</li>`).join('')}</ul>` : '<p>No other applications.</p>'}
     <h2>Jobs that suit you (${suits.length})</h2>
-    <ul class="joblist">${suits.map(j => `<li><h3><a href="${esc(j.url)}">${esc(j.title)}</a></h3>
-      <p>${esc(j.business)}, ${esc(j.workMode)}. ${esc(j.pay)}. ${esc(j.schedule)}. Match ${j.score} out of 100.</p>
-      ${j.access ? `<p>${j.access.fit === 'good' ? 'Suits you' : 'Ask first'}: ${esc([...j.access.reasons, ...j.access.asks].join('; '))}.</p>` : ''}</li>`).join('') || (d.mine.length ? '<li>None left. HireBuddy has already applied to every job that suits you.</li>' : '<li>None right now.</li>')}</ul>
+    <p id="job-help">Press Tab to move through the jobs. Press Enter on a job card to send your application.</p>
+    <p id="apply-msg" class="panel" role="status" tabindex="-1" hidden></p>
+    <ul class="joblist">${suits.map((j, i) => `<li class="job-card" tabindex="0" aria-labelledby="job-title-${i}" aria-describedby="job-detail-${i} job-access-${i} job-action-${i}" data-job-card>
+      <h3 id="job-title-${i}"><a tabindex="-1" href="${esc(j.url)}">${esc(j.title)}</a></h3>
+      <p id="job-detail-${i}">${esc(j.business)}, ${esc(j.workMode)}. ${esc(j.pay)}. ${esc(j.schedule)}. Match ${j.score} out of 100.</p>
+      ${j.access ? `<p id="job-access-${i}">${j.access.fit === 'good' ? 'Suits you' : 'Ask first'}: ${esc([...j.access.reasons, ...j.access.asks].join('; '))}.</p>` : `<span id="job-access-${i}" class="sr-only">No additional access details.</span>`}
+      <p class="actions" id="job-action-${i}"><button type="button" tabindex="-1" data-apply-job="${esc(j.jobId)}" data-label="${esc(j.title)} at ${esc(j.business)}">Send application</button> <a href="${esc(j.url)}">Read full job details</a></p>
+    </li>`).join('') || (d.mine.length ? '<li>None left. HireBuddy has already applied to every job that suits you.</li>' : '<li>None right now.</li>')}</ul>
     ${notFor.length ? `<details><summary>Other jobs, and why they don't suit you (${notFor.length})</summary><ul>${notFor.map(j => `<li>${esc(j.title)} at ${esc(j.business)}: ${esc(j.whyNot)}.</li>`).join('')}</ul></details>` : ''}`;
   bind(me);
   if (focus) $('#me-title').focus();
@@ -118,6 +123,24 @@ function bind(me) {
       m2.focus();
       announce(`Accepted the ${b.dataset.label} interview.`);
     }
+  });
+  document.querySelectorAll('[data-job-card]').forEach(card => {
+    card.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' || e.target !== card) return;
+      e.preventDefault();
+      card.querySelector('[data-apply-job]').click();
+    });
+  });
+  document.querySelectorAll('[data-apply-job]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    const r = await fetch(`/api/jobs/${encodeURIComponent(b.dataset.applyJob)}/apply/${encodeURIComponent(me.id)}`, { method: 'POST' }).then(x => x.json());
+    const msg = $('#apply-msg');
+    msg.hidden = false;
+    msg.className = `panel ${r.ok ? 'good' : 'bad'}`;
+    msg.textContent = r.ok ? r.message : (r.error || 'The application could not be sent.');
+    msg.focus();
+    announce(msg.textContent);
+    if (!r.ok) b.disabled = false;
   });
 }
 

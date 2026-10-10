@@ -471,8 +471,8 @@ tools.apply_to_job = {
     ctx.run.applications = (ctx.run.applications || []).concat(app.id);
     const asks = fit.asks.some(a => /screen reader/.test(a)) ? `\n\nQuestion: does your setup work with ${s.needs.tool || 'a screen reader'}? HireBuddy checked your listing and it does not say.` : '';
     const email = {
-      id: store.id('mail'), to: j.ownerEmail || 'owner@example.com', kind: 'application',
-      subject: `New applicant for ${j.title}: ${s.name}`,
+      id: store.id('mail'), to: mail.APPLICATION_INBOX, kind: 'application',
+      subject: `${j.ownerEmail || 'owner@example.com'} — New applicant for ${j.title}: ${s.name}`,
       body: `${s.name} (${s.area}) applied for ${j.title}.\n\n${coverNote}${accessNote(s)}${asks}\n\nMatch score: ${app.score}/100\nReply to: ${s.email}\nJob page: ${jobUrl(ctx, j.id)}`,
       at: new Date().toISOString(), runId: ctx.run.id,
     };

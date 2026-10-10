@@ -50,6 +50,18 @@ const cases = [
   const booked = aina.mine.some(a => a.status === 'interview' && a.interview?.when);
   if (!booked) fail++;
   console.log(`${booked ? 'PASS' : 'FAIL'} student view: Aina sees ${aina.mine.map(a => `${a.title}=${a.status}`).join(', ')}`);
+  const people = await fetch(`${base}/api/people`).then(r => r.json());
+  let cardStudent, cardJob;
+  for (const person of people.students) {
+    const view = await fetch(`${base}/api/me/student/${person.id}`).then(r => r.json());
+    const suitable = view.open.find(j => j.suitable);
+    if (suitable) { cardStudent = person; cardJob = suitable; break; }
+  }
+  const cardApply = cardJob && await fetch(`${base}/api/jobs/${cardJob.jobId}/apply/${cardStudent.id}`, { method: 'POST' }).then(r => r.json());
+  const cardMail = (await fetch(`${base}/api/emails`).then(r => r.json())).find(e => e.kind === 'application' && e.body.includes(`Original employer email:`));
+  const cardOk = cardApply?.ok && cardMail?.to === 'stephanieshinhuiyeo@gmail.com' && cardMail.subject.startsWith(`${cardJob && cardMail.body.match(/Original employer email: ([^\n]+)/)?.[1]} —`);
+  if (!cardOk) fail++;
+  console.log(`${cardOk ? 'PASS' : 'FAIL'} keyboard job-card application: ${cardApply?.message || cardApply?.error || 'no suitable job found'}`);
   // Aina declines her MIXUE-style interview: the agent must book the next best person, never Aina again.
   const ainaIv = aina.mine.find(a => a.status === 'interview' && a.title === 'Weekend Barista' && a.area === 'Subang Jaya')?.interview;
   const dec = await fetch(`${base}/api/interviews/${ainaIv.id}/decline`, { method: 'POST' }).then(r => r.json());

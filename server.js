@@ -8,6 +8,7 @@ const agent = require('./src/agent');
 const mcp = require('./src/mcp');
 const llm = require('./src/llm');
 const telegram = require('./src/telegram');
+const mail = require('./src/mail');
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC = path.join(__dirname, 'public');
@@ -297,6 +298,33 @@ async function route(req, res) {
     return json(res, 200, { ok: true, status: iv.status, runId: run.id, url: `${base}/runs/${run.id}` });
   }
   if (p === '/api/emails') return json(res, 200, store.db.emails.slice(-100).reverse());
+  if ((m = p.match(/^\/api\/jobs\/([\w-]+)\/apply\/([\w-]+)$/)) && req.method === 'POST') {
+    const j = store.db.jobs.find(x => x.id === m[1]);
+    const s = store.db.students.find(x => x.id === m[2]);
+    if (!j || !s) return json(res, 404, { ok: false, error: 'Job or job seeker not found.' });
+    if (j.status !== 'open') return json(res, 409, { ok: false, error: 'This job is closed.' });
+    if (store.db.applications.some(a => a.jobId === j.id && a.studentId === s.id)) {
+      return json(res, 409, { ok: false, error: 'You already applied to this job.' });
+    }
+    const wage = L.checkWage(j.pay, j.payUnit);
+    const fit = L.accessFit(j, s, { minPay: s.expectedRate || 0, maxDistanceKm: 60, askAboutTech: true });
+    if (!wage.ok || fit.fit === 'not suitable') return json(res, 409, { ok: false, error: !wage.ok ? wage.message : `This job does not suit your needs: ${fit.blockers.join('; ')}.` });
+    const skill = s.skills[0] || 'relevant experience';
+    const coverNote = `Hello ${j.business}, I would like to apply for the ${j.title} role. I have ${skill} experience and I am free ${L.describeSchedule(s.availability)}. Thank you.`;
+    const app = { id: store.id('app'), jobId: j.id, studentId: s.id, coverNote, at: new Date().toISOString(), score: L.scoreMatch(j, s).total, source: 'job card' };
+    store.db.applications.push(app);
+    const originalEmployer = j.ownerEmail || 'owner@example.com';
+    const email = {
+      id: store.id('mail'), to: mail.APPLICATION_INBOX, kind: 'application',
+      subject: `${originalEmployer} — New applicant for ${j.title}: ${s.name}`,
+      body: `${s.name} (${s.area}) applied for ${j.title} at ${j.business}.\n\n${coverNote}\n\nMatch score: ${app.score}/100\nReply to: ${s.email}\nOriginal employer email: ${originalEmployer}\nJob page: ${base}/jobs/${j.id}`,
+      at: new Date().toISOString(), runId: null,
+    };
+    email.delivery = await mail.deliver(email);
+    store.db.emails.push(email);
+    store.save();
+    return json(res, 200, { ok: true, message: `Application sent for ${j.title} at ${j.business}.`, delivery: email.delivery });
+  }
   // Before a demo: one button puts the demo data back to the start (fresh jobs, no applications or runs).
   if (p === '/reset') {
     const token = process.env.RESET_TOKEN;
@@ -322,9 +350,19 @@ async function route(req, res) {
   // ---- Pages ----
   if (p === '/jobs') {
     const open = [...store.db.jobs].reverse().filter(j => j.status === 'open');
-    const list = open.map(j => `<li><h2><a href="/jobs/${esc(j.id)}">${esc(j.title)}</a></h2>
-      <p>${esc(j.business)}, ${esc(j.area)}. RM${esc(j.pay)} per ${esc(j.payUnit)}. ${esc((j.access?.workMode || 'on-site').replace(/^\w/, c => c.toUpperCase()))}${j.access?.transit && j.access.workMode !== 'remote' ? `, ${esc(j.access.transit.walkMin)}-minute walk from ${esc(j.access.transit.station)}` : ''}.${(j.access?.assistiveTech || []).length ? ` Supports ${esc(j.access.assistiveTech.join(', '))}.` : ''}${L.checkWage(j.pay, j.payUnit).ok ? '' : ' <span class="status-word bad">Below the legal minimum wage</span>'}</p></li>`).join('');
-    return html(res, 200, page('Open jobs', `<h1>Open jobs (${open.length})</h1><p>Each job lists how you get there, whether screen readers are supported and any tasks that need sight. <a href="/about#demo-data">Employers here are fictional demo data.</a></p><ul class="joblist">${list}</ul>`, { current: '/jobs' }));
+    const list = open.map((j, i) => {
+      const access = j.access || {};
+      const details = `${j.business}, ${j.area}. RM${j.pay} per ${j.payUnit}. ${L.describeSchedule(j.schedule)}. ${(access.workMode || 'on-site').replace(/^\w/, c => c.toUpperCase())}.`;
+      const accessibility = `${access.transit && access.workMode !== 'remote' ? `${access.transit.walkMin}-minute walk from ${access.transit.station}. ` : ''}${(access.assistiveTech || []).length ? `Supports ${access.assistiveTech.join(', ')}. ` : ''}${(access.sightTasks || []).length ? `Tasks needing sight: ${access.sightTasks.join('; ')}.` : 'No tasks needing sight are listed.'}`;
+      return `<li class="job-card" tabindex="0" aria-labelledby="job-title-${i}" aria-describedby="job-detail-${i} job-description-${i} job-access-${i} job-action-${i}" data-job-card data-job-id="${esc(j.id)}">
+        <h2 id="job-title-${i}"><a tabindex="-1" href="/jobs/${esc(j.id)}">${esc(j.title)}</a></h2>
+        <p id="job-detail-${i}">${esc(details)} Must have: ${esc(j.requirements.join(', '))}.${j.niceToHave?.length ? ` Nice to have: ${esc(j.niceToHave.join(', '))}.` : ''}${L.checkWage(j.pay, j.payUnit).ok ? '' : ' <span class="status-word bad">Below the legal minimum wage</span>'}</p>
+        <p id="job-description-${i}">${esc(j.description)}</p>
+        <p id="job-access-${i}">${esc(accessibility)}</p>
+        <p class="actions" id="job-action-${i}"><button type="button" tabindex="-1" data-apply-job="${esc(j.id)}">Send application</button> <a href="/jobs/${esc(j.id)}">Read full job details</a></p>
+      </li>`;
+    }).join('');
+    return html(res, 200, page('Open jobs', `<h1>Open jobs (${open.length})</h1><p id="job-help">Press Tab to move through the jobs. Each card is read in full. Press Enter to send an application. <a href="/about#demo-data">Employers here are fictional demo data.</a></p><p id="apply-msg" class="panel" role="status" tabindex="-1" hidden></p><ul class="joblist">${list}</ul>`, { current: '/jobs', scripts: '<script src="/jobs.js"></script>' }));
   }
   if ((m = p.match(/^\/jobs\/([\w-]+)$/))) {
     const j = store.db.jobs.find(x => x.id === m[1]);
