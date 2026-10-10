@@ -317,39 +317,6 @@ $('#tg-test').onclick = async () => {
 };
 
 // Hand the sentence to WorkBuddy: make a task to paste, then follow the run here once WorkBuddy starts it.
-let intakeHandoff = null;
-let intakePrompt = '';
-let handoffFollowGeneration = 0;
-function showIntake(id, st) {
-  intakeHandoff = { id, revision: st.intake.revision };
-  progressSound.stop();
-  $('#applicant-intake').hidden = false;
-  $('#intake-fields').innerHTML = st.intake.missing.map(key => `<p><label for="intake-${key}">${esc(st.labels[key])}</label><input id="intake-${key}" data-intake-field="${key}" type="text" value="${esc(st.intake.answers?.[key] || '')}" aria-describedby="intake-help"><button type="button" data-intake-speak="${key}">Speak ${esc(st.labels[key])}</button></p>`).join('');
-  const help = 'WorkBuddy needs these details before finding jobs. Type or speak your answers, then press Send details to WorkBuddy. No work experience is a valid answer.';
-  $('#intake-help').textContent = help;
-  $('#handoff').removeAttribute('aria-disabled');
-  $('#handoff').textContent = 'Send details to WorkBuddy';
-  $('#handoff-status').textContent = 'Waiting for required details. Job searching has not started.';
-  $('#intake-fields').querySelectorAll('[data-intake-speak]').forEach(button => {
-    let stop = null;
-    button.hidden = !(window.SpeechRecognition || window.webkitSpeechRecognition);
-    button.onclick = () => {
-      if (stop) { stop(); return; }
-      button.textContent = 'Stop speaking';
-      announce('Speak your answer. Press Enter or this button when finished.');
-      stop = window.HB.listen('en-MY', text => {
-        stop = null;
-        button.textContent = `Speak ${st.labels[button.dataset.intakeSpeak]}`;
-        const input = $('#intake-' + button.dataset.intakeSpeak);
-        if (text) input.value = text;
-        input.focus();
-        announce(text ? 'Answer entered. Review it before sending.' : 'No answer heard. Try again or type.');
-      });
-    };
-  });
-  announce(help);
-  $('#intake-fields input')?.focus();
-}
 $('#handoff').onclick = async () => {
   const prompt = $('#prompt').value.trim();
   const err = $('#prompt-error');
@@ -360,8 +327,6 @@ $('#handoff').onclick = async () => {
     return $('#prompt').focus();
   }
   err.hidden = true;
-  if (intakePrompt !== prompt) { intakePrompt = prompt; intakeHandoff = null; $('#applicant-intake').hidden = true; }
-  const details = Object.fromEntries([...document.querySelectorAll('[data-intake-field]')].map(input => [input.dataset.intakeField, input.value.trim()]));
   let studentId;
   try { const me = JSON.parse(localStorage.getItem('hirebuddy.me')); if (me?.role === 'student') studentId = me.id; } catch {}
   // One hand-off at a time: a second press (or a stray Enter) while this one is under way does nothing.
@@ -370,7 +335,7 @@ $('#handoff').onclick = async () => {
   progressSound.start();
   setTimeout(() => $('#handoff').removeAttribute('aria-disabled'), 15000);
   if (tgKey()) announce('Sending to WorkBuddy through Telegram.');
-  const h = await fetch(intakeHandoff ? `/api/handoffs/${intakeHandoff.id}/details` : '/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, studentId, details, revision: intakeHandoff?.revision, key: tgKey() || undefined }) }).then(r => r.json()).catch(() => null);
+  const h = await fetch('/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, studentId, key: tgKey() || undefined }) }).then(r => r.json()).catch(() => null);
   if (!h?.task) {
     progressSound.stop();
     $('#handoff').removeAttribute('aria-disabled');
@@ -378,9 +343,6 @@ $('#handoff').onclick = async () => {
     err.textContent = 'Error: HireBuddy could not make the task. Check your internet connection and try again.';
     return $('#handoff').focus();
   }
-  intakeHandoff = null;
-  $('#applicant-intake').hidden = true;
-  $('#handoff').textContent = 'Find job';
   $('#handoff-task').value = h.task;
   $('#handoff-panel').hidden = false;
   $('#handoff-copy').onclick = () => navigator.clipboard.writeText(h.task).catch(() => $('#handoff-task').select());
@@ -423,11 +385,9 @@ $('#handoff').onclick = async () => {
 // Follow the run here as soon as WorkBuddy starts it with the person's sentence (for up to 20 minutes).
 // When the task went through Telegram (sentAt), also show what WorkBuddy replies there while we wait.
 async function followHandoff(id, notStarted, sentAt) {
-  const generation = ++handoffFollowGeneration;
   let heard = 0;
   for (let i = 0; i < 600; i++) {
     await new Promise(r => setTimeout(r, 2000));
-    if (generation !== handoffFollowGeneration) return;
     if (sentAt && i % 3 === 2) {
       const fresh = repliesSince(await tgCall(), sentAt);
       showReplies($('#handoff-replies'), $('#handoff-replies-title'), fresh);
@@ -435,8 +395,6 @@ async function followHandoff(id, notStarted, sentAt) {
       heard = fresh.length;
     }
     const st = await fetch(`/api/handoffs/${id}`).then(r => r.json()).catch(() => null);
-    if (generation !== handoffFollowGeneration) return;
-    if (st?.intake?.status === 'needs_details') return showIntake(id, st);
     if (st?.runId) {
       announce('WorkBuddy has started. Following it here.');
       history.pushState({}, '', `/runs/${st.runId}`);

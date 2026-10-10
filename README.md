@@ -153,6 +153,4 @@ Expand **Application debug console** at the bottom of the page after focusing or
 
 Run `npm run test:application` to check keyboard activation, Telegram hand-off, recipient handling and duplicate protection using a mocked Telegram connection.
 
-For website job-search handoffs, WorkBuddy reviews the prompt and supplied resume for name, age, work experience, education, location and interested position. It requests missing fields through hirebuddy_review_intake; JobBuddy collects typed or spoken answers and returns them under the same handoff for review. Search starts after WorkBuddy confirms all required details, with the existing workflow sequence unchanged. Update the installed HireBuddy skill and refresh its MCP tools to enable the review tool.
-
-Run node test/intake.js to verify review, voice-field entry, stale revisions and the answer round trip. Speech recognition requires browser support and microphone permission; typing remains available.
+Job searches use available information from the prompt and supplied resume. Missing applicant details do not block the handoff or trigger a compulsory-details form.
