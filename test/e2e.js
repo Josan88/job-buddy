@@ -25,6 +25,7 @@ const cases = [
   ['hirer', 'Need a weekend barista in Subang, RM12/hr, start next week', r => r.verified && r.jobId && r.interviews.length >= 2],
   ['illegal wage', 'Need a cashier for my kedai in USJ, RM7/hr, weekends', r => r.verified && !r.jobId && /below the legal minimum/.test(r.summary)],
   ['student', "I'm Aisyah from Sunway University, living in Bandar Sunway. I can make espresso and do latte art, good with customers. Free weekends 8am-2pm, want at least RM11/hr.", r => r.verified && r.persona === 'student' && r.applications.length >= 1],
+  ['RM50-60/day refused', 'Need a weekend cashier in Subang, RM50-60 a day, 8-hour shifts', r => r.verified && !r.jobId && /an 8-hour shift that is about RM6.25 an hour/.test(r.summary) && r.plan.some(s => s.status === 'skipped')],
   ['RM8.50 refused', 'Need a part-time barista in Subang Jaya, RM8.50/hr, weekends', r => r.verified && !r.jobId && /RM8.72/.test(r.summary)],
   ['tutor', 'Looking for an SPM maths tutor in Subang Jaya, RM30/hr, Saturday mornings', r => r.verified && r.interviews.length >= 1],
   ['replans (Cyberjaya)', 'Need 3 weekend baristas in Cyberjaya, must have latte art and Mandarin, RM13/hr',

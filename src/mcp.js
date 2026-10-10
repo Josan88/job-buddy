@@ -57,7 +57,7 @@ async function callTool(name, args, sessionId, baseUrl) {
     const checks = [...run.events].reverse().find(e => e.type === 'checks');
     return text({
       status: run.status, verified: run.verified, mode: run.mode, summary: run.summary,
-      plan: run.plan.map(s => `${s.status === 'done' ? '[x]' : '[ ]'} ${s.title}`),
+      plan: run.plan.map(s => `${s.status === 'done' ? '[x]' : s.status === 'skipped' ? '[-]' : '[ ]'} ${s.title}${s.status === 'skipped' ? ' (skipped: pay is below the legal minimum)' : ''}`),
       selfChecks: checks ? checks.checks.map(c => `${c.pass ? 'PASS' : 'FAIL'} ${c.name}`) : [],
       links: agent.links(run, baseUrl),
       note: run.done

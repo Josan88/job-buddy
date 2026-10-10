@@ -227,7 +227,8 @@ async function autopilotHirer(ctx) {
   if (!wage.ok) {
     say(ctx, `Stopping before publishing: ${wage.message} Posting this would break the Minimum Wages Order.`);
     ctx.run.wageBlocked = true;
-    return callTool(ctx, 'finish', { summary: `I did not publish the job. ${wage.message} Raise the offer to at least RM${wage.minimum}/${wage.unit} and run me again.` });
+    const perHour = spec.payUnit === 'day' ? ` For ${/^(8|11|18)\b/.test(String(spec.shiftHours || 8)) ? 'an' : 'a'} ${spec.shiftHours || 8}-hour shift that is about RM${(spec.pay / (spec.shiftHours || 8)).toFixed(2)} an hour, and the legal minimum is RM${L.MIN_WAGE.hour} an hour.` : '';
+    return callTool(ctx, 'finish', { summary: `I did not publish the job. ${wage.message}${perHour} Raise the offer to at least RM${wage.minimum}/${wage.unit} and run me again. (${L.MIN_WAGE.source}.)` });
   }
 
   const description = `${spec.business} is hiring a ${spec.title.toLowerCase()} in ${spec.area}. Pay: RM${spec.pay} per ${spec.payUnit}. `
@@ -436,7 +437,8 @@ async function execute(run, baseUrl) {
     run.status = 'error';
     ctx.emit({ type: 'error', message: e.message });
   }
-  if (run.done) for (const s of run.plan) s.status = 'done';
+  // A refused job stops early: the steps it never reached are shown as skipped, not done.
+  if (run.done) for (const s of run.plan) s.status = run.wageBlocked && !run.events.some(e => e.type === 'tool_call' && e.tool === s.tool) ? 'skipped' : 'done';
   ctx.emit({ type: 'final', status: run.status, verified: run.verified, summary: run.summary, plan: run.plan, links: links(run, baseUrl) });
   live.delete(run.id);
   store.save();

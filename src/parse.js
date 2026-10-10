@@ -39,10 +39,17 @@ function parseSchedule(text, defaultHours) {
 }
 
 function parsePay(text) {
-  const m = text.match(/rm\s?(\d+(?:\.\d+)?)\s*(?:\/|per|an?|a)?\s*(hr|hour|h|day|month|mth|mo)?\b/i);
+  // "RM50-60 a day" is judged on the lower end: that is what the worker may actually get.
+  const m = text.match(/rm\s?(\d+(?:\.\d+)?)(?:\s*(?:-|–|to)\s*(?:rm\s?)?\d+(?:\.\d+)?)?\s*(?:\/|per|an?|a)?\s*(hr|hour|h|day|month|mth|mo)?\b/i);
   if (!m) return null;
   const u = (m[2] || 'hour').toLowerCase();
   return { pay: Number(m[1]), payUnit: u.startsWith('d') ? 'day' : u.startsWith('m') ? 'month' : 'hour' };
+}
+
+// "8-hour shifts" -> 8 (used to show what a day rate works out to per hour)
+function shiftHours(text) {
+  const m = text.match(/(\d+(?:\.\d+)?)\s*-?\s*(?:hour|hr)s?\s*(?:shift|day|a day|per day)?/i);
+  return m && !/rm\s?$/i.test(text.slice(0, m.index)) ? Number(m[1]) : null;
 }
 
 function parseEmail(text) {
@@ -89,7 +96,7 @@ function hirer(prompt) {
   const subjectLabel = subject[0] ? subject[0].trim().replace(/\b\w/g, c => c.toUpperCase()).replace(/^Spm|^Pt3|^Igcse|^Upsr/, x => x.toUpperCase()) + ' ' : '';
   return {
     title: `${weekend ? 'Weekend ' : ''}${subjectLabel}${role.title}`, business, area, ...pay, schedule,
-    requirements: req, niceToHave: nice, startDate: startDate(prompt), ownerEmail: parseEmail(prompt), hires,
+    requirements: req, niceToHave: nice, startDate: startDate(prompt), ownerEmail: parseEmail(prompt), hires, shiftHours: shiftHours(prompt),
   };
 }
 
