@@ -23,10 +23,10 @@ async function run(prompt, listings) {
 
 const NADIA = "I'm Nadia Rahim. I'm blind and use NVDA. I live in Subang Jaya and take the LRT. I did customer service calls at a bank hotline for a year and type fast in English and Malay. Free weekdays 9am to 5pm, at least RM12 an hour, phone interviews please.";
 const cases = [
-  ['blind seeker (Nadia)', NADIA, r => r.verified && r.persona === 'student' && r.applications.length === 3 && !(r.interviews || []).length && (r.decisions || []).length >= 1
+  ['blind seeker (Nadia)', NADIA, r => r.verified && r.persona === 'student' && r.interviews.length === 3 && (r.decisions || []).length >= 1
     && !r.events.some(e => e.type === 'tool_call' && e.tool === 'apply_to_job' && e.args.jobId === 'job-delivery-subang')],
   ['low vision, remote only', "I'm Nur Aqilah, I have low vision and use a screen magnifier. Remote work only. I write Malay articles and captions. Free Mon, Wed and Fri 10am-6pm.",
-    r => r.verified && r.applications.length >= 1 && !(r.interviews || []).length && r.events.filter(e => e.type === 'tool_result' && e.tool === 'book_interview' && e.ok).every(e => e.result.format === 'video')],
+    r => r.verified && r.interviews.length >= 1 && r.events.filter(e => e.type === 'tool_result' && e.tool === 'book_interview' && e.ok).every(e => e.result.format === 'video')],
   ['hirer', 'Need a weekend barista in Subang, RM12/hr, start next week', r => r.verified && r.jobId && r.interviews.length >= 2],
   ['illegal wage', 'Need a cashier for my kedai in USJ, RM7/hr, weekends', r => r.verified && !r.jobId && /below the legal minimum/.test(r.summary)],
   ['student', "I'm Aisyah from Sunway University, living in Bandar Sunway. I can make espresso and do latte art, good with customers. Free weekends 8am-2pm, want at least RM11/hr.", r => r.verified && r.persona === 'student' && r.applications.length >= 1],
@@ -71,9 +71,17 @@ const cases = [
   const declineOk = rr.verified && rr.source === 'decline' && replacement && rr.decisions.length >= 1 && after.mine.some(a => a.status === 'declined');
   if (!declineOk) fail++;
   console.log(`${declineOk ? 'PASS' : 'FAIL'} decline: ${rr.summary}`);
-  // Applications do not create interviews before an employer response.
-  const pendingNadia = await fetch(`${base}/api/me/student/stu-nadia`).then(r => r.json());
-  if (pendingNadia.mine.some(a => a.status === 'interview')) fail++;
+  // Nadia can't make her first interview: the agent finds another time with the same employer.
+  const nadia = await fetch(`${base}/api/me/student/stu-nadia`).then(r => r.json());
+  const first = nadia.mine.find(a => a.status === 'interview');
+  const res2 = await fetch(`${base}/api/interviews/${first.interview.id}/decline`, { method: 'POST' }).then(r => r.json());
+  let rs;
+  for (let i = 0; i < 80; i++) { await sleep(250); rs = await fetch(`${base}/api/runs/${res2.runId}`).then(r => r.json()); if (rs.status !== 'running') break; }
+  const moved = await fetch(`${base}/api/me/student/stu-nadia`).then(r => r.json());
+  const now = moved.mine.find(a => a.jobId === first.jobId);
+  const reOk = rs.verified && now.status === 'interview' && now.interview.start !== first.interview.start && rs.decisions.length >= 1;
+  if (!reOk) fail++;
+  console.log(`${reOk ? 'PASS' : 'FAIL'} can't make it, rebooked: ${rs.summary}`);
   // WorkBuddy passes jobs it found on real sites: each is checked, suitable ones get a draft, nothing is sent.
   const found = [
     { title: 'Customer Service Executive (Inbound Calls)', employer: 'Example Telco', site: 'JobStreet', url: 'https://example.com/1', pay: 'RM2,600 - RM3,000 per month', location: 'Subang Jaya', hours: 'Mon - Fri, 9am - 6pm', description: 'Answer customer calls in English and Malay. Near SS15 LRT.' },
@@ -85,8 +93,8 @@ const cases = [
   const emailsBefore = ro.events.filter(e => e.type === 'tool_result' && e.tool === 'send_email').length;
   const o = ro.events.find(e => e.type === 'tool_result' && e.tool === 'check_outside_listings')?.result;
   const outOk = ro.verified && o && o.checked === 4 && o.results[0].verdict === 'worth asking' && /NVDA/.test(o.results[0].draft)
-    && o.results.every(r => r.verdict !== 'not suitable')
-    && o.results[1].verdict === 'worth asking' && /What is the pay\?/.test(o.results[1].draft) && /working hours/.test(o.results[1].draft) && /nothing was sent/.test(ro.summary) && emailsBefore === 0;
+    && o.results.slice(1, 3).every(r => r.verdict === 'not suitable')
+    && o.results[3].verdict === 'worth asking' && /What is the pay\?/.test(o.results[3].draft) && /working hours/.test(o.results[3].draft) && /nothing was sent/.test(ro.summary) && emailsBefore === 0;
   if (!outOk) fail++;
   console.log(`${outOk ? 'PASS' : 'FAIL'} other-site listings: ${ro.summary.slice(ro.summary.indexOf('I also checked'))}`);
   // WorkBuddy-led: the client calls the four steps itself, following `next`, and widens the search once.
@@ -105,7 +113,7 @@ const cases = [
     trail.push(tool.match(/_(\d)_/)[1] + (args.change ? '+' : ''));
     if (tool === 'hirebuddy_4_verify') break;
   }
-  const stepsOk = st.verified && /Submitted 3 application/.test(st.summary) && trail.includes('2+')
+  const stepsOk = st.verified && /You have 3 interviews/.test(st.summary) && trail.includes('2+')
     && !st.saveToComputer.files.some(f => /\.ics$/.test(f.path)) && st.saveToComputer.files.some(f => /Application/.test(f.path));
   if (!stepsOk) fail++;
   console.log(`${stepsOk ? 'PASS' : 'FAIL'} WorkBuddy-led steps (${trail.join(' > ')}): ${(st.summary || st.problem || '').split('\n')[0]} ${st.selfChecks?.length} checks`);

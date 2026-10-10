@@ -443,7 +443,7 @@ tools.search_jobs = {
     if (!s) return { ok: false, error: 'Unknown job seeker' };
     const opts = { maxDistanceKm: args.maxDistanceKm || 25, minPay: args.minPay || 0, maxWalkMin: args.maxWalkMin, askAboutTech: !!args.askAboutTech };
     ctx.run.search = opts;
-    const results = matchJobs(s, opts).filter(r => s.needs?.vision !== 'blind' || r.suitable).map(r => ({ ...r, url: jobUrl(ctx, r.jobId) }));
+    const results = matchJobs(s, opts).map(r => ({ ...r, url: jobUrl(ctx, r.jobId) }));
     ctx.run.jobSearch = results;
     return { ok: true, count: results.length, suitable: results.filter(r => r.suitable).length, results };
   },
@@ -510,10 +510,7 @@ tools.book_interview = {
     const s = store.db.students.find(x => x.id === studentId);
     const j = store.db.jobs.find(x => x.id === jobId);
     if (!s || !j) return { ok: false, error: 'Unknown job seeker or job' };
-    const application = store.db.applications.find(a => a.jobId === jobId && a.studentId === studentId);
-    if (!application) return { ok: false, problems: ['Apply to this job before booking an interview.'] };
-    if (!application.employerResponse?.interviewRequested && !store.db.interviews.some(i => i.jobId === jobId && i.studentId === studentId))
-      return { ok: false, problems: ['Wait for an employer response inviting the applicant to interview before booking.'] };
+    if (!store.db.applications.some(a => a.jobId === jobId && a.studentId === studentId)) return { ok: false, problems: ['Apply to this job before booking an interview.'] };
     if (store.db.interviews.some(i => i.jobId === jobId && i.studentId === studentId && i.status !== 'declined')) return { ok: false, problems: ['An interview for this job is already booked.'] };
     const offered = j.access?.interviewFormats || ['in person'];
     const fmt = format && offered.includes(format) ? format : L.pickFormat(j, s);
@@ -559,7 +556,7 @@ tools.check_outside_listings = {
     const results = outside.assessAll(ctx.run.options?.listings || [], s);
     ctx.run.outside = results;
     return { ok: true, checked: results.length, worthAsking: results.filter(r => r.verdict !== 'not suitable').length,
-      results: results.map((r, listingIndex) => ({ ...r, listingIndex })).filter(r => s.needs?.vision !== 'blind' || r.verdict !== 'not suitable').map(r => ({ listingIndex: r.listingIndex, title: r.title, employer: r.employer, companyEmail: r.companyEmail, site: r.site, url: r.url,
+      results: results.map(r => ({ title: r.title, employer: r.employer, companyEmail: r.companyEmail, site: r.site, url: r.url,
         location: r.location, pay: r.pay, hours: r.hours, verdict: r.verdict, blockers: r.blockers, reasons: r.reasons, questions: r.asks, draft: r.draft })),
       note: 'Nothing was sent. HireBuddy can only apply and book interviews for jobs listed on HireBuddy.' };
   },
@@ -574,9 +571,9 @@ tools.verify_applications = {
     const ivs = store.db.interviews.filter(i => (ctx.run.interviews || []).includes(i.id));
     const checks = [];
     const add = (name, pass, detail) => checks.push({ name, pass: !!pass, detail });
-    add(ctx.run.daily ? 'Daily check: any new application or interview is recorded' : 'At least one application or interview', ctx.run.daily || apps.length + ivs.length > 0 || store.db.applications.some(a => a.studentId === studentId), `${apps.length} applications, ${ivs.length} interviews${ctx.run.daily && !ivs.length ? ' (no new suitable jobs today)' : ''}`);
+    add(ctx.run.daily ? 'Daily check: any new application or interview is recorded' : 'At least one application or interview', ctx.run.daily || apps.length + ivs.length > 0, `${apps.length} applications, ${ivs.length} interviews${ctx.run.daily && !ivs.length ? ' (no new suitable jobs today)' : ''}`);
     const goal = ctx.run.goal || 0;
-    if (goal) add(`Goal of ${goal} applications met, or the shortfall explained`, apps.length >= goal || (ctx.run.decisions || []).length > 0,
+    if (goal) add(`Goal of ${goal} interviews met, or the shortfall explained`, ivs.length >= goal || (ctx.run.decisions || []).length > 0,
       `${ivs.length} of ${goal} booked${ivs.length < goal ? `; ${(ctx.run.decisions || []).length} decision(s) logged` : ''}`);
     for (const a of apps) {
       const j = store.db.jobs.find(x => x.id === a.jobId);

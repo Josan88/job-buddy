@@ -128,8 +128,7 @@ function assessAll(listings, s) {
 const named = (r, site = true) => `${r.title}${r.employer ? ` at ${r.employer}` : ''}${site && r.site ? ` on ${r.site}` : ''}`;
 
 // One paragraph for the spoken summary.
-function summarise(results, student) {
-  if (student?.needs?.vision === 'blind') results = results.filter(r => r.verdict !== 'not suitable');
+function summarise(results) {
   if (!results.length) return '';
   const ok = results.filter(r => r.verdict !== 'not suitable');
   const no = results.filter(r => r.verdict === 'not suitable');

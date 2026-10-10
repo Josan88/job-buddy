@@ -153,7 +153,3 @@ Expand **Application debug console** at the bottom of the page after focusing or
 Run `npm run test:application` to check keyboard activation, Telegram hand-off, recipient handling and duplicate protection using a mocked Telegram connection.
 
 Job searches use available information from the prompt and supplied resume. Missing applicant details do not block the handoff or trigger a compulsory-details form.
-
-Job seeker applications do not book interviews. Wait for an employer response inviting the applicant to interview before arranging a time.
-
-For blind applicants, unsuitable jobs are omitted from search results, the Jobs page, profile recommendations, summaries and saved results. Outside listings retain their original application indices after filtering.

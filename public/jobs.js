@@ -7,16 +7,6 @@ if (!me || me.role !== 'student' || !me.id) {
   console.info('[HireBuddy application] No selected job seeker; using the demo profile Nadia Rahim.');
 }
 
-// Render the server-filtered job list for the selected applicant.
-if (window.location?.href) {
-  const pageUrl = new URL(window.location.href);
-  if (pageUrl.searchParams.get('studentId') !== me.id) {
-    cards.forEach(card => { card.hidden = true; });
-    pageUrl.searchParams.set('studentId', me.id);
-    window.location.replace(pageUrl.href);
-  }
-}
-
 function report(text, ok) {
   message.hidden = false;
   message.className = `panel ${ok ? 'good' : 'bad'}`;
