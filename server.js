@@ -10,7 +10,6 @@ const llm = require('./src/llm');
 const telegram = require('./src/telegram');
 const mail = require('./src/mail');
 const application = require('./src/application');
-const intake = require('./src/intake');
 const pendingApplications = new Set();
 
 const PORT = Number(process.env.PORT || 3000);
@@ -177,13 +176,13 @@ async function route(req, res) {
   // Hand Nadia's sentence to WorkBuddy. The website makes a task for the person's own WorkBuddy and follows
   // that run live when it starts. A browser paired through Telegram has the server send it; otherwise the
   // person pastes it.
-  const handoffTask = ho => intake.task(ho, base);
+  const handoffTask = ho => `Use the HireBuddy skill to find me work. My request: "${ho.prompt}". Extract available facts from this prompt and any supplied resume, then search job sites without requesting compulsory missing details.${ho.resumeUrl ? ` Resume: ${ho.resumeUrl}` : ""}`;
   if (p === '/api/handoffs' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
     const prompt = String(body.prompt || '').trim().slice(0, 2000);
     if (!prompt) return json(res, 400, { error: 'prompt required' });
     const profile = store.db.students.find(s => s.id === body.studentId);
-    const ho = { id: `ho-${Math.random().toString(36).slice(2, 8)}`, prompt, resumeUrl: profile?.resume ? `${base}/api/me/student/${profile.id}/resume` : null, createdAt: new Date().toISOString(), runId: null, intake: { status: 'reviewing', revision: 1, details: {}, answers: {}, missing: [] } };
+    const ho = { id: `ho-${Math.random().toString(36).slice(2, 8)}`, prompt, resumeUrl: profile?.resume ? `${base}/api/me/student/${profile.id}/resume` : null, createdAt: new Date().toISOString(), runId: null };
     store.db.handoffs = (store.db.handoffs || []).concat(ho).slice(-200);
     store.save();
     if (body.key && telegram.keyOk(body.key)) {
@@ -192,30 +191,13 @@ async function route(req, res) {
     }
     return json(res, 201, { id: ho.id, task: handoffTask(ho) });
   }
-  const detailMatch = p.match(/^\/api\/handoffs\/(ho-[a-z0-9]+)\/details$/);
-  if (detailMatch && req.method === 'POST') {
-    const body = JSON.parse(await readBody(req) || '{}');
-    const ho = (store.db.handoffs || []).find(h => h.id === detailMatch[1]);
-    if (!ho) return json(res, 404, { error: 'Handoff not found.' });
-    if (ho.runId || ho.intake?.status !== 'needs_details' || body.revision !== ho.intake.revision)
-      return json(res, 409, { error: 'This details request is no longer current.' });
-    ho.intake.answers = { ...ho.intake.answers, ...intake.answers(body.details) };
-    ho.intake.status = 'reviewing';
-    ho.intake.revision++;
-    store.save();
-    if (body.key && telegram.keyOk(body.key)) {
-      try { await telegram.send(handoffTask(ho)); return json(res, 200, { id: ho.id, task: handoffTask(ho), sent: 'telegram', bot: telegram.BOT }); }
-      catch (e) { return json(res, 200, { id: ho.id, task: handoffTask(ho), sendError: e.message }); }
-    }
-    return json(res, 200, { id: ho.id, task: handoffTask(ho) });
-  }
   const hm = p.match(/^\/api\/handoffs\/(ho-[a-z0-9]+)$/);
   if (hm) {
     const ho = (store.db.handoffs || []).find(h => h.id === hm[1]);
     if (!ho) return json(res, 404, { error: 'not found' });
     const run = ho.runId && store.db.runs.find(r => r.id === ho.runId);
     // The task is included so the HireBuddy bridge on the person's own computer can paste it into WorkBuddy.
-    return json(res, 200, { id: ho.id, status: run ? run.status : 'waiting', runId: ho.runId, prompt: ho.prompt, resumeUrl: ho.resumeUrl, intake: ho.intake, labels: intake.FIELDS, task: handoffTask(ho) });
+    return json(res, 200, { id: ho.id, status: run ? run.status : 'waiting', runId: ho.runId, prompt: ho.prompt, task: handoffTask(ho) });
   }
   if (p === '/api/runs' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
