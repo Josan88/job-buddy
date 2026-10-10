@@ -92,6 +92,31 @@ From one sentence, HireBuddy:
 
 HireBuddy does not automatically book interviews, send interview invitations, or create interview reminders.
 
+## Verification checks
+
+HireBuddy shows the result as **X of Y checks passed**. The total changes with the type of request.
+
+Every job-seeker search checks that:
+
+1. The job seeker's profile was saved.
+2. The job search completed successfully.
+
+When WorkBuddy supplies jobs from JobStreet, Indeed, Hiredly, or Maukerja, HireBuddy also checks that:
+
+3. Every supplied job was checked.
+4. No recommended job is below the legal minimum wage, below the user's pay requirement, or requires sight.
+5. Every job worth asking about has an application draft containing its unanswered questions.
+6. Every draft asks about screen-reader support unless the listing already mentions it.
+7. Nothing was sent automatically to employers on other sites.
+
+For an employer request, HireBuddy checks that:
+
+1. The published job page is live and shows the correct title.
+2. The pay meets the legal minimum wage.
+3. Candidate scores were recalculated and every evidence quote matches the candidate's profile word for word.
+
+HireBuddy cannot finish a run unless its final verification passes.
+
 ## Accessibility
 
 - Full keyboard operation with clear focus indicators
