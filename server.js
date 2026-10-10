@@ -407,7 +407,7 @@ async function route(req, res) {
         <p id="job-detail-${i}">${esc(details)} Must have: ${esc(j.requirements.join(', '))}.${j.niceToHave?.length ? ` Nice to have: ${esc(j.niceToHave.join(', '))}.` : ''}${L.checkWage(j.pay, j.payUnit).ok ? '' : ' <span class="status-word bad">Below the legal minimum wage</span>'}</p>
         <p id="job-description-${i}">${esc(j.description)}</p>
         <p id="job-access-${i}">${esc(accessibility)}</p>
-        <p class="actions" id="job-action-${i}"><button type="button" tabindex="-1" data-apply-job="${esc(j.id)}">Send application</button> <a href="/jobs/${esc(j.id)}">Read full job details</a></p>
+        <p class="actions" id="job-action-${i}"><button type="button" data-apply-job="${esc(j.id)}" data-label="${esc(j.title)} at ${esc(j.business)}">Send application</button> <a href="/jobs/${esc(j.id)}">Read full job details</a></p>
       </li>`;
     }).join('');
     return html(res, 200, page('Open jobs', `<h1>Open jobs (${open.length})</h1><p id="job-help">Press Tab to move through the jobs. Each card is read in full. Press Enter to send an application. <a href="/about#demo-data">Employers here are fictional demo data.</a></p><p id="apply-msg" class="panel" role="status" tabindex="-1" hidden></p><ul class="joblist">${list}</ul>`, { current: '/jobs', scripts: '<script src="/jobs.js"></script>' }));

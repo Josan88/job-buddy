@@ -25,10 +25,18 @@ async function apply(button) {
 
 cards.forEach(card => {
   const button = card.querySelector('[data-apply-job]');
+  card.addEventListener('focus', () => window.HB.readFocus(`${card.innerText} Press Enter to send this application.`));
+  button.addEventListener('focus', () => window.HB.readFocus(`${button.dataset.label}. Send application button. Press Enter to send.`));
   button.addEventListener('click', () => apply(button));
   card.addEventListener('keydown', event => {
     if (event.key !== 'Enter' || event.target !== card) return;
     event.preventDefault();
     button.click();
   });
+});
+
+window.addEventListener('load', () => {
+  const title = document.querySelector('main h1')?.textContent || 'Open jobs';
+  const help = document.getElementById('job-help')?.textContent || 'Press Tab to move through the jobs.';
+  window.HB.readFocus(`${title}. ${help}`);
 });

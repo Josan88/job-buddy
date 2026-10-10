@@ -95,7 +95,7 @@ async function showStudent(me, focus) {
       <h3 id="job-title-${i}"><a tabindex="-1" href="${esc(j.url)}">${esc(j.title)}</a></h3>
       <p id="job-detail-${i}">${esc(j.business)}, ${esc(j.workMode)}. ${esc(j.pay)}. ${esc(j.schedule)}. Match ${j.score} out of 100.</p>
       ${j.access ? `<p id="job-access-${i}">${j.access.fit === 'good' ? 'Suits you' : 'Ask first'}: ${esc([...j.access.reasons, ...j.access.asks].join('; '))}.</p>` : `<span id="job-access-${i}" class="sr-only">No additional access details.</span>`}
-      <p class="actions" id="job-action-${i}"><button type="button" tabindex="-1" data-apply-job="${esc(j.jobId)}" data-label="${esc(j.title)} at ${esc(j.business)}">Send application</button> <a href="${esc(j.url)}">Read full job details</a></p>
+      <p class="actions" id="job-action-${i}"><button type="button" data-apply-job="${esc(j.jobId)}" data-label="${esc(j.title)} at ${esc(j.business)}">Send application</button> <a href="${esc(j.url)}">Read full job details</a></p>
     </li>`).join('') || (d.mine.length ? '<li>None left. HireBuddy has already applied to every job that suits you.</li>' : '<li>None right now.</li>')}</ul>
     ${notFor.length ? `<details><summary>Other jobs, and why they don't suit you (${notFor.length})</summary><ul>${notFor.map(j => `<li>${esc(j.title)} at ${esc(j.business)}: ${esc(j.whyNot)}.</li>`).join('')}</ul></details>` : ''}`;
   bind(me);
@@ -169,6 +169,7 @@ function bind(me) {
     }
   });
   document.querySelectorAll('[data-job-card]').forEach(card => {
+    card.addEventListener('focus', () => window.HB.readFocus(`${card.innerText} Press Enter to send this application.`));
     card.addEventListener('keydown', e => {
       if (e.key !== 'Enter' || e.target !== card) return;
       e.preventDefault();
@@ -186,6 +187,9 @@ function bind(me) {
     announce(msg.textContent);
     if (!r.ok) b.disabled = false;
   });
+  document.querySelectorAll('[data-apply-job]').forEach(b => b.addEventListener('focus', () => {
+    window.HB.readFocus(`${b.dataset.label}. Send application button. Press Enter to send.`);
+  }));
 }
 
 async function showOwner(me, focus) {

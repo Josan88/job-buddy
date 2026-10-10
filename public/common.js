@@ -34,6 +34,14 @@ window.HB = {
     speechSynthesis.speak(u);
     if (button) button.textContent = 'Stop reading';
   },
+  // Read newly focused controls for people using the site's built-in speech rather than a screen reader.
+  readFocus(text) {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(String(text || '').replace(/\s+/g, ' ').trim());
+    u.lang = 'en-GB'; u.rate = 1;
+    speechSynthesis.speak(u);
+  },
   // Listen until the person presses Enter (or the button again). Escape cancels. Calls done(text), with ''
   // when nothing was heard or it was cancelled. Returns a stop function, or null without speech recognition.
   listen(lang, done) {
