@@ -234,7 +234,7 @@ document.addEventListener('focusin', event => {
   if (!event.target.matches?.('#prompt')) return;
   const label = document.querySelector('label[for="prompt"]')?.textContent.trim() || 'Introduce yourself';
   const content = event.target.value.trim();
-  window.HB.readControl(`${label}. Text area. ${content ? `Current content: ${content}. ` : 'It is empty. '}Type your introduction. Press Enter to send it. Press Shift plus Enter to add another line.`);
+  window.HB.readControl(`${label}. Text area. ${content ? `Current content: ${content}. ` : 'It is empty. '}Type more introduction. Press Enter to send it. Press Shift plus Enter to add another line.`);
 });
 
 // This heading is deliberately in the Tab order between the WorkBuddy button and

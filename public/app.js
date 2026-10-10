@@ -105,7 +105,7 @@ function setPersona(p) {
   $('#ideas').querySelectorAll('button').forEach(b => b.onclick = () => {
     window.HB.readControl(`${b.textContent.trim()}. Idea for what to write. Your introduction was not changed.`);
   });
-  $('#examples').innerHTML = EXAMPLES[p].map((e, i) => `<li><button type="button" data-i="${i}"><span><b>Use this example:</b> ${esc(e)}</span></button></li>`).join('');
+  $('#examples').innerHTML = EXAMPLES[p].map((e, i) => `<li><button type="button" data-i="${i}"><span><b>Example ${i + 1}:</b> ${esc(e)}</span></button></li>`).join('');
   $('#examples').querySelectorAll('button').forEach(b => b.onclick = () => {
     $('#prompt').value = EXAMPLES[p][b.dataset.i];
     $('#prompt').focus();
