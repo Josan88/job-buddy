@@ -111,6 +111,10 @@ $('#handoff').onclick = async () => {
     return $('#prompt').focus();
   }
   err.hidden = true;
+  // One hand-off at a time: a second press (or a stray Enter) while this one is under way does nothing.
+  if ($('#handoff').getAttribute('aria-disabled') === 'true') return;
+  $('#handoff').setAttribute('aria-disabled', 'true');
+  setTimeout(() => $('#handoff').removeAttribute('aria-disabled'), 15000);
   const h = await fetch('/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }) }).then(r => r.json());
   $('#handoff-task').value = h.task;
   // Copy straight away, in the same key press: a screen reader user shouldn't have to find a second button.

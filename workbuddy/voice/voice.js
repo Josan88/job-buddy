@@ -124,22 +124,42 @@ const askTyped = prompt => ps(`Add-Type -AssemblyName Microsoft.VisualBasic; [Mi
 
 // Bring WorkBuddy to the front and paste the task into it, the way the person would.
 function sendToWorkBuddy(task) {
+  // Keys are pressed only once WorkBuddy is confirmed as the window in front, so Ctrl+V and Enter
+  // can never land in another app (for example the browser, where Enter would press a button again).
   const r = ps(`
 Add-Type -AssemblyName System.Windows.Forms
+Add-Type @"
+using System; using System.Runtime.InteropServices;
+public static class HBWin {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] public static extern void keybd_event(byte k, byte s, uint f, UIntPtr e);
+}
+"@
 Set-Clipboard -Value $env:HB_TASK
-$w = New-Object -ComObject WScript.Shell
-$p = Get-Process | Where-Object { $_.MainWindowTitle -like ('*' + $env:HB_TITLE + '*') -or $_.ProcessName -like ('*' + $env:HB_TITLE + '*') } | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+$p = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and ($_.MainWindowTitle -like ('*' + $env:HB_TITLE + '*') -or $_.ProcessName -like ('*' + $env:HB_TITLE + '*')) } | Select-Object -First 1
 if ($p -eq $null) { Write-Output 'notfound'; exit }
-$ok = $w.AppActivate($p.Id)
-if (-not $ok) { $ok = $w.AppActivate($p.MainWindowTitle) }
-if (-not $ok) { Write-Output 'nofocus'; exit }
-Start-Sleep -Milliseconds 800
+$h = $p.MainWindowHandle
+for ($i = 0; $i -lt 5 -and [HBWin]::GetForegroundWindow() -ne $h; $i++) {
+  if ([HBWin]::IsIconic($h)) { [void][HBWin]::ShowWindow($h, 9) }
+  # A tap of Alt lets this app hand the foreground to WorkBuddy (Windows blocks it otherwise).
+  [HBWin]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [HBWin]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+  [void][HBWin]::SetForegroundWindow($h)
+  Start-Sleep -Milliseconds 300
+}
+if ([HBWin]::GetForegroundWindow() -ne $h) { Write-Output 'nofocus'; exit }
+Start-Sleep -Milliseconds 500
 if ($env:HB_NEWTASK) { [System.Windows.Forms.SendKeys]::SendWait($env:HB_NEWTASK); Start-Sleep -Milliseconds 800 }
+if ([HBWin]::GetForegroundWindow() -ne $h) { Write-Output 'nofocus'; exit }
 [System.Windows.Forms.SendKeys]::SendWait('^v')
 Start-Sleep -Milliseconds 400
+if ([HBWin]::GetForegroundWindow() -ne $h) { Write-Output 'nofocus'; exit }
 [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
 Write-Output 'sent'`, { HB_TASK: task, HB_TITLE: TITLE, HB_NEWTASK: NEW_TASK_KEYS });
-  return r.stdout || 'sent';
+  if (process.platform !== 'win32') return 'sent';
+  return ['sent', 'notfound', 'nofocus'].includes(r.stdout) ? r.stdout : 'nofocus';
 }
 
 function install() {
