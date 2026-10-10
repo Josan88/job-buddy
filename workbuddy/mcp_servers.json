@@ -3,11 +3,11 @@
     "hirebuddy": {
       "command": "node",
       "args": ["/ABSOLUTE/PATH/TO/hirebuddy/workbuddy/hirebuddy-mcp.js"],
-      "env": { "HIREBUDDY_URL": "https://hirebuddy.onrender.com" }
+      "env": { "HIREBUDDY_URL": "https://hirebuddy-k543.onrender.com" }
     },
     "hirebuddy-http": {
       "type": "streamable-http",
-      "url": "https://hirebuddy.onrender.com/mcp"
+      "url": "https://hirebuddy-k543.onrender.com/mcp"
     }
   }
 }

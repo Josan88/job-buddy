@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Run the HireBuddy agent from one prompt and print the verified result.
 // Usage: node hirebuddy.js "Need a weekend barista in Subang, RM12/hr, start next week"
-const BASE = (process.env.HIREBUDDY_URL || 'https://hirebuddy.onrender.com').replace(/\/$/, '');
+const BASE = (process.env.HIREBUDDY_URL || 'https://hirebuddy-k543.onrender.com').replace(/\/$/, '');
 const prompt = process.argv.slice(2).join(' ').trim();
 if (!prompt) { console.error('Usage: node hirebuddy.js "<your request>"'); process.exit(1); }
 

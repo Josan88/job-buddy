@@ -34,6 +34,8 @@ The agent builds her profile and ranks the open gigs. It **skips jobs that pay b
 
 ## Try it
 
+**Live app: https://hirebuddy-k543.onrender.com** (free tier, so the first load after idle can take about a minute)
+
 - **Web app:** type a prompt on the home page, or click an example, and watch the plan, tool calls, self-fixes and checks stream in live.
 - **From WorkBuddy:** see [WorkBuddy setup](#workbuddy-setup).
 - **From a terminal:** `node workbuddy/hirebuddy-skill/scripts/hirebuddy.js "Need a weekend barista in Subang, RM12/hr"`
@@ -92,13 +94,13 @@ WorkBuddy is Tencent's desktop AI agent. HireBuddy plugs into it in two ways:
     "hirebuddy": {
       "command": "node",
       "args": ["/path/to/hirebuddy/workbuddy/hirebuddy-mcp.js"],
-      "env": { "HIREBUDDY_URL": "https://<your-app>.onrender.com" }
+      "env": { "HIREBUDDY_URL": "https://hirebuddy-k543.onrender.com" }
     }
   }
 }
 ```
 
-`hirebuddy-mcp.js` is a zero-dependency stdio-to-HTTP bridge. Clients that support remote MCP can point straight at `https://<your-app>.onrender.com/mcp`. Restart WorkBuddy, then type the one prompt. WorkBuddy calls `hirebuddy_run` and shows the verified result, the self-checks and the links.
+`hirebuddy-mcp.js` is a zero-dependency stdio-to-HTTP bridge. Clients that support remote MCP can point straight at `https://hirebuddy-k543.onrender.com/mcp`. Restart WorkBuddy, then type the one prompt. WorkBuddy calls `hirebuddy_run` and shows the verified result, the self-checks and the links.
 
 **B. Skill.** Import `workbuddy/hirebuddy-skill/` (which contains `SKILL.md`, `skill.yaml` and `scripts/hirebuddy.js`) through WorkBuddy's Skills panel. The skill tells WorkBuddy when to use HireBuddy, how to call it (MCP, or the script as a fallback), and what to report back.
 
