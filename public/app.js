@@ -38,7 +38,7 @@ function setPersona(p) {
   $('#examples').querySelectorAll('button').forEach(b => b.onclick = () => {
     $('#prompt').value = EXAMPLES[p][b.dataset.i];
     $('#prompt').focus();
-    announce('Example copied into your sentence. Press Find me work to start.');
+    announce('Example added. Press Enter to start, or press Alt V and say Find me work.');
   });
 }
 
@@ -86,6 +86,9 @@ $('#ask').onsubmit = async e => {
   history.pushState({}, '', `/runs/${r.id}`);
   openRun(r.id, true);
 };
+
+// Enter starts, like a search box. Shift+Enter adds a new line.
+$('#prompt').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('#ask').requestSubmit(); } });
 
 // Hand the sentence to WorkBuddy: make a task to paste, then follow the run here once WorkBuddy starts it.
 $('#handoff').onclick = async () => {
