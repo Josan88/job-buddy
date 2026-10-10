@@ -41,8 +41,26 @@ function ps(script, env = {}) {
 
 const speak = text => {
   log('SAY:', text);
-  ps(`Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Rate = 1; $s.Speak($env:HB_TEXT)`, { HB_TEXT: text });
+  const r = ps(SPEAK_PS, { HB_TEXT: text });
+  if (r.stdout && r.stdout !== 'ok') log('speech:', r.stdout);
 };
+// Speak on the default audio device with an enabled voice. If .NET speech fails, use the Windows SAPI voice directly.
+const SPEAK_PS = `
+try {
+  Add-Type -AssemblyName System.Speech
+  $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
+  $v = $s.GetInstalledVoices() | Where-Object { $_.Enabled } | Select-Object -First 1
+  if ($v -eq $null) { throw 'no enabled voice' }
+  $s.SelectVoice($v.VoiceInfo.Name)
+  $s.SetOutputToDefaultAudioDevice()
+  $s.Volume = 100; $s.Rate = 1
+  $s.Speak($env:HB_TEXT)
+  Write-Output 'ok'
+} catch {
+  $first = $_.Exception.Message
+  try { $c = New-Object -ComObject SAPI.SpVoice; $c.Volume = 100; [void]$c.Speak($env:HB_TEXT); Write-Output ('used SAPI because: ' + $first) }
+  catch { Write-Output ('NO SPEECH: ' + $first + ' / SAPI: ' + $_.Exception.Message) }
+}`;
 
 // Windows speech recognition, phrase by phrase, until about three seconds of silence.
 function listen() {
@@ -90,6 +108,8 @@ $o += 'workbuddy window: ' + $(if ($p) { $p.ProcessName + ' / ' + $p.MainWindowT
 $o += 'windows with titles: ' + ((Get-Process | Where-Object { $_.MainWindowTitle } | ForEach-Object { $_.ProcessName + '=' + $_.MainWindowTitle }) -join '; ')
 $lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'HireBuddy Voice.lnk'
 $o += 'shortcut: ' + $(if (Test-Path $lnk) { (New-Object -ComObject WScript.Shell).CreateShortcut($lnk).Hotkey } else { 'NOT INSTALLED' })
+try { $c = New-Object -ComObject SAPI.SpVoice; $o += 'SAPI voice: ' + $c.Voice.GetDescription() + ', volume ' + $c.Volume } catch { $o += 'SAPI voice: ERROR ' + $_.Exception.Message }
+try { $o += 'sound devices: ' + ((Get-CimInstance Win32_SoundDevice | ForEach-Object { $_.Name + ' (' + $_.Status + ')' }) -join '; ') } catch {}
 $o -join [Environment]::NewLine`, { HB_TITLE: TITLE });
   log(r.stdout || '(no output from PowerShell)');
   return r.stdout;
