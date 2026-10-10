@@ -11,8 +11,8 @@ function S(type, properties, required = []) {
 }
 const scheduleSchema = {
   type: 'object',
-  description: 'Weekly hours, e.g. {"Sat":["08:00-14:00"],"Sun":["08:00-14:00"]}. Day keys: Mon Tue Wed Thu Fri Sat Sun. 24h times.',
-  additionalProperties: { type: 'array', items: { type: 'string' } },
+  description: 'Weekly hours as 24h ranges, e.g. {"Sat":["08:00-14:00"],"Sun":["08:00-14:00"]}. Leave out days with no hours.',
+  properties: Object.fromEntries(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => [d, { type: 'array', items: { type: 'string' } }])),
 };
 
 function jobUrl(ctx, id) { return `${ctx.baseUrl}/jobs/${id}`; }
@@ -158,7 +158,7 @@ tools.schedule_interviews = {
   parameters: S('object', {
     jobId: { type: 'string' }, candidateIds: { type: 'array', items: { type: 'string' } },
     durationMinutes: { type: 'number' }, ownerHours: scheduleSchema,
-    mode: { type: 'string', description: 'e.g. "In person at the cafe" or "Google Meet"' },
+    mode: { type: 'string', description: 'Optional. Default is a video call with a unique Jitsi Meet link. Use e.g. "In person at the cafe" to override.' },
   }, ['jobId', 'candidateIds']),
   run: async ({ jobId, candidateIds, durationMinutes = 20, ownerHours, mode }, ctx) => {
     const job = store.db.jobs.find(j => j.id === jobId);
@@ -190,10 +190,13 @@ tools.schedule_interviews = {
       const iv = {
         id: store.id('iv'), jobId, studentId: s.id, name: s.name, email: s.email,
         start: new Date(found[0]).toISOString(), end: new Date(found[1]).toISOString(),
-        when: L.fmtMyt(new Date(found[0])), mode: mode || `In person at ${job.business}, ${job.area}`, runId: ctx.run.id,
+        when: L.fmtMyt(new Date(found[0])), runId: ctx.run.id,
       };
+      // Each interview gets its own video room, so the invite works with no extra setup.
+      iv.meetUrl = mode && !/video|jitsi|online|call/i.test(mode) ? null : `https://meet.jit.si/HireBuddy-${iv.id.replace(/^iv-/, '')}`;
+      iv.mode = iv.meetUrl ? 'Video call (Jitsi Meet)' : mode;
       store.db.interviews.push(iv);
-      out.push({ interviewId: iv.id, candidateId: s.id, name: s.name, email: s.email, when: iv.when, start: iv.start, icsUrl: `${ctx.baseUrl}/ics/${iv.id}.ics` });
+      out.push({ interviewId: iv.id, candidateId: s.id, name: s.name, email: s.email, when: iv.when, start: iv.start, meetUrl: iv.meetUrl, icsUrl: `${ctx.baseUrl}/ics/${iv.id}.ics` });
     }
     store.save();
     ctx.run.interviews = (ctx.run.interviews || []).concat(out.map(o => o.interviewId));
@@ -218,6 +221,7 @@ tools.send_email = {
       if (!a.body.includes(iv.when)) problems.push(`Body must state the interview time exactly as "${iv.when}" (Malaysia time).`);
       const url = jobUrl(ctx, iv.jobId);
       if (!a.body.includes(url)) problems.push(`Body must include the job link ${url}.`);
+      if (iv.meetUrl && !a.body.includes(iv.meetUrl)) problems.push(`Body must include the video call link ${iv.meetUrl}.`);
       if (problems.length) return { ok: false, problems };
     }
     const email = {
@@ -263,11 +267,12 @@ tools.verify_hiring_outcome = {
 
       const icsRes = await fetch(`${ctx.baseUrl}/ics/${iv.id}.ics`).then(r => r.text()).catch(() => '');
       const parsed = icsRes ? L.parseIcs(icsRes) : {};
-      add(`${iv.name}'s calendar invite downloads and matches`, parsed.start && parsed.start.toISOString() === iv.start && parsed.attendee === iv.email,
-        parsed.start ? `DTSTART ${parsed.start.toISOString()}` : 'could not fetch .ics');
+      add(`${iv.name}'s calendar invite downloads and matches`,
+        parsed.method === 'REQUEST' && parsed.start && parsed.start.toISOString() === iv.start && parsed.attendee === iv.email && (!iv.meetUrl || parsed.url === iv.meetUrl),
+        parsed.start ? `Invitation (Accept/Decline), DTSTART ${parsed.start.toISOString()}${iv.meetUrl ? `, call ${iv.meetUrl}` : ''}` : 'could not fetch .ics');
 
       const em = store.db.emails.find(e => e.interviewId === iv.id);
-      add(`${iv.name} was emailed the right time and link`, em && em.body.includes(iv.when) && em.body.includes(jobUrl(ctx, jobId)),
+      add(`${iv.name} was emailed the right time and links`, em && em.body.includes(iv.when) && em.body.includes(jobUrl(ctx, jobId)) && (!iv.meetUrl || em.body.includes(iv.meetUrl)),
         em ? `${em.delivery?.channel}: "${em.subject}"` : 'no invite email found');
     }
     const pass = checks.every(c => c.pass);

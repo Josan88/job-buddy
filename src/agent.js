@@ -131,8 +131,9 @@ async function autopilotHirer(ctx) {
     const cand = screened.details.find(d => d.id === iv.candidateId);
     const body = `Hi ${iv.name.split(' ')[0]},\n\nThanks for your interest in the ${spec.title} role at ${spec.business}. `
       + `You scored ${cand.score}/100 on our screening (${cand.why}).\n\n`
-      + `Your interview: ${iv.when} (Malaysia time), 20 minutes, in person in ${spec.area}.\n`
-      + `The calendar invite is attached. Job details: ${jobUrl(ctx, jobId)}\n\nReply to this email if the time doesn't work.\n\n${spec.business}`;
+      + `Your interview: ${iv.when} (Malaysia time), 20 minutes, by video call.\n`
+      + `Join the video call: ${iv.meetUrl}\n\n`
+      + `The calendar invitation is attached. Press Accept to add it to your calendar.\nJob details: ${jobUrl(ctx, jobId)}\n\nReply to this email if the time doesn't work.\n\n${spec.business}`;
     await callTool(ctx, 'send_email', { to: iv.email || store.db.students.find(s => s.id === iv.candidateId).email,
       subject: `Interview for ${spec.title}: ${iv.when}`, body, interviewId: iv.interviewId, kind: 'interview_invite' });
   }
@@ -198,11 +199,19 @@ Weekly schedules use day keys Mon Tue Wed Thu Fri Sat Sun with 24h ranges, e.g. 
   if (persona === 'student') return `${common}
 User: a university student looking for part-time gigs. Steps: register_student (bio built only from what they said), search_jobs, check pay legality, apply_to_job to up to 3 legal jobs scoring >= ${MINIMUM_MATCH} with requiredCoverage >= 0.5 (write a personal cover note naming the job and a real skill), verify_applications, finish.`;
   return `${common}
-User: a small-business owner hiring part-timers. Steps: check_minimum_wage (if illegal, explain and finish without publishing), publish_job (write an attractive ad that states pay and area; infer must-have skills), find_candidates, screen_candidates on all of them, verify_screening, pick a shortlist of the top 3 (or 2x the hires requested) with score >= ${MINIMUM_MATCH} and requiredCoverage >= 0.5, schedule_interviews, send_email an invite to each (pass interviewId; body must contain the exact "when" text and the job link), email the owner a summary if they gave an email, verify_hiring_outcome, finish.`;
+User: a small-business owner hiring part-timers. Steps: check_minimum_wage (if illegal, explain and finish without publishing), publish_job (write an attractive ad that states pay and area; infer must-have skills), find_candidates, screen_candidates on all of them, verify_screening, pick a shortlist of the top 3 (or 2x the hires requested) with score >= ${MINIMUM_MATCH} and requiredCoverage >= 0.5, schedule_interviews, send_email an invite to each (pass interviewId; body must contain the exact "when" text, the meetUrl video link and the job link), email the owner a summary if they gave an email, verify_hiring_outcome, finish.`;
+}
+
+// Some OpenAI-compatible endpoints (e.g. Google Gemini) reject additionalProperties in schemas.
+function stripExtras(schema) {
+  if (Array.isArray(schema)) return schema.map(stripExtras);
+  if (!schema || typeof schema !== 'object') return schema;
+  return Object.fromEntries(Object.entries(schema).filter(([k]) => k !== 'additionalProperties').map(([k, v]) => [k, stripExtras(v)]));
 }
 
 function toOpenAiTools(names) {
-  return names.map(n => ({ type: 'function', function: { name: n, description: tools[n].description, parameters: tools[n].parameters } }));
+  const clean = /googleapis|gemini/i.test(llm.BASE);
+  return names.map(n => ({ type: 'function', function: { name: n, description: tools[n].description, parameters: clean ? stripExtras(tools[n].parameters) : tools[n].parameters } }));
 }
 
 async function llmLoop(ctx) {

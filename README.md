@@ -14,7 +14,7 @@ From that one line, with no further guidance, HireBuddy:
 4. **Finds candidates** in the student talent pool by distance, plus anyone who applied on the page.
 5. **Screens and ranks** every candidate out of 100. Every skill point quotes the candidate's own words.
 6. **Self-checks the ranking.** It recomputes each score independently and confirms every quote appears word for word, so no qualification is invented.
-7. **Books interviews** that fit both the owner's hours and each candidate's free time, with no clashes, and creates a real `.ics` calendar invite for each.
+7. **Books interviews** that fit both the owner's hours and each candidate's free time, with no clashes. Each interview gets its own Jitsi Meet video room and a real calendar invitation that shows Accept / Decline in Gmail or Outlook.
 8. **Emails each candidate** their time, the job link and the invite.
 9. **Verifies the whole outcome.** It checks the page is live and the pay is legal. It checks every slot sits inside the candidate's availability with no overlaps, downloads every `.ics` and compares its times with the booking, and confirms every email carries the right time and link.
 10. **Delivers** a summary with links. It is **not allowed to finish** until the final verification passes.
@@ -72,7 +72,8 @@ Environment variables (all optional):
 | Var | Purpose |
 |---|---|
 | `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Any OpenAI-compatible chat API. Default base `https://api.openai.com/v1`, model `gpt-4o-mini` |
-| `RESEND_API_KEY`, `MAIL_FROM` | Send real emails to real addresses. `example.com` demo addresses always stay in the outbox |
+| `BREVO_API_KEY`, `DEMO_INBOX` | Send real email through Brevo's free plan. Real mail **only** goes to inboxes you control: demo candidates are delivered to `DEMO_INBOX` with a +tag (`you+aina@gmail.com`), and anything else stays in the outbox. `MAIL_ALLOW` adds more addresses. `MAIL_FROM` defaults to `DEMO_INBOX` |
+| `RESEND_API_KEY` | Alternative provider (without your own domain it only reaches your signup email) |
 | `PUBLIC_URL` | Public base URL (auto-detected on Render) |
 | `RESET_TOKEN` | Protects `POST /api/reset?token=…` |
 | `DATA_DIR` | Where `db.json` lives |

@@ -165,7 +165,7 @@ async function route(req, res) {
       return {
         jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`, url: `${base}/jobs/${j.id}`,
         status, applied: !!app, appliedAt: app?.at || null, score: app?.score ?? L.scoreMatch(j, s).total,
-        interview: iv ? { when: iv.when, mode: iv.mode, ics: `${base}/ics/${iv.id}.ics` } : null,
+        interview: iv ? { when: iv.when, mode: iv.mode, meetUrl: iv.meetUrl || null, ics: `${base}/ics/${iv.id}.ics` } : null,
         updatedAt: iv ? (store.db.emails.find(e => e.interviewId === iv.id)?.at || iv.start) : app?.at,
       };
     }).filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
@@ -204,11 +204,7 @@ async function route(req, res) {
     const iv = store.db.interviews.find(i => i.id === m[1]);
     if (!iv) return json(res, 404, { error: 'not found' });
     const j = store.db.jobs.find(x => x.id === iv.jobId);
-    const body = L.makeIcs({
-      uid: iv.id, start: new Date(iv.start), end: new Date(iv.end),
-      summary: `Interview: ${j.title} (${j.business})`, description: `Interview with ${iv.name}. Job: ${base}/jobs/${j.id}`,
-      location: iv.mode, organizer: j.ownerEmail || undefined, attendee: iv.email,
-    });
+    const body = L.interviewIcs(iv, j, base);
     res.writeHead(200, { 'content-type': 'text/calendar; charset=utf-8', 'content-disposition': `attachment; filename="interview-${iv.id}.ics"` });
     return res.end(body);
   }

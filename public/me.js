@@ -47,7 +47,7 @@ async function showStudent(me) {
       const [label, cls] = STATUS[a.status];
       return `<article class="card app ${a.status}"><div class="app-top"><div><b><a href="${esc(a.url)}">${esc(a.title)}</a></b><div class="muted small">${esc(a.business)} · ${esc(a.area)} · ${esc(a.pay)}</div></div>
         <span class="badge ${cls}">${label}</span></div>
-        ${a.interview ? `<p class="when">${esc(a.interview.when)} · ${esc(a.interview.mode)}</p><a href="${esc(a.interview.ics)}">Add to calendar</a>` : ''}
+        ${a.interview ? `<p class="when">${esc(a.interview.when)} · ${esc(a.interview.mode)}</p>${a.interview.meetUrl ? `<a class="btn" href="${esc(a.interview.meetUrl)}" target="_blank">Join video call</a> ` : ''}<a href="${esc(a.interview.ics)}">Add to calendar</a>` : ''}
         ${!a.applied && a.interview ? '<p class="muted small">The business found you in the talent pool and invited you.</p>' : ''}</article>`;
     }).join('') : '<p class="muted">No applications yet.</p>'}
     <h2>Open jobs for you</h2><p class="muted small"><a href="/about#demo-data">Demo data, modelled on real listings</a></p>

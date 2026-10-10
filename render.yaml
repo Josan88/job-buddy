@@ -15,7 +15,9 @@ services:
         value: https://api.openai.com/v1
       - key: LLM_MODEL
         value: gpt-4o-mini
-      - key: RESEND_API_KEY
+      - key: BREVO_API_KEY
+        sync: false
+      - key: DEMO_INBOX
         sync: false
       - key: RESET_TOKEN
         generateValue: true

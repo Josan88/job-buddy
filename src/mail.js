@@ -1,39 +1,88 @@
-// Email delivery. Real sends go through Resend (https://resend.com) when RESEND_API_KEY is set
-// and the recipient is a real address. Demo addresses (example.com) stay in the public outbox.
+// Email delivery with a safety rule: real email only ever goes to an inbox the demo owner controls.
+//
+// DEMO_INBOX=you@gmail.com  -> every demo address (aina.rahman@example.com ...) is delivered to
+//                              you+aina@gmail.com, so each candidate's invite lands in your inbox.
+// Real addresses are delivered only if they are DEMO_INBOX itself, a +tag of it, or listed in
+// MAIL_ALLOW (comma separated). Everything else stays in the public outbox page.
+//
+// Providers (first one configured wins):
+//   BREVO_API_KEY  - brevo.com free plan, sends to any address after you verify your sender email.
+//   RESEND_API_KEY - resend.com; without your own domain it only delivers to your signup email.
 const store = require('./store');
 const L = require('./lib');
 
-async function deliver(email, interview) {
-  const key = process.env.RESEND_API_KEY;
-  const demo = /@([a-z0-9-]+\.)*example\.com$/i.test(email.to);
-  if (!key || demo) {
-    return { channel: 'demo outbox', delivered: true, reason: demo ? 'demo address' : 'email not configured' };
+const FROM = () => process.env.MAIL_FROM || process.env.DEMO_INBOX || '';
+const FROM_NAME = () => process.env.MAIL_FROM_NAME || 'HireBuddy';
+
+function split(addr) {
+  const [local, domain] = String(addr || '').toLowerCase().split('@');
+  return { base: (local || '').split('+')[0], local, domain };
+}
+
+// Where (if anywhere) this email may really be delivered.
+function route(to) {
+  const inbox = process.env.DEMO_INBOX;
+  if (!inbox) return null;
+  const me = split(inbox);
+  const t = split(to);
+  if (/(^|\.)example\.com$/.test(t.domain)) {
+    const tag = t.local.replace(/[^a-z0-9]+/g, '.').split('.')[0] || 'demo';
+    return `${me.base}+${tag}@${me.domain}`;
   }
-  const payload = {
-    from: process.env.MAIL_FROM || 'HireBuddy <onboarding@resend.dev>',
-    to: [email.to], subject: email.subject, text: email.body,
+  if (t.domain === me.domain && t.base === me.base) return to;
+  const allow = (process.env.MAIL_ALLOW || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+  return allow.includes(String(to).toLowerCase()) ? to : null;
+}
+
+function mask(addr) {
+  const { local, domain } = split(addr);
+  return `${local.slice(0, 1)}***${local.includes('+') ? '+' + local.split('+')[1] : ''}@${domain}`;
+}
+
+async function sendBrevo({ to, subject, text, ics }) {
+  const body = {
+    sender: { email: FROM(), name: FROM_NAME() },
+    to: [{ email: to }], subject, textContent: text,
   };
+  if (ics) body.attachment = [{ name: 'invite.ics', content: Buffer.from(ics).toString('base64') }];
+  const r = await fetch(process.env.BREVO_API_URL || 'https://api.brevo.com/v3/smtp/email', {
+    method: 'POST', headers: { 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.message || `Brevo ${r.status}`);
+  return { provider: 'Brevo', providerId: data.messageId };
+}
+
+async function sendResend({ to, subject, text, ics }) {
+  const body = { from: `${FROM_NAME()} <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`, to: [to], subject, text };
+  if (ics) body.attachments = [{ filename: 'invite.ics', content: Buffer.from(ics).toString('base64'), content_type: 'text/calendar; method=REQUEST' }];
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST', headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'content-type': 'application/json' },
+    body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.message || `Resend ${r.status}`);
+  return { provider: 'Resend', providerId: data.id };
+}
+
+async function deliver(email, interview) {
+  const provider = process.env.BREVO_API_KEY ? sendBrevo : process.env.RESEND_API_KEY ? sendResend : null;
+  const target = route(email.to);
+  if (!provider) return { channel: 'demo outbox', delivered: true, reason: 'email not configured' };
+  if (!target) return { channel: 'demo outbox', delivered: true, reason: 'not an inbox the demo owner controls' };
+  let ics = null;
   if (interview) {
-    const s = store.db.students.find(x => x.id === interview.studentId);
-    const j = store.db.jobs.find(x => x.id === interview.jobId);
-    const ics = L.makeIcs({
-      uid: interview.id, start: new Date(interview.start), end: new Date(interview.end),
-      summary: `Interview: ${j.title} (${j.business})`, description: `Interview with ${s.name}`,
-      location: interview.mode, attendee: interview.email,
-    });
-    payload.attachments = [{ filename: 'interview.ics', content: Buffer.from(ics).toString('base64') }];
+    const job = store.db.jobs.find(x => x.id === interview.jobId);
+    // Organizer stays the business (not your own inbox) so Gmail shows Accept / Decline to you.
+    ics = L.interviewIcs(interview, job, process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '', { attendee: target });
   }
   try {
-    const r = await fetch('https://api.resend.com/emails', {
-      method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) return { channel: 'demo outbox', delivered: true, reason: `real send failed: ${data.message || r.status}` };
-    return { channel: 'email (Resend)', delivered: true, providerId: data.id };
+    const res = await provider({ to: target, subject: email.subject, text: email.body, ics });
+    return { channel: `real email (${res.provider})`, delivered: true, to: mask(target), providerId: res.providerId };
   } catch (e) {
     return { channel: 'demo outbox', delivered: true, reason: `real send failed: ${e.message}` };
   }
 }
 
-module.exports = { deliver };
+module.exports = { deliver, route };
