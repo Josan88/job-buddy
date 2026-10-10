@@ -12,7 +12,7 @@ rl.on('line', async line => {
   let msg;
   try { msg = JSON.parse(line); } catch { return; }
   try {
-    const r = await fetch(`${BASE}/mcp`, {
+    const r = await fetch(`${BASE}/mcp${process.env.HIREBUDDY_MCP_TOOLS === 'all' ? '?tools=all' : ''}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(session ? { 'mcp-session-id': session } : {}) },
       body: JSON.stringify(msg),

@@ -22,11 +22,12 @@ function detectPersona(prompt) {
   return student > hirer ? 'student' : 'hirer';
 }
 
-function newRun(prompt, persona, source = 'web') {
+function newRun(prompt, persona, source = 'web', options = {}) {
   const run = {
     id: store.id('run'), prompt, persona: persona || detectPersona(prompt), source,
     mode: llm.enabled() ? `LLM (${llm.MODEL})` : 'Autopilot (rule-based planner)',
     status: 'running', createdAt: new Date().toISOString(), plan: [], events: [], summary: null, verified: null,
+    options: Object.fromEntries(Object.entries(options).filter(([, v]) => v)),
   };
   store.db.runs.push(run);
   store.save();
@@ -80,7 +81,7 @@ const say = (ctx, text) => ctx.emit({ type: 'thought', text });
 // Autopilot: deterministic planner that drives the same tools.
 
 async function autopilotHirer(ctx) {
-  const spec = parse.hirer(ctx.run.prompt);
+  const spec = { ...parse.hirer(ctx.run.prompt), ...(ctx.run.options || {}) };
   say(ctx, `Understood the brief: ${spec.title} in ${spec.area}, RM${spec.pay}/${spec.payUnit}, ${L.describeSchedule(spec.schedule)}, start ${spec.startDate}. Must have: ${spec.requirements.join(', ')}.`);
   await callTool(ctx, 'set_plan', { steps: [
     { title: 'Check the pay is legal', tool: 'check_minimum_wage' },
@@ -208,7 +209,7 @@ async function llmLoop(ctx) {
   const names = ctx.run.persona === 'student' ? STUDENT_TOOLS : HIRER_TOOLS;
   const messages = [
     { role: 'system', content: systemPrompt(ctx.run.persona, ctx.baseUrl) },
-    { role: 'user', content: ctx.run.prompt },
+    { role: 'user', content: ctx.run.prompt + (Object.keys(ctx.run.options || {}).length ? `\n(Details: ${JSON.stringify(ctx.run.options)})` : '') },
   ];
   const defs = toOpenAiTools(names);
   let nudges = 0, lastFail = '', repeats = 0, failStreak = 0;

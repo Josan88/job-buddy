@@ -56,7 +56,7 @@ Web console ──REST/SSE──▶ Agent ──▶ Tools ──▶ store (jobs,
 - **Agent** (`src/agent.js`): with `LLM_API_KEY` set, an OpenAI-compatible model (OpenAI, DeepSeek, Groq, Tencent Hunyuan…) plans and calls tools in a loop. It has a stuck-loop guard and a finish gate. Without a key, a rule-based **autopilot** drives the same tools, so the demo never depends on a network call to a model.
 - **Tools** (`src/tools.js`): deterministic and auditable. Each returns either a result or a list of specific `problems`, and the agent fixes those and retries. The timeline shows each fix as "Caught a problem, fixing it".
 - **Scoring** (`src/lib.js`): must-have skills 35, nice-to-have 5, shift-availability overlap 25, distance 15 (Haversine over Klang Valley areas), experience 15, pay fit 5.
-- **MCP server** (`src/mcp.js`): Streamable HTTP at `/mcp`. It exposes `hirebuddy_run` (the whole job from one prompt) plus every granular tool, so WorkBuddy's own model can run the plan itself.
+- **MCP server** (`src/mcp.js`): Streamable HTTP at `/mcp`. By default it exposes only `hirebuddy_run` (the whole job from one prompt, returning only when it is verified) plus two read tools. That way a client's model can't stop halfway. Add `?tools=all` to the URL, or set `HIREBUDDY_MCP_TOOLS=all` for the bridge, to expose every step tool as well.
 - **No dependencies.** Plain Node 20+, so it deploys anywhere in seconds.
 
 ## Run locally

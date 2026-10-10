@@ -87,7 +87,7 @@ async function route(req, res) {
   // ---- MCP ----
   if (p === '/mcp') {
     if (req.method !== 'POST') { res.writeHead(405, { allow: 'POST' }); return res.end(); }
-    return mcp.handle(req, res, await readBody(req), base);
+    return mcp.handle(req, res, await readBody(req), base, url.searchParams.get('tools') === 'all');
   }
 
   // ---- API ----
