@@ -121,7 +121,7 @@ WorkBuddy is Tencent's desktop AI agent. HireBuddy plugs into it in two ways:
 2. Still in BotFather, send `/setjoingroups`, pick the bot and choose **Disable**, so nobody can add it to a group.
 3. In WorkBuddy: **Assistant** (sidebar), then **Assistant Settings**, then **Channels**, then **Telegram**. Paste the token and press **Save**. Keep WorkBuddy open and the computer awake.
 4. Do one run at the computer first and choose "Always allow" for the hirebuddy tools. A permission prompt that appears on the computer can't be answered from the phone.
-5. On the HireBuddy page, press **Hand it to WorkBuddy** once. Under "Send through Telegram", type the bot's username and press **Save**. Only that browser remembers it; the server never sees it. From then on, Hand it to WorkBuddy opens Telegram straight away. "Stop using Telegram" goes back to copy and paste (or the bridge, if it is running).
+5. On the HireBuddy home page, open **Send to WorkBuddy through Telegram** (under the buttons), type the bot's username and press **Save**. The button then reads "Hand it to WorkBuddy on Telegram". Only that browser remembers it; the server never sees it. From then on, Hand it to WorkBuddy opens Telegram straight away. "Stop using Telegram" goes back to copy and paste (or the bridge, if it is running).
 
 Treat the token like a password: anyone who has it, or who finds the bot and messages it, can give WorkBuddy tasks on your computer. If the token leaks, revoke it in BotFather with `/revoke`. See [WorkBuddy's Telegram guide](https://www.workbuddy.ai/docs/workbuddy/Platform-Integration/Telegram-Guide).
 

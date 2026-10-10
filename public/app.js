@@ -34,6 +34,7 @@ function setPersona(p) {
   document.querySelectorAll('input[name="persona"]').forEach(r => { r.checked = r.value === p; });
   $('#go').textContent = p === 'student' ? 'Find me work' : 'Hire for me';
   $('#handoff').hidden = p !== 'student';
+  $('#tg').hidden = p !== 'student';
   $('#examples').innerHTML = EXAMPLES[p].map((e, i) => `<li><button type="button" data-i="${i}"><span><b>Use this example:</b> ${esc(e)}</span></button></li>`).join('');
   $('#examples').querySelectorAll('button').forEach(b => b.onclick = () => {
     $('#prompt').value = EXAMPLES[p][b.dataset.i];
@@ -110,7 +111,8 @@ function tgShowSaved() {
   const bot = tgBot();
   $('#tg-bot').value = bot;
   $('#tg-forget').hidden = !bot;
-  $('#tg-title').textContent = bot ? `Sending through Telegram, to @${bot}` : 'Send through Telegram';
+  $('#tg-title').textContent = bot ? `WorkBuddy on Telegram: @${bot}` : 'Send to WorkBuddy through Telegram';
+  $('#handoff').textContent = bot ? 'Hand it to WorkBuddy on Telegram' : 'Hand it to WorkBuddy';
 }
 let handoffTask = null;
 function sendViaTelegram(bot, task) {
@@ -123,8 +125,10 @@ function sendViaTelegram(bot, task) {
   $('#handoff-title').focus();
   announce('Telegram is opening your WorkBuddy chat with the task typed in. Press Send there. I will tell you each step here.');
 }
-$('#tg-form').onsubmit = e => {
-  e.preventDefault();
+// The setting sits inside the main form, so Enter in it saves the username instead of starting a run.
+$('#tg-bot').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); tgSave(); } });
+$('#tg-save').onclick = () => tgSave();
+function tgSave() {
   const bot = $('#tg-bot').value.trim().replace(/^(https?:\/\/)?(t\.me\/|telegram\.me\/)?@?/i, '').replace(/[/?].*$/, '');
   const err = $('#tg-error');
   if (!/^[A-Za-z][A-Za-z0-9_]{3,30}bot$/i.test(bot)) {
@@ -139,7 +143,7 @@ $('#tg-form').onsubmit = e => {
   tgShowSaved();
   if (handoffTask) sendViaTelegram(bot, handoffTask);
   else announce(`Saved. Hand it to WorkBuddy will open @${bot} in Telegram.`);
-};
+}
 $('#tg-forget').onclick = () => {
   try { localStorage.removeItem(TG_KEY); } catch (e) {}
   tgShowSaved();
