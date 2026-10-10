@@ -61,7 +61,6 @@ steps.hirebuddy_1_understand = {
     type: 'object',
     properties: {
       prompt: { type: 'string', description: 'The user\'s words, unchanged' },
-      handoff: { type: 'string', description: 'The HireBuddy handoff code (ho-...) if the request contains one' },
       daily: { type: 'boolean', description: 'true for the scheduled background check: look only for NEW jobs and book up to 3 new interviews; a day with nothing new is a normal result' },
       listings: { type: 'array', maxItems: 20, description: 'Optional: jobs you found on real job sites, copied as written (title, employer, site, url, pay, location, hours, description). Leave out anything you did not see.', items: { type: 'object' } },
     },
@@ -70,8 +69,10 @@ steps.hirebuddy_1_understand = {
   async run(args, baseUrl) {
     const listings = Array.isArray(args.listings) && args.listings.length ? args.listings : null;
     // Started from the HireBuddy website: use the sentence the person typed there, and let the site follow this run.
-    const code = String(args.handoff || '').match(/ho-[a-z0-9]+/)?.[0] || String(args.prompt || '').match(/\bho-[a-z0-9]{6}\b/)?.[0];
-    const ho = code && (store.db.handoffs || []).find(x => x.id === code && !x.runId);
+    // The task carries no code, so match the newest unclaimed hand-off (last 30 minutes) whose sentence is in the request.
+    const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const said = norm(args.prompt);
+    const ho = said && (store.db.handoffs || []).slice().reverse().find(x => !x.runId && Date.now() - Date.parse(x.createdAt) < 30 * 60e3 && norm(x.prompt) && said.includes(norm(x.prompt)));
     const run = agent.newRun((ho ? ho.prompt : String(args.prompt || '')).slice(0, 2000), 'student', 'workbuddy', { listings });
     if (ho) { ho.runId = run.id; run.handoffId = ho.id; }
     run.mode = 'WorkBuddy runs the steps';
