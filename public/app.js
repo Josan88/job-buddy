@@ -241,7 +241,7 @@ function tgShowSaved() {
   $('#tg-forget').hidden = !on;
   $('#tg-tools').hidden = !on;
   $('#tg-title').textContent = on ? `Paired: tasks go to WorkBuddy on Telegram${tgBot ? ` (@${tgBot})` : ''}` : 'Send to WorkBuddy automatically, through Telegram';
-  $('#handoff').textContent = on ? 'Hand it to WorkBuddy on Telegram' : 'Hand it to WorkBuddy';
+  $('#handoff').textContent = 'Find job';
 }
 // The setting sits inside the main form, so Enter in it pairs instead of starting a run.
 $('#tg-key').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); tgPair(); } });
