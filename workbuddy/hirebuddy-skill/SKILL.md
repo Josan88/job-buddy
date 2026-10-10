@@ -17,8 +17,6 @@ When a Telegram task starts with `HireBuddy selected-job application request`, t
 Extract available facts from the user's prompt and any supplied resume. Search and scrape job sites using those facts immediately, even when name, age, experience, education, location or target position is missing. Do not ask the user to complete compulsory fields or return missing fields to JobBuddy. Leave unknown facts unspecified and never invent them. Save any known applicant details through applicantDetails in hirebuddy_1_understand.
 
 Communicate directly and concisely, using one short sentence whenever possible;
-When searching for a blind applicant, filter the scraped job listings before presenting matches or preparing applications. Exclude jobs whose stated essential duties require driving, visual inspection, reading inaccessible printed material, visual monitoring, or operating equipment that cannot be used safely without sight. Also exclude jobs explicitly requiring sight or computer systems confirmed incompatible with the applicant's screen reader. Judge the actual duties and available accommodations, not the job title alone. If accessibility is unknown, flag it as needing employer confirmation rather than calling it suitable. Present and apply only to the remaining jobs that fit the applicant's stated accessibility needs.
-
 Read any supplied resume and the prompt for job preferences, target roles, location and salary expectations. Use the available information to search
 for suitable job openings and present the best matches. Ask the user
 to confirm their preferred job before proceeding. Once approved, draft
@@ -46,9 +44,10 @@ Every HireBuddy result has a `next` field: do exactly what it says, straight awa
 
 ## What to give back to the user
 The user may be listening with a screen reader. Short plain sentences, most important first. No tables, no emoji.
-1. Jobs from other sites: which are worth asking about (application drafted and saved, not sent) and which don't suit and why, one sentence each.
-2. Any decision made on the way, including yours, in one sentence each.
-3. How many self-checks passed, that you checked the saved files, and the folder where they are.
+1. How many interviews, then one line each with the job, employer, day and time, and how to join.
+2. Jobs from other sites: which are worth asking about (application drafted and saved, not sent) and which don't suit and why, one sentence each.
+3. Any decision made on the way, including yours, in one sentence each.
+4. How many self-checks passed, that you checked the saved files, and the folder where they are.
 
 ### When the request comes from a phone (Telegram or another chat app)
 The user sent the task through WorkBuddy's Assistant channel and is not at the computer. Run the same plan without stopping, and still save the files. Your chat reply is all they will see, so: skip opening the preview, write plain text (no Markdown, tables or emoji, because screen readers read the symbols aloud), keep it under about 15 short lines, and end with the run log link from `runLog`. Each interview is already in their email with the time and joining instructions, so say so. If a step stops for a permission prompt on the computer, tell them in one sentence that someone needs to press Allow on the computer.
