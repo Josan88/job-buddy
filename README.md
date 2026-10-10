@@ -38,7 +38,8 @@ From that one sentence, with no further questions, HireBuddy:
 **Live app: https://hirebuddy-k543.onrender.com** (free tier, so the first load after idle can take about a minute)
 
 - **Web app:** type a sentence on the home page, or pick an example.
-- **My page (`/me`):** pick who you are, with no password. A job seeker hears their interviews first (when, how to join), can accept or say they can't make it, then sees jobs that suit them and why others don't. An employer sees their jobs and booked interviews.
+- **My details (`/me`):** pick who you are, with no password (switch person from the Demo menu). A job seeker hears their interviews first (when, how to join), can accept or say they can't make it, edits how they describe themselves, uploads a resume, then sees jobs that suit them and why others don't. An employer sees their jobs and booked interviews.
+- **Demo menu:** Jobs, Emails and How it works are demo pages, folded into the menu in the header.
 - **From WorkBuddy:** see [WorkBuddy setup](#workbuddy-setup).
 - **From a terminal:** `node workbuddy/hirebuddy-skill/scripts/hirebuddy.js "<your sentence>"`
 

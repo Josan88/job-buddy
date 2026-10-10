@@ -1,4 +1,4 @@
-// "My page". A job seeker hears their interviews first (time, how to join), can accept or say
+// "My details". A job seeker hears their interviews first (time, how to join), can accept or say
 // they can't make it, then their applications and the jobs that suit them.
 // An employer sees only the jobs they published, with the interviews booked.
 const $ = s => document.querySelector(s);
@@ -35,7 +35,7 @@ async function showPicker() {
 function header(me, sub) {
   return `<h1 id="me-title" tabindex="-1">${esc(me.name)}</h1>
     <p>${me.role === 'student' ? 'Job seeker' : 'Employer'}${sub ? `. ${sub}` : ''}</p>
-    <p><button type="button" class="secondary" id="switch">Switch person</button></p>`;
+`;
 }
 
 const STATUS = {
@@ -75,17 +75,61 @@ async function showStudent(me, focus) {
     ${others.length ? `<ul class="joblist">${others.map(a => `<li><h3><a href="${esc(a.url)}">${esc(a.title)}</a> at ${esc(a.business)}</h3>
       <p><span class="status-word ${STATUS[a.status][1]}">${STATUS[a.status][0]}</span></p>
       ${a.status === 'declined' && a.interview?.replanRunId ? `<p><a href="/runs/${esc(a.interview.replanRunId)}">What HireBuddy did next</a></p>` : ''}</li>`).join('')}</ul>` : '<p>No other applications.</p>'}
+    <h2 id="about-title">About me</h2>
+    <form id="about-form" class="stack" novalidate>
+      <label for="about">How you describe yourself to employers</label>
+      <span class="hint" id="about-hint">HireBuddy checks jobs against these words. Add skills, experience and what helps you work.</span>
+      <textarea id="about" rows="5" aria-describedby="about-hint about-msg">${esc(d.student.bio)}</textarea>
+      <p class="actions"><button type="submit">Save</button></p>
+      <p id="about-msg" role="status"></p>
+    </form>
+    <h2 id="resume-title">My resume</h2>
+    <p id="resume-now">${d.student.resume ? `<a href="/api/me/student/${esc(me.id)}/resume">${esc(d.student.resume.name)}</a>, added ${esc(new Date(d.student.resume.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }))}. <button type="button" class="secondary" id="resume-remove">Remove</button>` : 'No resume yet.'}</p>
+    <label for="resume-file">${d.student.resume ? 'Replace it' : 'Upload a resume'}</label>
+    <span class="hint" id="resume-hint">PDF, Word or text, up to 5 MB.</span>
+    <input id="resume-file" type="file" accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" aria-describedby="resume-hint resume-msg">
+    <p id="resume-msg" role="status"></p>
     <h2>Jobs that suit you (${suits.length})</h2>
     <ul class="joblist">${suits.map(j => `<li><h3><a href="${esc(j.url)}">${esc(j.title)}</a></h3>
       <p>${esc(j.business)}, ${esc(j.workMode)}. ${esc(j.pay)}. ${esc(j.schedule)}. Match ${j.score} out of 100.</p>
       ${j.access ? `<p>${j.access.fit === 'good' ? 'Suits you' : 'Ask first'}: ${esc([...j.access.reasons, ...j.access.asks].join('; '))}.</p>` : ''}</li>`).join('') || (d.mine.length ? '<li>None left. HireBuddy has already applied to every job that suits you.</li>' : '<li>None right now.</li>')}</ul>
     ${notFor.length ? `<details><summary>Other jobs, and why they don't suit you (${notFor.length})</summary><ul>${notFor.map(j => `<li>${esc(j.title)} at ${esc(j.business)}: ${esc(j.whyNot)}.</li>`).join('')}</ul></details>` : ''}`;
   bind(me);
+  bindDetails(me);
   if (focus) $('#me-title').focus();
 }
 
+// Saving the description and the resume. Each says what happened in the status line beside it.
+function bindDetails(me) {
+  const base = `/api/me/student/${encodeURIComponent(me.id)}`;
+  $('#about-form').onsubmit = async e => {
+    e.preventDefault();
+    const r = await fetch(`${base}/about`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ bio: $('#about').value }) }).then(r => r.json());
+    $('#about-msg').textContent = r.ok ? 'Saved.' : `Error: ${r.error}`;
+  };
+  $('#resume-file').onchange = async () => {
+    const f = $('#resume-file').files[0];
+    if (!f) return;
+    const msg = $('#resume-msg');
+    if (f.size > 5 * 1024 * 1024) { msg.textContent = 'Error: the file is over 5 MB.'; return; }
+    msg.textContent = `Uploading ${f.name}…`;
+    const r = await fetch(`${base}/resume`, { method: 'PUT', headers: { 'content-type': f.type || 'application/octet-stream', 'x-filename': encodeURIComponent(f.name) }, body: f })
+      .then(r => r.json()).catch(() => ({ error: 'Upload failed. Try again.' }));
+    if (!r.ok) { msg.textContent = `Error: ${r.error}`; return; }
+    await showStudent(me, false);
+    $('#resume-msg').textContent = `Uploaded ${f.name}.`;
+    $('#resume-file').focus();
+  };
+  const rm = $('#resume-remove');
+  if (rm) rm.onclick = async () => {
+    await fetch(`${base}/resume`, { method: 'DELETE' });
+    await showStudent(me, false);
+    $('#resume-msg').textContent = 'Resume removed.';
+    $('#resume-file').focus();
+  };
+}
+
 function bind(me) {
-  $('#switch').onclick = () => { setMe(null); showPicker(); };
   document.querySelectorAll('[data-iv]').forEach(b => b.onclick = async () => {
     const decline = b.dataset.act === 'decline';
     b.disabled = true;
@@ -147,4 +191,6 @@ async function show(focus) {
   await (me.role === 'student' ? showStudent(me, focus) : showOwner(me, focus));
 }
 
+// "Switch person" in the demo menu comes here with ?switch=1.
+if (new URLSearchParams(location.search).has('switch')) { setMe(null); history.replaceState({}, '', '/me'); }
 show(false);

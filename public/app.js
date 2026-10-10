@@ -54,7 +54,8 @@ let telegramOn = false;
 function setPersona(p) {
   persona = p;
   document.querySelectorAll('input[name="persona"]').forEach(r => { r.checked = r.value === p; });
-  $('#go').textContent = p === 'student' ? 'Find me work' : 'Hire for me';
+  // Job seekers hand their words to WorkBuddy; employers have HireBuddy hire for them here.
+  $('#go').hidden = p === 'student';
   $('#handoff').hidden = p !== 'student';
   $('#tg').hidden = p !== 'student' || !telegramOn;
   $('#prompt-label').textContent = p === 'student' ? 'Introduce yourself' : 'Describe the job';
@@ -90,26 +91,43 @@ fetch('/api/config').then(r => r.json()).then(c => {
 });
 
 // Speak instead of typing, where the browser supports it (useful on phones and for low vision).
-// Press Enter (or the button again) to stop; Escape cancels.
+// Press Enter (or the button again) to stop; Escape cancels. With words already in the box, the person
+// first chooses to add to them or to start again.
 if (window.SpeechRecognition || window.webkitSpeechRecognition) {
   const btn = $('#speak');
   let stop = null;
   btn.hidden = false;
-  btn.onclick = () => {
-    if (stop) return stop();
+  $('#speak-hint').hidden = false;
+  const listen = mode => {
+    $('#again').hidden = true;
+    const box = $('#prompt');
+    if (mode === 'new') box.value = '';
     stop = window.HB.listen('en-MY', text => {
       stop = null;
-      btn.textContent = 'Speak instead';
-      if (text) { const box = $('#prompt'); box.value = [box.value.trim(), text].filter(Boolean).join(' '); announce(`Heard: ${text}`); }
-      $('#prompt').focus();
+      btn.setAttribute('aria-pressed', 'false');
+      $('#speak-label').textContent = 'Speak';
+      if (text) { box.value = [box.value.trim(), text].filter(Boolean).join(' '); announce(`Heard: ${text}`); }
+      else announce('Stopped. Nothing added.');
+      box.focus();
     });
-    btn.textContent = 'Listening. Press Enter to stop';
-    announce('Listening. Speak, then press Enter.');
+    btn.setAttribute('aria-pressed', 'true');
+    $('#speak-label').textContent = 'Stop (Enter)';
+    btn.focus();
+    announce(mode === 'add' ? 'Listening. Carry on, then press Enter.' : 'Listening. Speak, then press Enter.');
   };
+  btn.onclick = () => {
+    if (stop) return stop();
+    if (!$('#prompt').value.trim()) return listen('new');
+    $('#again').hidden = false;
+    $('#again-add').focus();
+  };
+  $('#again-add').onclick = () => listen('add');
+  $('#again-new').onclick = () => listen('new');
 }
 
 $('#ask').onsubmit = async e => {
   e.preventDefault();
+  if (persona === 'student') return $('#handoff').click();
   const prompt = $('#prompt').value.trim();
   const err = $('#prompt-error');
   if (!prompt) {

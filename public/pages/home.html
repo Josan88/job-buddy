@@ -15,14 +15,21 @@
     </fieldset>
 
     <label for="prompt" id="prompt-label">Introduce yourself</label>
-    <span class="hint" id="prompt-hint">Not sure what to write? Use the ideas below.</span>
+    <span class="hint" id="prompt-hint">Type or speak. Not sure what to write? Use the ideas below.</span>
+    <div class="mic-row">
+      <button id="speak" type="button" class="mic" aria-describedby="speak-hint" hidden><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="13" rx="4" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg> <span id="speak-label">Speak</span></button>
+      <span class="hint" id="speak-hint" hidden>Press Enter when you finish.</span>
+    </div>
+    <div id="again" class="panel again" role="group" aria-labelledby="again-title" hidden>
+      <p id="again-title">You already said something. What now?</p>
+      <p class="actions"><button type="button" id="again-add">Keep it and add more</button> <button type="button" id="again-new" class="secondary">Clear it and start again</button></p>
+    </div>
     <textarea id="prompt" name="prompt" aria-describedby="prompt-hint prompt-error" spellcheck="true"></textarea>
     <p id="prompt-error" class="panel bad" hidden></p>
 
     <div class="actions">
-      <button id="go" type="submit">Find me work</button>
-      <button id="handoff" type="button" class="secondary">Hand it to WorkBuddy</button>
-      <button id="speak" type="button" class="secondary" hidden>Speak instead</button>
+      <button id="go" type="submit" hidden>Hire for me</button>
+      <button id="handoff" type="button">Hand it to WorkBuddy</button>
     </div>
 
     <h2 id="ideas-title">Ideas for what to write</h2>

@@ -11,6 +11,12 @@
   sync();
 })();
 
+// The demo menu closes with Escape (focus back on it) or a click elsewhere.
+document.querySelectorAll('details.menu').forEach(m => {
+  m.addEventListener('keydown', e => { if (e.key === 'Escape' && m.open) { m.open = false; m.querySelector('summary').focus(); } });
+  document.addEventListener('click', e => { if (m.open && !m.contains(e.target)) m.open = false; });
+});
+
 window.HB = {
   esc: s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
   // Polite announcement for screen readers through the page's live region.
@@ -56,7 +62,7 @@ window.HB = {
 };
 
 // Voice commands: press Alt+V (or the "Voice command" button), say a button's name, such as
-// "Find me work", "first example" or "read aloud", then press Enter. "What can I say" lists the buttons on screen.
+// "Hand it to WorkBuddy", "first example" or "read aloud", then press Enter. "What can I say" lists the buttons on screen.
 // Without speech recognition in the browser, a box asks for the button's name instead.
 (function () {
   const btn = document.getElementById('voice-command');
@@ -108,7 +114,7 @@ window.HB = {
     const reset = () => { stop = null; if (btn) { btn.disabled = false; btn.textContent = 'Voice command'; } };
     stop = window.HB.listen('en-GB', heard => { reset(); if (heard) act(heard); else say("I didn't hear a button. Press Alt V to try again."); });
     if (!stop) {
-      const typed = window.prompt('Type the name of the button you want, for example Find me work. Type help to hear the buttons.');
+      const typed = window.prompt('Type the name of the button you want, for example Hand it to WorkBuddy. Type help to hear the buttons.');
       if (typed) act(typed);
       return;
     }
