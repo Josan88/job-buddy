@@ -102,8 +102,8 @@ const cases = [
     trail.push(tool.match(/_(\d)_/)[1] + (args.change ? '+' : ''));
     if (tool === 'hirebuddy_4_verify') break;
   }
-  const stepsOk = st.verified && /You have 3 interviews/.test(st.summary) && trail.includes('2+') && st.saveToComputer.files.some(f => /\.ics$/.test(f.path) && /BEGIN:VCALENDAR/.test(f.content))
-    && st.saveToComputer.files.some(f => /Application/.test(f.path));
+  const stepsOk = st.verified && /You have 3 interviews/.test(st.summary) && trail.includes('2+')
+    && !st.saveToComputer.files.some(f => /\.ics$/.test(f.path)) && st.saveToComputer.files.some(f => /Application/.test(f.path));
   if (!stepsOk) fail++;
   console.log(`${stepsOk ? 'PASS' : 'FAIL'} WorkBuddy-led steps (${trail.join(' > ')}): ${(st.summary || st.problem || '').split('\n')[0]} ${st.selfChecks?.length} checks`);
   // The daily background check: nothing new is a normal, verified result.

@@ -1,4 +1,4 @@
-// The agent's tools. Each one does real work against the store, the web, email or calendar files,
+// The agent's tools. Each one does real work against the store, the web or email,
 // and returns a JSON result the agent (LLM or autopilot) reads before deciding the next step.
 const store = require('./store');
 const L = require('./lib');
@@ -166,7 +166,7 @@ tools.verify_screening = {
 };
 
 tools.schedule_interviews = {
-  description: 'Book interview slots for shortlisted candidates in the next withinDays days (default 7). Each slot sits inside both the owner hours and the candidate availability, never overlaps another, and gets a downloadable .ics calendar invite.',
+  description: 'Book interview slots for shortlisted candidates in the next withinDays days (default 7). Each slot sits inside both the owner hours and the candidate availability and never overlaps another.',
   parameters: S('object', {
     jobId: { type: 'string' }, candidateIds: { type: 'array', items: { type: 'string' } },
     durationMinutes: { type: 'number' }, ownerHours: scheduleSchema, withinDays: { type: 'number' },
@@ -207,11 +207,11 @@ tools.schedule_interviews = {
         start: new Date(found[0]).toISOString(), end: new Date(found[1]).toISOString(),
         when: L.fmtMyt(new Date(found[0])), runId: ctx.run.id,
       };
-      // Each interview gets its own video room, so the invite works with no extra setup.
+      // Each interview gets its own video room, so joining works with no extra setup.
       iv.meetUrl = mode && !/video|jitsi|online|call/i.test(mode) ? null : `https://meet.jit.si/HireBuddy-${iv.id.replace(/^iv-/, '')}`;
       iv.mode = iv.meetUrl ? 'Video call (Jitsi Meet)' : mode;
       store.db.interviews.push(iv);
-      out.push({ interviewId: iv.id, candidateId: s.id, name: s.name, email: s.email, when: iv.when, start: iv.start, meetUrl: iv.meetUrl, icsUrl: `${ctx.baseUrl}/ics/${iv.id}.ics` });
+      out.push({ interviewId: iv.id, candidateId: s.id, name: s.name, email: s.email, when: iv.when, start: iv.start, meetUrl: iv.meetUrl });
     }
     store.save();
     ctx.run.interviews = (ctx.run.interviews || []).concat(out.map(o => o.interviewId));
@@ -220,7 +220,7 @@ tools.schedule_interviews = {
 };
 
 tools.send_email = {
-  description: 'Send an email. Interview invites must pass interviewId so the .ics invite is attached, and the body must state the exact interview time and the job link. Delivered for real when the address is real and email is configured; demo addresses land in the public outbox.',
+  description: 'Send an email. Interview emails must pass interviewId, and the body must state the exact interview time and the job link. Delivered for real when the address is real and email is configured; demo addresses land in the public outbox.',
   parameters: S('object', {
     to: { type: 'string' }, subject: { type: 'string' }, body: { type: 'string' },
     interviewId: { type: 'string' }, kind: { type: 'string', enum: ['interview_invite', 'owner_summary', 'application', 'other'] },
@@ -248,10 +248,10 @@ tools.send_email = {
     }
     const email = {
       id: store.id('mail'), to: a.to, subject: a.subject, body: a.body, kind: a.kind || (iv ? 'interview_invite' : 'other'),
-      interviewId: iv?.id || null, attachment: iv ? `${ctx.baseUrl}/ics/${iv.id}.ics` : null,
+      interviewId: iv?.id || null,
       at: new Date().toISOString(), runId: ctx.run.id,
     };
-    const delivery = await mail.deliver(email, iv);
+    const delivery = await mail.deliver(email);
     email.delivery = delivery;
     store.db.emails.push(email);
     store.save();
@@ -312,7 +312,7 @@ tools.record_fit_judgement = {
 };
 
 tools.verify_hiring_outcome = {
-  description: 'Final self-check before finishing: job page is live, pay is legal, screening verified, interviews fit both calendars without clashes, every .ics invite downloads and matches, and every shortlisted candidate got a correct invite email.',
+  description: 'Final self-check before finishing: job page is live, pay is legal, screening verified, interviews fit both schedules without clashes, and every shortlisted candidate got a correct interview email.',
   parameters: S('object', { jobId: { type: 'string' } }, ['jobId']),
   run: async ({ jobId }, ctx) => {
     const job = store.db.jobs.find(j => j.id === jobId);
@@ -343,15 +343,9 @@ tools.verify_hiring_outcome = {
       const inside = L.ranges(s.availability?.[p.dow]).some(([a, b]) => st >= a && en <= b);
       add(`${iv.name} is free at ${iv.when}`, inside, `Their ${p.dow} availability: ${(s.availability?.[p.dow] || []).join(', ') || 'none'}`);
 
-      const icsRes = await fetch(`${ctx.baseUrl}/ics/${iv.id}.ics`).then(r => r.text()).catch(() => '');
-      const parsed = icsRes ? L.parseIcs(icsRes) : {};
-      add(`${iv.name}'s calendar invite downloads and matches`,
-        parsed.method === 'REQUEST' && parsed.start && parsed.start.toISOString() === iv.start && parsed.attendee === iv.email && (!iv.meetUrl || parsed.url === iv.meetUrl),
-        parsed.start ? `Invitation (Accept/Decline), DTSTART ${parsed.start.toISOString()}${iv.meetUrl ? `, call ${iv.meetUrl}` : ''}` : 'could not fetch .ics');
-
       const em = store.db.emails.find(e => e.interviewId === iv.id);
       add(`${iv.name} was emailed the right time and links`, em && em.body.includes(iv.when) && em.body.includes(jobUrl(ctx, jobId)) && (!iv.meetUrl || em.body.includes(iv.meetUrl)),
-        em ? `${em.delivery?.channel}: "${em.subject}"` : 'no invite email found');
+        em ? `${em.delivery?.channel}: "${em.subject}"` : 'no interview email found');
     }
     const pass = checks.every(c => c.pass);
     ctx.run.verified = pass;
@@ -497,7 +491,7 @@ function joinText(iv, j) {
 }
 
 tools.book_interview = {
-  description: 'Book an interview for the job seeker with an employer they applied to. Picks the first slot in the next 14 days inside the employer\'s interview hours and the seeker\'s availability, clear of their other interviews. Format is the seeker\'s preference when the employer offers it, else the first accessible format offered. Creates a calendar invite.',
+  description: 'Book an interview for the job seeker with an employer they applied to. Picks the first slot in the next 14 days inside the employer\'s interview hours and the seeker\'s availability, clear of their other interviews. Format is the seeker\'s preference when the employer offers it, else the first accessible format offered.',
   parameters: S('object', {
     studentId: { type: 'string' }, jobId: { type: 'string' },
     format: { type: 'string', description: 'Optional: "phone", "video" or "in person"' },
@@ -539,7 +533,7 @@ tools.book_interview = {
     store.save();
     ctx.run.interviews = (ctx.run.interviews || []).concat(iv.id);
     return { ok: true, interviewId: iv.id, job: j.title, business: j.business, email: s.email, when: iv.when, whenLong: iv.whenLong, format: fmt,
-      preferred: s.needs?.interviewFormat || null, howToJoin: iv.howToJoin, meetUrl: iv.meetUrl, icsUrl: `${ctx.baseUrl}/ics/${iv.id}.ics` };
+      preferred: s.needs?.interviewFormat || null, howToJoin: iv.howToJoin, meetUrl: iv.meetUrl };
   },
 };
 
@@ -558,7 +552,7 @@ tools.check_outside_listings = {
 };
 
 tools.verify_applications = {
-  description: 'Final self-check for a job seeker: every application is stored and the employer notified, pay is legal, access is re-checked with no blockers, each interview fits both calendars and never clashes, the format is accessible, in-person venues are a short walk from a stop, each .ics invite downloads and matches, and each email to the seeker states the time and how to join in its first lines, in plain text.',
+  description: 'Final self-check for a job seeker: every application is stored and the employer notified, pay is legal, access is re-checked with no blockers, each interview fits both schedules and never clashes, the format is accessible, in-person venues are a short walk from a stop, and each email to the seeker states the time and how to join in its first lines, in plain text.',
   parameters: S('object', { studentId: { type: 'string' } }, ['studentId']),
   run: async ({ studentId }, ctx) => {
     const s = store.db.students.find(x => x.id === studentId);
@@ -596,10 +590,6 @@ tools.verify_applications = {
         const t = j.access?.transit, max = (ctx.run.search?.maxWalkMin) || s.needs.maxWalkMin || L.DEFAULT_WALK;
         add(`${j.business}: venue is reachable by public transport`, t && t.walkMin <= max, t ? `${t.walkMin}-minute walk from ${t.station}` : 'no stop listed');
       }
-      const icsRes = await fetch(`${ctx.baseUrl}/ics/${iv.id}.ics`).then(r => r.text()).catch(() => '');
-      const parsed = icsRes ? L.parseIcs(icsRes) : {};
-      add(`${j.business}: calendar invite downloads and matches`, parsed.method === 'REQUEST' && parsed.start && parsed.start.toISOString() === iv.start,
-        parsed.start ? `DTSTART ${parsed.start.toISOString()}` : 'could not fetch .ics');
       const em = store.db.emails.find(e => e.interviewId === iv.id);
       const head = em ? em.body.split('\n').slice(0, 3).join(' ') : '';
       add(`${j.business}: your email says the time and how to join in its first lines`, em && head.includes(iv.when) && (iv.meetUrl ? em.body.includes(iv.meetUrl) : head.includes(iv.howToJoin.split('.')[0])) && !/<[a-z][^>]*>/i.test(em.body),

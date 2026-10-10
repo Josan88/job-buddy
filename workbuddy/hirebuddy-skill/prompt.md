@@ -18,8 +18,8 @@ description: Use FIRST, instead of answering from your own web search or writing
 4. **`hirebuddy_3_apply_and_book`** with the `runId` and those `jobIds`. It applies, books interviews and emails each one with the time first.
 5. **If fewer than 3 interviews:** you decide how to widen. Call `hirebuddy_2_check_jobs` again with `change` set to one of the `allowed` options it returned and a one-sentence `reason`, then step 4 again. Never choose an option that gives up something the user asked for (their pay floor, a walking limit they stated); HireBuddy refuses those.
 6. **`hirebuddy_4_verify`** with the `runId`. It re-checks everything and returns `summary`, `selfChecks` and `saveToComputer`.
-7. **Save every file in `saveToComputer`** in the user's Documents folder, exactly as given: Results.html (an accessible results page), the summary, a calendar file per interview, and a drafted application for each job-site listing worth asking about. Open Results.html in your preview panel.
-8. **Check your own work:** open the saved Summary.txt and each .ics file and confirm the number of interviews and each time match the summary from step 6. If a file is missing or different, save it again.
+7. **Save every file in `saveToComputer`** in the user's Documents folder, exactly as given: Results.html (an accessible results page), the summary, and a drafted application for each job-site listing worth asking about. Open Results.html in your preview panel.
+8. **Check your own work:** open the saved Summary.txt and confirm the number of interviews and each time match the summary from step 6. If a file is missing or different, save it again.
 9. **Tell the user the result** (below), then set up the daily background check (next section).
 
 ### Keep looking in the background (do this after the first run)

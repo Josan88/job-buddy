@@ -491,9 +491,9 @@ function showResult(e, live) {
   const interviews = booked.length
     ? `<h3>Your interviews</h3><ol class="interviews">${booked.map(b => `<li><h4>${esc(b.job)} at ${esc(b.business)}</h4>
         <dl class="facts"><dt>When</dt><dd>${esc(b.whenLong)} (Malaysia time)</dd><dt>How</dt><dd>${esc(b.howToJoin)}${b.preferred && b.preferred !== b.format ? ` You asked for ${esc(b.preferred)}, but they only interview ${esc(b.format)}.` : ''}</dd></dl>
-        <p class="actions">${b.meetUrl ? `<a class="btn" href="${esc(b.meetUrl)}">Join the ${esc(b.business)} video call</a>` : ''}<a class="btn secondary" href="${esc(b.icsUrl)}">Add ${esc(b.business)} interview to calendar</a></p></li>`).join('')}</ol>`
+        <p class="actions">${b.meetUrl ? `<a class="btn" href="${esc(b.meetUrl)}">Join the ${esc(b.business)} video call</a>` : ''}</p></li>`).join('')}</ol>`
     : (outcome.slots || []).length
-      ? `<h3>Interviews booked</h3><ul>${outcome.slots.map(s => `<li>${esc(s.name)}: ${esc(s.when)}. <a href="${esc(s.icsUrl)}">Calendar file for ${esc(s.name)}</a></li>`).join('')}</ul>`
+      ? `<h3>Interviews booked</h3><ul>${outcome.slots.map(s => `<li>${esc(s.name)}: ${esc(s.when)}.</li>`).join('')}</ul>`
       : '';
   const out = outcome.outside || [];
   const others = out.length ? `<h3>Jobs WorkBuddy found on other sites</h3>
@@ -507,7 +507,7 @@ function showResult(e, live) {
   $('#result-body').innerHTML = `<p><span class="status-word ${e.verified && !refused ? 'good' : 'bad'}">${refused ? 'Refused: pay is below the legal minimum' : e.verified ? 'Checked and verified' : ok ? 'Done' : 'Needs attention'}</span></p>
     <p class="lede">${linkify(esc(head))}</p>${interviews}${others}${rest.map(l => `<p>${linkify(esc(l))}</p>`).join('')}
     ${(outcome.decisions || []).length ? `<h3>Decisions made on the way</h3><ul>${outcome.decisions.map(d => `<li><b>${esc(d.choice)}.</b> ${esc(d.reason)}</li>`).join('')}</ul>` : ''}
-    <p class="actions"><button type="button" class="secondary" id="read-aloud">Read aloud</button>${(e.links || []).filter(l => !l.label.startsWith('Calendar invite')).map(l => `<a class="btn secondary" href="${esc(l.url)}">${esc(l.label)}</a>`).join('')}</p>`;
+    <p class="actions"><button type="button" class="secondary" id="read-aloud">Read aloud</button>${(e.links || []).map(l => `<a class="btn secondary" href="${esc(l.url)}">${esc(l.label)}</a>`).join('')}</p>`;
   $('#read-aloud').onclick = ev => window.HB.speak((e.summary || '').replace(/https?:\/\/\S+/g, 'the link'), ev.currentTarget);
   if (!('speechSynthesis' in window)) $('#read-aloud').remove();
   document.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
