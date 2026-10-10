@@ -121,6 +121,7 @@ fieldset { border: 0; padding: 0; margin: 1.5rem 0; }
 .panel.bad { border-color: var(--bad); border-left-width: 10px; }
 .panel.decision { border-color: var(--brand); border-left-width: 10px; }
 .panel.fix { background: var(--warn-bg); border-left-width: 10px; }
+.voice-guide { width: fit-content; max-width: min(38rem, calc(100% - 2rem)); margin: 1rem auto; box-sizing: border-box; }
 .replies { padding-left: 1.25rem; }
 .replies li { white-space: pre-wrap; overflow-wrap: anywhere; margin: .25rem 0; }
 .mic-row { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; margin: 0 0 .5rem; }
