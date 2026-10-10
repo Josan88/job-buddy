@@ -69,7 +69,7 @@ function page(title, inner, { current = '', scripts = '', description = 'HireBud
 </div></header>
 <main id="main" tabindex="-1">${inner}</main>
 <footer><p>Built to work with screen readers (NVDA, JAWS, VoiceOver, TalkBack), with a keyboard alone, and at large text sizes. People and employers in this demo are fictional.</p></footer>
-<script src="/common.js"></script>${scripts}
+<script src="/common.js?v=20261011-2"></script>${scripts}
 </body></html>`;
 }
 
@@ -453,7 +453,7 @@ async function route(req, res) {
   // ---- Static ----
   const file = path.join(PUBLIC, path.normalize(p).replace(/^(\.\.[/\\])+/, ''));
   if (file.startsWith(PUBLIC) && fs.existsSync(file) && fs.statSync(file).isFile()) {
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' });
+    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
     return fs.createReadStream(file).pipe(res);
   }
   html(res, 404, page('Not found', '<h1>Not found</h1>'));

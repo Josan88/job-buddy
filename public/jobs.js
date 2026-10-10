@@ -34,11 +34,3 @@ cards.forEach(card => {
     button.click();
   });
 });
-
-function readIntroduction() {
-  const title = document.querySelector('main h1')?.textContent || 'Open jobs';
-  const help = document.getElementById('job-help')?.textContent || 'Press Tab to move through the jobs.';
-  window.HB.readFocus(`${title}. ${help}`);
-}
-
-window.addEventListener('load', readIntroduction);
