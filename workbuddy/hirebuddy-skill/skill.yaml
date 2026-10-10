@@ -1,0 +1,12 @@
+name: hirebuddy
+version: 1.0.0
+description: >
+  One-prompt hiring agent for Malaysian small businesses and students. Publishes the job, screens and ranks
+  candidates with quoted evidence, books interviews with .ics invites, emails them, and verifies its own work.
+parameters:
+  - name: prompt
+    type: string
+    required: true
+    description: The user's request in their own words.
+entry: scripts/hirebuddy.js
+instructions: SKILL.md

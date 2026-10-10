@@ -1,1 +1,113 @@
-# job-buddy
+# HireBuddy
+
+**One prompt. The hiring gets done.**
+
+HireBuddy is an autonomous hiring agent for Malaysian small businesses and the students who want their part-time gigs. It runs inside **WorkBuddy** (as a Skill and an MCP server) and as a standalone web app that shows every step live.
+
+> *"Need a weekend barista in Subang, RM12/hr, start next week"*
+
+From that one line, with no further guidance, HireBuddy:
+
+1. **Plans** the job as a checklist, where each step names the tool that completes it.
+2. **Checks the pay is legal** under Malaysia's Minimum Wages Order 2024 (RM8.17/hour). If it isn't, the agent refuses to publish.
+3. **Publishes a live job page** with an apply form, then fetches the page back to prove it is up.
+4. **Finds candidates** in the student talent pool by distance, plus anyone who applied on the page.
+5. **Screens and ranks** every candidate out of 100. Every skill point quotes the candidate's own words.
+6. **Self-checks the ranking.** It recomputes each score independently and confirms every quote appears word for word, so no qualification is invented.
+7. **Books interviews** that fit both the owner's hours and each candidate's free time, with no clashes, and creates a real `.ics` calendar invite for each.
+8. **Emails each candidate** their time, the job link and the invite.
+9. **Verifies the whole outcome.** It checks the page is live and the pay is legal. It checks every slot sits inside the candidate's availability with no overlaps, downloads every `.ics` and compares its times with the booking, and confirms every email carries the right time and link.
+10. **Delivers** a summary with links. It is **not allowed to finish** until the final verification passes.
+
+Students get the same engine from the other side:
+
+> *"I'm Aisyah from Sunway University, I make espresso and do latte art, free weekends 8am-2pm, want at least RM11/hr."*
+
+The agent builds her profile and ranks the open gigs. It **skips jobs that pay below minimum wage**, applies to the best legal matches with a personal cover note, notifies each business, and verifies each application landed on the job's record.
+
+## Who it's for
+
+| User | Problem | What HireBuddy delivers |
+|---|---|---|
+| Small business owner (cafe, bakery, tuition centre) with no HR staff | Hiring a part-timer takes hours of posting, reading messages and juggling schedules | A live job post, a ranked shortlist with evidence, interviews booked in calendars and emails sent, all checked |
+| University student | Finding legal, nearby gigs that fit around classes | A talent-pool profile and applications to well-matched, legally paid jobs |
+
+## Try it
+
+- **Web app:** type a prompt on the home page, or click an example, and watch the plan, tool calls, self-fixes and checks stream in live.
+- **From WorkBuddy:** see [WorkBuddy setup](#workbuddy-setup).
+- **From a terminal:** `node workbuddy/hirebuddy-skill/scripts/hirebuddy.js "Need a weekend barista in Subang, RM12/hr"`
+
+## Architecture
+
+```
+WorkBuddy ──(Skill / MCP)──┐
+                           ▼
+Web console ──REST/SSE──▶ Agent ──▶ Tools ──▶ store (jobs, students, applications, interviews, emails, runs)
+                           │          │
+                    LLM planner or    ├─ public job pages + apply form
+                    rule autopilot    ├─ .ics calendar files
+                                      ├─ email (Resend) / outbox
+                                      └─ HTTP self-checks against its own public URLs
+```
+
+- **Agent** (`src/agent.js`): with `LLM_API_KEY` set, an OpenAI-compatible model (OpenAI, DeepSeek, Groq, Tencent Hunyuan…) plans and calls tools in a loop. It has a stuck-loop guard and a finish gate. Without a key, a rule-based **autopilot** drives the same tools, so the demo never depends on a network call to a model.
+- **Tools** (`src/tools.js`): deterministic and auditable. Each returns either a result or a list of specific `problems`, and the agent fixes those and retries. The timeline shows each fix as "Caught a problem, fixing it".
+- **Scoring** (`src/lib.js`): must-have skills 35, nice-to-have 5, shift-availability overlap 25, distance 15 (Haversine over Klang Valley areas), experience 15, pay fit 5.
+- **MCP server** (`src/mcp.js`): Streamable HTTP at `/mcp`. It exposes `hirebuddy_run` (the whole job from one prompt) plus every granular tool, so WorkBuddy's own model can run the plan itself.
+- **No dependencies.** Plain Node 20+, so it deploys anywhere in seconds.
+
+## Run locally
+
+```bash
+node server.js          # http://localhost:3000
+npm test                # boots a fresh server and runs the hirer, illegal-wage, student and tutor flows plus MCP
+```
+
+Environment variables (all optional):
+
+| Var | Purpose |
+|---|---|
+| `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Any OpenAI-compatible chat API. Default base `https://api.openai.com/v1`, model `gpt-4o-mini` |
+| `RESEND_API_KEY`, `MAIL_FROM` | Send real emails to real addresses. `example.com` demo addresses always stay in the outbox |
+| `PUBLIC_URL` | Public base URL (auto-detected on Render) |
+| `RESET_TOKEN` | Protects `POST /api/reset?token=…` |
+| `DATA_DIR` | Where `db.json` lives |
+
+## Deploy (Render, free)
+
+1. Fork or push this repo to GitHub.
+2. On Render, choose **New → Blueprint** and select the repo. `render.yaml` sets everything up.
+3. Optional: add `LLM_API_KEY` (and `LLM_BASE_URL` / `LLM_MODEL` for a non-OpenAI provider) in the service's Environment tab.
+
+## WorkBuddy setup
+
+WorkBuddy is Tencent's desktop AI agent. HireBuddy plugs into it in two ways:
+
+**A. MCP server (recommended).** Add HireBuddy to WorkBuddy's MCP servers (`mcp_servers.json` in WorkBuddy's config directory; see `workbuddy/mcp_servers.json`):
+
+```json
+{
+  "mcpServers": {
+    "hirebuddy": {
+      "command": "node",
+      "args": ["/path/to/hirebuddy/workbuddy/hirebuddy-mcp.js"],
+      "env": { "HIREBUDDY_URL": "https://<your-app>.onrender.com" }
+    }
+  }
+}
+```
+
+`hirebuddy-mcp.js` is a zero-dependency stdio-to-HTTP bridge. Clients that support remote MCP can point straight at `https://<your-app>.onrender.com/mcp`. Restart WorkBuddy, then type the one prompt. WorkBuddy calls `hirebuddy_run` and shows the verified result, the self-checks and the links.
+
+**B. Skill.** Import `workbuddy/hirebuddy-skill/` (which contains `SKILL.md`, `skill.yaml` and `scripts/hirebuddy.js`) through WorkBuddy's Skills panel. The skill tells WorkBuddy when to use HireBuddy, how to call it (MCP, or the script as a fallback), and what to report back.
+
+Every run started from WorkBuddy also appears in the web app's **Recent runs**, labelled "via WorkBuddy/MCP".
+
+## Demo data
+
+The seeded talent pool holds 12 fictional students and 6 open gigs around the Klang Valley, including one bakery paying an illegal RM7/hour to show the wage guard. All seeded emails use `example.com` and are never delivered.
+
+## License
+
+MIT

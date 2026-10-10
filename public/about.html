@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>How HireBuddy works</title>
+<link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/"><img src="/favicon.svg" alt="" width="26" height="26">HireBuddy</a>
+  <nav><a href="/">Agent</a><a href="/jobs">Jobs</a><a href="/outbox">Outbox</a><a href="/about">How it works</a></nav>
+</header>
+<main class="wrap prose">
+  <h1>How HireBuddy works</h1>
+  <p class="lede" style="text-align:left">A cafe owner in Subang has no HR team. Hiring a weekend barista means writing an ad, posting it, reading a pile of messages, comparing schedules and booking interviews. That's hours of work. HireBuddy does all of it from one sentence and shows its working.</p>
+
+  <section class="card">
+    <h2>1. One prompt in</h2>
+    <p>“Need a weekend barista in Subang, RM12/hr, start next week.” The owner gives no further guidance. Students use the same agent from the other side: “I'm Aisyah from Sunway, I make espresso, free weekends.”</p>
+  </section>
+
+  <section class="card">
+    <h2>2. It plans</h2>
+    <p>The agent writes a plan first. Each step names the tool that completes it, so the checklist on screen updates on its own as the work happens.</p>
+  </section>
+
+  <section class="card">
+    <h2>3. It calls real tools</h2>
+    <ul>
+      <li><b>check_minimum_wage</b> checks the pay against Malaysia's Minimum Wages Order 2024 (RM8.17/hour, RM1,700/month). If the pay is illegal, the agent refuses to publish.</li>
+      <li><b>publish_job</b> creates a live public job page with an apply form, then fetches the page back to prove it is up.</li>
+      <li><b>find_candidates</b> searches the student talent pool by distance (Haversine over Klang Valley areas) and includes anyone who applied on the page.</li>
+      <li><b>screen_candidates</b> scores every candidate out of 100: must-have skills 35, nice-to-have 5, shift availability overlap 25, distance 15, experience 15, pay fit 5. Every skill point quotes the candidate's own words.</li>
+      <li><b>schedule_interviews</b> books slots that fit both the owner's hours and the candidate's free time, with no clashes. Each slot gets a real .ics calendar invite.</li>
+      <li><b>send_email</b> sends each invite with the calendar file attached. Email goes through Resend when it is configured. Demo addresses stay in the public outbox.</li>
+      <li>On the student side, <b>register_student</b>, <b>search_jobs</b> and <b>apply_to_job</b> handle the profile, the gig search and the applications. Applications appear on the business's job.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>4. It checks its own work</h2>
+    <ul>
+      <li><b>verify_screening</b> recomputes every score independently and confirms each evidence quote appears word for word in the profile. That rules out invented qualifications.</li>
+      <li><b>verify_hiring_outcome</b> checks that the job page is live and the pay is legal. It confirms every interview sits inside the candidate's availability with no overlaps. It downloads each .ics file and compares its times with the booking, and confirms every email states the right time and link.</li>
+      <li>Tools reject bad input with specific problems, for example “Body must state the interview time exactly as …”. The agent fixes the problem and retries, and the timeline shows each fix.</li>
+      <li>The agent <b>cannot finish</b> until the final verification passes.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>5. A result you can verify</h2>
+    <p>The owner gets a live job link, a ranked shortlist with evidence, booked interviews with calendar files, sent emails, and a permanent run log showing every step.</p>
+  </section>
+
+  <section class="card">
+    <h2>Runs inside WorkBuddy</h2>
+    <p>HireBuddy is also an MCP server at <code>/mcp</code>, and the repo includes a WorkBuddy Skill. From WorkBuddy, the owner types the same one prompt. WorkBuddy calls <code>hirebuddy_run</code> and gets back the verified result, the self-check list and links. The step-by-step tools are exposed too, so WorkBuddy's own model can run the plan itself. Every run, from either place, appears on this site's run log.</p>
+  </section>
+
+  <section class="card">
+    <h2>Brains</h2>
+    <p>With an LLM key (any OpenAI-compatible API, including Tencent Hunyuan), the model does the planning and writing, and the deterministic tools and checks keep it honest. Without a key, a rule-based autopilot drives the same tools, so a demo never fails because of a network issue.</p>
+  </section>
+</main>
+</body>
+</html>

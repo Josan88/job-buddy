@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HireBuddy · one-prompt hiring agent</title>
+<meta name="description" content="Type one prompt. HireBuddy publishes the job, screens candidates with evidence, books interviews and verifies its own work.">
+<link rel="icon" href="/favicon.svg">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/"><img src="/favicon.svg" alt="" width="26" height="26">HireBuddy</a>
+  <nav><a href="/">Agent</a><a href="/jobs">Jobs</a><a href="/outbox">Outbox</a><a href="/about">How it works</a></nav>
+</header>
+
+<main class="wrap">
+  <section id="composer" class="hero">
+    <h1>One prompt. The hiring gets done.</h1>
+    <p class="lede">For Malaysian small businesses hiring part-timers, and the students who want those gigs. HireBuddy plans the job, calls real tools, checks its own work and hands you a result you can verify.</p>
+
+    <div class="persona" role="tablist">
+      <button role="tab" data-persona="hirer" class="on">I'm hiring</button>
+      <button role="tab" data-persona="student">I'm a student</button>
+    </div>
+
+    <form id="ask" class="ask">
+      <textarea id="prompt" rows="3" placeholder="Need a weekend barista in Subang, RM12/hr, start next week"></textarea>
+      <div class="ask-row">
+        <div id="examples" class="examples"></div>
+        <button id="go" type="submit">Run agent</button>
+      </div>
+    </form>
+    <p class="mode" id="mode"></p>
+  </section>
+
+  <section id="runview" class="runview" hidden>
+    <div class="prompt-echo"><span class="eyebrow" id="rv-persona"></span><p id="rv-prompt"></p></div>
+    <div id="result" class="result" hidden></div>
+    <div class="grid">
+      <aside class="card plan">
+        <h2>Plan</h2>
+        <ol id="plan"><li class="muted">Planning…</li></ol>
+        <div id="stats" class="stats"></div>
+      </aside>
+      <section class="timeline" id="timeline" aria-live="polite"></section>
+    </div>
+    <p><a href="/" class="btn ghost">New prompt</a></p>
+  </section>
+
+  <section id="recent" class="recent">
+    <h2>Recent runs</h2>
+    <div id="runs"></div>
+  </section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>
