@@ -228,6 +228,14 @@ document.addEventListener('focusin', event => {
   window.HB.readControl(`${context}${name}. Button. Press Enter to activate.`);
 });
 
+// The site's own voice must announce the introduction field too. A native screen reader
+// already gets the label and description through the textarea's accessible attributes.
+document.addEventListener('focusin', event => {
+  if (!event.target.matches?.('#prompt')) return;
+  const label = document.querySelector('label[for="prompt"]')?.textContent.trim() || 'Introduce yourself';
+  window.HB.readControl(`${label}. Text area. Type your introduction. Press Enter to send it. Press Shift plus Enter to add another line.`);
+});
+
 // Announce expandable sections in the main page. On the home page this follows the
 // idea buttons, and opening it exposes full-example buttons that are read in full.
 document.addEventListener('focusin', event => {
