@@ -42,7 +42,7 @@ function readBody(req) {
 // and a text-size control that is applied before first paint.
 const NAV = [['/', 'Find work'], ['/me', 'My page'], ['/jobs', 'Jobs'], ['/outbox', 'Emails'], ['/about', 'How it works']];
 function page(title, inner, { current = '', scripts = '', description = 'HireBuddy: say what work you want in one sentence. An agent finds jobs that suit blind and low-vision people, applies, books interviews and checks its own work.' } = {}) {
-  const nav = NAV.map(([href, label]) => `<li><a href="${href}"${href === current ? ' aria-current="page"' : ''}${href === '/me' ? ' id="me-link"' : ''}>${label}</a></li>`).join('');
+  const nav = NAV.map(([href, label]) => `<li><a href="${href}"${href === current ? ' aria-current="page"' : ''}>${label}</a></li>`).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · HireBuddy</title><meta name="description" content="${esc(description)}">
 <link rel="icon" href="/favicon.svg">
@@ -57,8 +57,7 @@ function page(title, inner, { current = '', scripts = '', description = 'HireBud
 <nav aria-label="Main"><ul>${nav}</ul></nav>
 <div class="textsize" role="group" aria-label="Text size"><span aria-hidden="true">Text size</span>
 <button type="button" class="secondary" data-size="normal" aria-label="Normal text">A</button><button type="button" class="secondary" data-size="large" aria-label="Large text">A+</button><button type="button" class="secondary" data-size="larger" aria-label="Largest text">A++</button></div>
-<button type="button" class="secondary" id="speak-toggle" aria-pressed="true" title="Turn off if you use a screen reader">Speak out loud</button>
-<button type="button" class="secondary" id="voice-command" aria-keyshortcuts="Alt+V" title="Alt+V, then say a button">Voice command</button>
+<button type="button" class="secondary" id="voice-command" aria-keyshortcuts="Alt+V" title="Alt+V, say a button, then Enter">Voice command</button>
 </div></header>
 <main id="main" tabindex="-1">${inner}</main>
 <footer><p>Built to work with screen readers (NVDA, JAWS, VoiceOver, TalkBack), with a keyboard alone, and at large text sizes. People and employers in this demo are fictional.</p></footer>

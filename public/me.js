@@ -145,8 +145,6 @@ async function show(focus) {
   $('#view').hidden = false;
   $('#view').innerHTML = '<p>Loading…</p>';
   await (me.role === 'student' ? showStudent(me, focus) : showOwner(me, focus));
-  const link = document.getElementById('me-link');
-  if (link) link.textContent = `My page (${me.name.split(' ')[0]})`;
 }
 
 show(false);

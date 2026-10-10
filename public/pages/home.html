@@ -1,10 +1,9 @@
-<!-- {"title":"Find work in one sentence","script":"/app.js"} -->
+<!-- {"title":"Find work","script":"/app.js"} -->
 <div id="announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <section id="composer" class="hero" aria-labelledby="hero-title">
   <h1 id="hero-title">Tell HireBuddy the work you want</h1>
-  <p class="lede">One sentence is enough: what you can do, where you live, when you are free and what you need. HireBuddy finds jobs that suit you, applies, books interviews and checks everything twice.</p>
-  <p>Made for blind and low-vision job seekers. It works with your screen reader, with a keyboard alone, and in WorkBuddy.</p>
+  <p class="lede">Introduce yourself in a few lines. HireBuddy finds jobs that suit you, applies and books interviews.</p>
 
   <form id="ask" novalidate>
     <fieldset>
@@ -15,8 +14,8 @@
       </div>
     </fieldset>
 
-    <label for="prompt">Your sentence</label>
-    <span class="hint" id="prompt-hint">For example: I'm blind and use NVDA, I live in Subang Jaya, I'm good on the phone, free weekdays 9 to 5.</span>
+    <label for="prompt" id="prompt-label">Introduce yourself</label>
+    <span class="hint" id="prompt-hint">Not sure what to write? Use the ideas below.</span>
     <textarea id="prompt" name="prompt" aria-describedby="prompt-hint prompt-error" spellcheck="true"></textarea>
     <p id="prompt-error" class="panel bad" hidden></p>
 
@@ -26,26 +25,32 @@
       <button id="speak" type="button" class="secondary" hidden>Speak instead</button>
     </div>
 
+    <h2 id="ideas-title">Ideas for what to write</h2>
+    <p class="hint">Choose one to start that line in the box.</p>
+    <ul id="ideas" class="ideas" aria-labelledby="ideas-title"></ul>
+
+    <details id="examples-wrap">
+      <summary>See a full example</summary>
+      <ul id="examples" class="examples" aria-label="Examples"></ul>
+    </details>
+
     <details id="tg">
       <summary id="tg-title">Send to WorkBuddy through Telegram</summary>
-      <p>If your WorkBuddy is connected to a Telegram bot (in WorkBuddy: Assistant, Assistant Settings, Channels, Telegram), type the bot's username. This browser remembers it. After that, Hand it to WorkBuddy opens that chat with the task typed in, on this computer or on your phone, and you press Send.</p>
-      <label for="tg-bot">Your WorkBuddy bot's username</label>
-      <span class="hint" id="tg-hint">It ends in "bot", for example nadia_workbuddy_bot.</span>
+      <p>Connect WorkBuddy to a Telegram bot (WorkBuddy: Assistant Settings, Channels, Telegram), then save its username here.</p>
+      <label for="tg-bot">WorkBuddy bot username</label>
+      <span class="hint" id="tg-hint">Ends in "bot", for example nadia_workbuddy_bot.</span>
       <input id="tg-bot" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="tg-hint tg-error">
       <p id="tg-error" class="panel bad" hidden></p>
       <p class="actions"><button type="button" id="tg-save">Save</button> <button type="button" id="tg-forget" class="secondary" hidden>Stop using Telegram</button></p>
     </details>
-
-    <h2 id="examples-title">Or start from an example</h2>
-    <ul id="examples" class="examples" aria-labelledby="examples-title"></ul>
   </form>
-  <p class="notice" id="mode"></p>
+  <p class="notice small" id="mode"></p>
 </section>
 
 <section id="handoff-panel" class="panel" aria-labelledby="handoff-title" hidden>
   <h2 id="handoff-title" tabindex="-1">Your task for WorkBuddy</h2>
-  <p id="handoff-how">It is already copied. Press <kbd>Alt</kbd>+<kbd>Tab</kbd> to WorkBuddy, <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste, then <kbd>Enter</kbd>. WorkBuddy searches job sites, applies through HireBuddy, books interviews and saves the results in your Documents folder. This page follows each step and reads out the result.</p>
-  <p id="handoff-tg" hidden>Telegram opens your WorkBuddy chat with the task already typed. Press <strong>Send</strong> there. If Telegram did not open, use this link: <a id="handoff-tg-link" href="#" target="_blank" rel="noopener">Open WorkBuddy in Telegram</a>. If the message box is empty, paste the task, which is already copied. This page follows each step and reads out the result.</p>
+  <p id="handoff-how">It is copied. Press <kbd>Alt</kbd>+<kbd>Tab</kbd> to WorkBuddy, <kbd>Ctrl</kbd>+<kbd>V</kbd>, then <kbd>Enter</kbd>. This page follows each step.</p>
+  <p id="handoff-tg" hidden>Press <strong>Send</strong> in Telegram. Didn't open? <a id="handoff-tg-link" href="#" target="_blank" rel="noopener">Open WorkBuddy in Telegram</a>. The task is also copied.</p>
   <label for="handoff-task">Task for WorkBuddy</label>
   <textarea id="handoff-task" readonly rows="5"></textarea>
   <p class="actions"><button type="button" id="handoff-copy">Copy the task</button></p>
@@ -67,7 +72,7 @@
   <ol id="plan" class="plan" aria-labelledby="plan-title"><li>Planning…</li></ol>
 
   <details id="log-wrap">
-    <summary>Everything the agent did, step by step</summary>
+    <summary>Every step the agent took</summary>
     <ol id="timeline" class="log"></ol>
   </details>
 

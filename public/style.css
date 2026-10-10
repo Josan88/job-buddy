@@ -114,6 +114,8 @@ fieldset { border: 0; padding: 0; margin: 1.5rem 0; }
 .panel.bad { border-color: var(--bad); border-left-width: 10px; }
 .panel.decision { border-color: var(--brand); border-left-width: 10px; }
 .panel.fix { background: var(--warn-bg); border-left-width: 10px; }
+.ideas { list-style: none; padding: 0; margin: .5rem 0 1.5rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+.ideas button::before { content: "+ "; }
 .examples { list-style: none; padding: 0; margin: .5rem 0 1rem; display: grid; gap: .5rem; }
 .examples button { width: 100%; justify-content: flex-start; text-align: left; font-weight: 400; background: var(--bg); color: var(--ink); border: 2px solid var(--line); }
 .examples button b { color: var(--brand); }
