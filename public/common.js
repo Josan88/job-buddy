@@ -160,9 +160,18 @@ window.HB = {
     const title = main.querySelector('h1')?.textContent?.trim() || document.title;
     const intro = main.querySelector('.lede, h1 + p, #job-help')?.textContent?.trim() || '';
     const sections = [...main.querySelectorAll('h2')].filter(h => h.getClientRects().length).map(h => h.textContent.trim());
-    const tabs = [...document.querySelectorAll('header nav a, header nav summary')].filter(el => el.getClientRects().length).map(el => el.textContent.trim());
-    const text = `${tabs.length ? `Navigation tabs: ${tabs.join(', ')}. ` : ''}${title}. ${intro}${sections.length ? ` This page has these sections: ${sections.join(', ')}.` : ''}`;
-    console.info('[HireBuddy speech] page introduction', { title, intro, sections, interrupt });
+    const expandableSections = [...main.querySelectorAll('details:not([hidden]) > summary')]
+      .filter(el => el.getClientRects().length)
+      .map(el => el.textContent.trim());
+    const tabs = [...document.querySelectorAll('header nav a, header nav summary')]
+      .filter(el => !el.closest('details.menu') && el.getClientRects().length)
+      .map(el => el.textContent.trim());
+    const voiceGuide = document.querySelector('details.voice-guide');
+    const voiceGuideText = voiceGuide
+      ? [...voiceGuide.querySelectorAll('summary, p')].map(el => el.textContent.trim()).join('. ')
+      : '';
+    const text = `${tabs.length ? `Navigation tabs: ${tabs.join(', ')}. ` : ''}${voiceGuideText ? `${voiceGuideText}. ` : ''}${title}. ${intro}${sections.length ? ` This page has these sections: ${sections.join(', ')}.` : ''}${expandableSections.length ? ` After that, there ${expandableSections.length === 1 ? 'is an expandable section' : 'are expandable sections'}: ${expandableSections.join(', ')}.` : ''}`;
+    console.info('[HireBuddy speech] page introduction', { title, intro, sections, expandableSections, voiceGuideText, interrupt });
     (interrupt ? window.HB.readControl : window.HB.readFocus)(text);
   },
   // Listen until the person presses Enter (or the button again). Escape cancels. Calls done(text), with ''
@@ -216,10 +225,22 @@ document.addEventListener('focusin', event => {
   window.HB.readControl(`${context}${name}. Button. Press Enter to activate.`);
 });
 
+// Announce expandable sections in the main page. On the home page this follows the
+// idea buttons, and opening it exposes full-example buttons that are read in full.
+document.addEventListener('focusin', event => {
+  const summary = event.target.closest?.('main details > summary, details.voice-guide > summary');
+  if (!summary) return;
+  const name = summary.getAttribute('aria-label') || summary.textContent.trim();
+  const state = summary.parentElement.open ? 'Expanded' : 'Collapsed';
+  window.HB.readControl(`${name}. Expandable section. ${state}. Press Enter to ${summary.parentElement.open ? 'close' : 'open'}.`);
+});
+
 // Navigation items are announced as tabs before their name and activation instruction.
 document.addEventListener('focusin', event => {
   const tab = event.target.closest?.('header nav a, header nav summary');
-  if (!tab) return;
+  // Keep the Demo hamburger and its links silent in HireBuddy's built-in voice.
+  // They remain available to the browser, keyboard users, and external screen readers.
+  if (!tab || tab.closest('details.menu')) return;
   const name = tab.getAttribute('aria-label') || tab.textContent.trim();
   window.HB.readControl(`${name}. Navigation tab. Press Enter to select.`);
 });
@@ -235,9 +256,9 @@ document.addEventListener('focusin', event => {
   const nameOf = el => norm(el.getAttribute('aria-label') || el.textContent).replace(/^use this example /, 'example ');
   // Buttons on the page first, then the menu; the text-size buttons are left out.
   const targets = () => {
-    const controls = [...document.querySelectorAll('main button, main a.btn, main summary, main input[type=radio]'), ...document.querySelectorAll('header nav a, header nav summary')]
-    .filter(el => el !== btn && visible(el))
-    .map(el => ({ el, name: el.matches('input') ? norm(el.closest('label')?.textContent) : nameOf(el), kind: el.closest('header nav') ? 'navigation tab' : 'control' }));
+    const controls = [...document.querySelectorAll('main button, main a.btn, main summary, main input[type=radio], details.voice-guide > summary'), ...document.querySelectorAll('header nav a, header nav summary')]
+    .filter(el => el !== btn && !el.closest('details.menu') && visible(el))
+    .map(el => ({ el, name: el.matches('input') ? norm(el.closest('label')?.textContent) : nameOf(el), kind: el.closest('details.voice-guide') ? 'voice guide' : el.closest('header nav') ? 'navigation tab' : 'control' }));
     const sections = [...document.querySelectorAll('main h1, main h2')].filter(visible).map(el => {
       if (!el.hasAttribute('tabindex')) el.tabIndex = -1;
       return { el, name: norm(el.textContent), kind: 'section' };
@@ -254,7 +275,7 @@ document.addEventListener('focusin', event => {
   };
 
   function act(heard) {
-    const h = norm(heard).replace(/^(press|click|choose|select|open|go to|the)\s+/, '').replace(/\s+button$/, '');
+    const h = norm(heard).replace(/^(press|click|choose|select|open|show|read|go to|the)\s+/, '').replace(/\s+button$/, '');
     console.info('[HireBuddy voice] command', { heard, normalized: h });
     if (!h) return say("I didn't hear a button. Press Space to try again.");
     if (/what can i say|^help$|^options$/.test(h)) return say(listing());
@@ -277,6 +298,14 @@ document.addEventListener('focusin', event => {
     }
     if (!best) { console.warn('[HireBuddy voice] no target matched', { heard, normalized: h }); return say(`I couldn't find a button called ${heard}. ${listing()}`); }
     console.info('[HireBuddy voice] activating target', { heard, target: best.name, score });
+    if (best.kind === 'voice guide') {
+      const guide = best.el.closest('details.voice-guide');
+      guide.open = true;
+      best.el.focus();
+      const instructions = [...guide.querySelectorAll('p')].map(el => el.textContent.trim()).join(' ');
+      say(`Voice command guide. ${instructions}`);
+      return;
+    }
     best.el.focus();
     say(best.kind === 'section'
       ? `Focused ${best.name}. Section selected.`
