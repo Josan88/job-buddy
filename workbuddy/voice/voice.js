@@ -25,14 +25,18 @@ const TITLE = cfg.windowTitle || 'WorkBuddy';
 const NEW_TASK_KEYS = cfg.newTaskKeys || '';
 const args = process.argv.slice(isSea ? 1 : 2);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const log = (...a) => console.log(new Date().toLocaleTimeString(), ...a);
+const LOG = path.join(require('os').tmpdir(), 'hirebuddy-voice.log');
+const log = (...a) => { const line = `${new Date().toLocaleTimeString()} ${a.map(x => typeof x === 'string' ? x : JSON.stringify(x)).join(' ')}`; console.log(line); try { fs.appendFileSync(LOG, line + '\n'); } catch {} };
 
 // Run a PowerShell snippet. Values go in through environment variables, never pasted into the code.
 function ps(script, env = {}) {
   if (process.platform !== 'win32') { log('[powershell skipped: not Windows]', Object.values(env).join(' | ')); return { stdout: '', status: 0 }; }
   const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')],
     { env: { ...process.env, ...env }, encoding: 'utf8', windowsHide: true, timeout: 120000 });
-  return { stdout: (r.stdout || '').trim(), stderr: (r.stderr || '').trim(), status: r.status };
+  const out = { stdout: (r.stdout || '').trim(), stderr: (r.stderr || '').trim(), status: r.status };
+  if (r.error) log('powershell could not start:', r.error.message);
+  if (out.stderr) log('powershell error:', out.stderr.slice(0, 500));
+  return out;
 }
 
 const speak = text => {
@@ -46,7 +50,11 @@ function listen() {
 $ErrorActionPreference = 'Stop'
 try {
   Add-Type -AssemblyName System.Speech
-  $r = New-Object System.Speech.Recognition.SpeechRecognitionEngine
+  $all = [System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers()
+  if ($all.Count -eq 0) { Write-Output 'ERR:no-recognizer'; exit }
+  $pick = $all | Where-Object { $_.Culture.Name -like 'en-*' } | Select-Object -First 1
+  if ($pick -eq $null) { $pick = $all | Select-Object -First 1 }
+  $r = New-Object System.Speech.Recognition.SpeechRecognitionEngine($pick)
   $r.SetInputToDefaultAudioDevice()
   $r.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))
   $r.InitialSilenceTimeout = [TimeSpan]::FromSeconds(8)
@@ -59,7 +67,31 @@ try {
     $r.InitialSilenceTimeout = [TimeSpan]::FromSeconds(3)
   }
   Write-Output ($parts -join ' ')
-} catch { Write-Output '' }`);
+} catch { Write-Output ('ERR:' + $_.Exception.Message) }`);
+  if (r.stdout.startsWith('ERR:')) {
+    log('listen failed:', r.stdout);
+    speak(r.stdout === 'ERR:no-recognizer'
+      ? 'Windows speech recognition is not installed, so I will open a typing box instead. To speak, add English speech recognition in Windows settings, under Time and language, Speech.'
+      : 'I could not use the microphone, so I will open a typing box instead.');
+    return '';
+  }
+  return r.stdout;
+}
+
+// Checks each part and says what works, so a problem can be found quickly.
+function selfTest() {
+  log('--- self-test', BASE, process.platform, process.version);
+  const r = ps(`
+$o = @()
+try { Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; $o += 'voices: ' + (($s.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name }) -join ', ') } catch { $o += 'voices: ERROR ' + $_.Exception.Message }
+try { $o += 'recognizers: ' + (([System.Speech.Recognition.SpeechRecognitionEngine]::InstalledRecognizers() | ForEach-Object { $_.Culture.Name }) -join ', ') } catch { $o += 'recognizers: ERROR ' + $_.Exception.Message }
+$p = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and ($_.MainWindowTitle -like ('*' + $env:HB_TITLE + '*') -or $_.ProcessName -like ('*' + $env:HB_TITLE + '*')) } | Select-Object -First 1
+$o += 'workbuddy window: ' + $(if ($p) { $p.ProcessName + ' / ' + $p.MainWindowTitle } else { 'NOT FOUND' })
+$o += 'windows with titles: ' + ((Get-Process | Where-Object { $_.MainWindowTitle } | ForEach-Object { $_.ProcessName + '=' + $_.MainWindowTitle }) -join '; ')
+$lnk = Join-Path ([Environment]::GetFolderPath('Programs')) 'HireBuddy Voice.lnk'
+$o += 'shortcut: ' + $(if (Test-Path $lnk) { (New-Object -ComObject WScript.Shell).CreateShortcut($lnk).Hotkey } else { 'NOT INSTALLED' })
+$o -join [Environment]::NewLine`, { HB_TITLE: TITLE });
+  log(r.stdout || '(no output from PowerShell)');
   return r.stdout;
 }
 
@@ -140,6 +172,14 @@ async function follow(handoffId) {
 
 (async () => {
   if (args.includes('--install')) return install();
+  if (args.includes('--test')) {
+    const out = selfTest();
+    const ok = await fetch(`${BASE}/health`).then(r => r.json()).catch(e => ({ error: e.message }));
+    log('hirebuddy:', ok);
+    speak('This is HireBuddy Voice. If you can hear me, speaking works.');
+    console.log(`\nFull log: ${LOG}`);
+    return;
+  }
   let sentence = args.includes('--say') ? args[args.indexOf('--say') + 1] : '';
   if (!sentence && !args.includes('--type')) {
     speak('Listening. Say the work you want, then stop talking.');

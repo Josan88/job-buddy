@@ -17,6 +17,7 @@ That adds a "HireBuddy Voice" Start menu shortcut with the Ctrl+Alt+H hotkey. Ot
 
 - `node workbuddy\voice\voice.js --type` lets you type instead of speaking.
 - `node workbuddy\voice\voice.js --say "..."` uses the given sentence.
+- `node workbuddy\voice\voice.js --test` checks speech, the speech recognizer, the WorkBuddy window and the Ctrl+Alt+H shortcut, and prints what fails. Each run also writes a log to `%TEMP%\hirebuddy-voice.log`.
 
 **Settings (optional):** create `workbuddy/voice/hirebuddy-voice.json` with:
 - `url`: the HireBuddy address.
