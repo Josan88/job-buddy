@@ -5,6 +5,7 @@ const store = require('./store');
 const agent = require('./agent');
 const { tools } = require('./tools');
 const { steps } = require('./steps');
+const intake = require('./intake');
 
 const PROTOCOL = '2025-06-18';
 const sessions = new Map(); // mcp session id -> run used by granular tools
@@ -69,6 +70,8 @@ const text = (obj, isError = false) => ({ content: [{ type: 'text', text: typeof
 
 async function callTool(name, args, sessionId, baseUrl) {
   if (name === 'hirebuddy_run') {
+    const handoff = intake.find(args);
+    if (handoff?.intake && handoff.intake.status !== 'ready') return text({ ok: false, error: 'Complete hirebuddy_review_intake before the job-search fallback.' }, true);
     const listings = Array.isArray(args.listings) && args.listings.length ? args.listings : null;
     const run = agent.newRun(args.prompt, args.persona || (listings ? 'student' : undefined), 'mcp', { business: args.business, ownerEmail: args.ownerEmail, listings });
     await agent.execute(run, baseUrl);

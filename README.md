@@ -82,12 +82,13 @@ A search does not send an application. The user must select and confirm a job fi
 
 From one sentence, HireBuddy:
 
-1. Saves the job seeker's known experience, availability, location, pay needs, and accessibility needs.
-2. Searches for jobs and checks pay, hours, travel, required tasks, and screen-reader support.
-3. Explains why each unsuitable job was excluded.
-4. Prepares suitable jobs for the user to review.
-5. Sends an application only after the user selects a job.
-6. Verifies its work before showing the result.
+1. Reads the request and an optional resume.
+2. Lets the user type or speak any required details that are missing.
+3. Searches for jobs and checks pay, hours, travel, required tasks, and screen-reader support.
+4. Explains why each unsuitable job was excluded.
+5. Prepares suitable jobs for the user to review.
+6. Sends an application only after the user selects a job.
+7. Verifies its work before showing the result.
 
 HireBuddy does not automatically book interviews, send interview invitations, or create interview reminders.
 
@@ -187,6 +188,10 @@ Open **Application debug console** at the bottom of the page to see hand-off eve
 - `503`: Telegram is not configured on the server.
 
 Run `npm run test:application` to test keyboard activation, Telegram hand-off, recipient handling, and duplicate protection with a mocked connection.
+
+For website searches, WorkBuddy reviews the request and supplied resume for required details. If something is missing, the web app accepts typed or spoken answers before the search starts. Speech recognition requires browser support and microphone permission; typing is always available.
+
+After updating HireBuddy, reinstall the skill and refresh its MCP tools in WorkBuddy. Run `node test/intake.js` to test intake review, voice-field entry, stale revisions, and the answer round trip.
 
 ## Demo data
 

@@ -53,13 +53,22 @@ ${(run.decisions || []).length ? `<h2>Decisions made on the way</h2><ul>${run.de
 </main></body></html>`;
 }
 
+const intake = require('./intake');
 const steps = {};
+steps.hirebuddy_review_intake = {
+  description: 'WorkBuddy reviews prompt/resume facts and requests missing details through JobBuddy before job search.',
+  inputSchema: { type: 'object', properties: { handoffId: { type: 'string' }, revision: { type: 'integer' },
+    details: { type: 'object', properties: Object.fromEntries(Object.keys(intake.FIELDS).map(k => [k, { type: ['string', 'number'] }])), additionalProperties: false },
+    missing: { type: 'array', items: { type: 'string', enum: Object.keys(intake.FIELDS) } } }, required: ['handoffId', 'revision', 'details', 'missing'] },
+  async run(args) { return intake.review(intake.find(args), args); }
+};
 
 steps.hirebuddy_1_understand = {
   description: 'Step 1 of 4 for a job seeker (blind or low-vision people included). Saves their profile and access needs from their own words and starts the job. If you searched real job sites (JobStreet, Indeed, Hiredly, Maukerja), pass what you found as listings. Then follow `next` without asking the user anything.',
   inputSchema: {
     type: 'object',
     properties: {
+      handoffId: { type: 'string', description: 'Website handoff whose applicant facts WorkBuddy has reviewed' },
       prompt: { type: 'string', description: 'The user\'s words, unchanged' },
       applicantDetails: { type: 'object', description: 'Optional facts extracted from this applicant’s resume or explicitly supplied by the user. Never invent missing details.',
         properties: { education: { type: 'string' },
@@ -71,11 +80,15 @@ steps.hirebuddy_1_understand = {
   },
   async run(args, baseUrl) {
     const listings = Array.isArray(args.listings) && args.listings.length ? args.listings : null;
-    // Started from the HireBuddy website: use the sentence the person typed there, and let the site follow this run.
-    // The task carries no code, so match the newest unclaimed hand-off (last 30 minutes) whose sentence is in the request.
-    const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    const said = norm(args.prompt);
-    const ho = said && (store.db.handoffs || []).slice().reverse().find(x => !x.runId && Date.now() - Date.parse(x.createdAt) < 30 * 60e3 && norm(x.prompt) && said.includes(norm(x.prompt)));
+    // Review website intake before starting the existing workflow.
+    const ho = intake.find(args);
+    if (args.handoffId && !ho) return bad('Unknown handoffId.', 'Read the current JobBuddy handoff.');
+    if (ho?.intake && ho.intake.status !== 'ready') return bad('WorkBuddy must complete the applicant-details review before starting the job search.', 'Call hirebuddy_review_intake, then wait for missing answers if needed.');
+    if (ho?.runId) return bad('This handoff has already started.', 'Follow the existing run.');
+    if (ho?.intake) {
+      const facts = ho.intake.details;
+      args = { ...args, applicantDetails: { ...args.applicantDetails, education: facts.education, age: Number(facts.age), workExperience: facts.workExperience, interestedPosition: facts.interestedPosition } };
+    }
     const run = agent.newRun((ho ? ho.prompt : String(args.prompt || '')).slice(0, 2000), 'student', 'workbuddy', { listings });
     if (ho) { ho.runId = run.id; run.handoffId = ho.id; }
     run.mode = 'WorkBuddy runs the steps';
@@ -90,6 +103,9 @@ steps.hirebuddy_1_understand = {
       { title: 'WorkBuddy: get the files to save on your computer', tool: 'finish' },
     ] });
     const p = parse.student(run.prompt);
+    if (ho?.intake) { p.name = ho.intake.details.name; p.area = ho.intake.details.location;
+      p.bio = [p.bio, ho.intake.details.workExperience].filter(Boolean).join(' ');
+    }
     const reg = await agent.callTool(ctx, 'register_student', { name: p.name, email: p.email || undefined, area: p.area, campus: p.campus || undefined, skills: p.skills,
       availability: p.availability, expectedRate: p.expectedRate || undefined, bio: p.bio, needs: p.needs || undefined,
       education: args.applicantDetails?.education,

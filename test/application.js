@@ -111,7 +111,7 @@ const apply = (job, key) => fetch(`${base}/api/jobs/${job}/apply/stu-nadia`, {
   const withResume = await handoff({ prompt: 'Find remote work', studentId: student.id });
   assert.equal(withResume.status, 201);
   assert(withResume.task.includes(`/api/me/student/${student.id}/resume`));
-  assert(withResume.task.includes('without requesting compulsory missing details'));
+  assert(withResume.task.includes('hirebuddy_review_intake'));
   assert.equal((await handoff({ prompt: '' })).status, 400);
   console.log('PASS application handoff and searches with incomplete details or supplied resume');
 })().then(() => { fs.rmSync(dir, { recursive: true, force: true }); process.exit(0); })
