@@ -52,7 +52,7 @@ async function showStudent(me, focus) {
   document.title = `${me.name} · HireBuddy`;
   $('#view').innerHTML = header(me, `${esc(d.student.area)}${n ? `. ${esc(n.vision.replace(/^\w/, c => c.toUpperCase()))}, uses ${esc(n.tool)}` : ''}. Free ${esc(d.student.free)}${d.student.minPay ? `. At least RM${esc(d.student.minPay)} an hour` : ''}`) + `
     <h2>Your applications (${others.length})</h2>
-    ${others.length ? `<ul class="joblist">${others.map(a => `<li><h3><a href="${esc(a.url)}">${esc(a.title)}</a> at ${esc(a.business)}</h3>
+    ${others.length ? `<ul class="joblist">${others.map(a => `<li><div class="person-top"><h3><a href="${esc(a.url)}">${esc(a.title)}</a> at ${esc(a.business)}</h3><span class="score-pill" aria-label="Match score ${a.score} out of 100">${a.score}/100</span></div>
       <p><span class="status-word ${STATUS[a.status][1]}">${STATUS[a.status][0]}</span></p>
 </li>`).join('')}</ul>` : '<p>No applications.</p>'}
     <h2 id="about-title">About me</h2>
@@ -73,12 +73,12 @@ async function showStudent(me, focus) {
     <p id="job-help">Press Tab to move through the jobs. Press Enter on a job card to send your application.</p>
     <p id="apply-msg" class="panel" role="status" tabindex="-1" hidden></p>
     <ul class="joblist">${suits.map((j, i) => `<li class="job-card" tabindex="0" aria-labelledby="job-title-${i}" aria-describedby="job-detail-${i} job-access-${i} job-action-${i}" data-job-card>
-      <h3 id="job-title-${i}"><a tabindex="-1" href="${esc(j.url)}">${esc(j.title)}</a></h3>
-      <p id="job-detail-${i}">${esc(j.business)}, ${esc(j.workMode)}. ${esc(j.pay)}. ${esc(j.schedule)}. Match ${j.score} out of 100.</p>
+      <div class="person-top"><h3 id="job-title-${i}"><a tabindex="-1" href="${esc(j.url)}">${esc(j.title)}</a></h3><span class="score-pill" aria-label="Match score ${j.score} out of 100">${j.score}/100</span></div>
+      <p id="job-detail-${i}">${esc(j.business)}, ${esc(j.workMode)}. ${esc(j.pay)}. ${esc(j.schedule)}.</p>
       ${j.access ? `<p id="job-access-${i}">${j.access.fit === 'good' ? 'Suits you' : 'Ask first'}: ${esc([...j.access.reasons, ...j.access.asks].join('; '))}.</p>` : `<span id="job-access-${i}" class="sr-only">No additional access details.</span>`}
       <p class="actions" id="job-action-${i}"><button type="button" data-apply-job="${esc(j.jobId)}" data-label="${esc(j.title)} at ${esc(j.business)}">Send application</button> <a href="${esc(j.url)}">Read full job details</a></p>
     </li>`).join('') || (d.mine.length ? '<li>None left. HireBuddy has already applied to every job that suits you.</li>' : '<li>None right now.</li>')}</ul>
-    ${notFor.length ? `<details><summary>Other jobs, and why they don't suit you (${notFor.length})</summary><ul>${notFor.map(j => `<li>${esc(j.title)} at ${esc(j.business)}: ${esc(j.whyNot)}.</li>`).join('')}</ul></details>` : ''}`;
+    ${notFor.length ? `<details><summary>Other jobs, and why they don't suit you (${notFor.length})</summary><ul>${notFor.map(j => `<li><b>${esc(j.title)} at ${esc(j.business)}</b> <span class="score-pill" aria-label="Match score ${j.score} out of 100">${j.score}/100</span>: ${esc(j.whyNot)}.</li>`).join('')}</ul></details>` : ''}`;
   bind(me);
   bindDetails(me);
   if (focus) $('#me-title').focus();
@@ -150,7 +150,7 @@ async function showOwner(me, focus) {
       <h2 id="job-${esc(j.id)}"><a href="${esc(j.url)}">${esc(j.title)}</a></h2>
       <p>${esc(j.area)}. ${esc(j.pay)}. ${esc(j.schedule)}.</p>
       ${j.runId ? `<p><a href="/runs/${esc(j.runId)}">How the agent did it</a></p>` : ''}
-      ${j.applicants.length ? `<h3>Applicants</h3><ul>${j.applicants.map(a => `<li>${esc(a.name)}, match ${a.score} out of 100</li>`).join('')}</ul>` : ''}
+      ${j.applicants.length ? `<h3>Applicants</h3><ul>${j.applicants.map(a => `<li><span class="person-top"><span>${esc(a.name)}</span><span class="score-pill" aria-label="Match score ${a.score} out of 100">${a.score}/100</span></span></li>`).join('')}</ul>` : ''}
     </section>`).join('') || '<p>You have not published any jobs yet.</p>'}`;
   bind(me);
   if (focus) $('#me-title').focus();
