@@ -16,8 +16,7 @@ const EXAMPLES = {
   ],
 };
 
-// Topics a person may want to include. These remain focusable buttons so the site's voice
-// reads them individually, but activating one never changes the introduction text.
+// Idea buttons append a sentence starter and focus the introduction for completion.
 const IDEAS = {
   student: [
     ['Your name', "I'm "],
@@ -121,13 +120,19 @@ function setPersona(p) {
   persona = p;
   document.querySelectorAll('input[name="persona"]').forEach(r => { r.checked = r.value === p; });
   // Job seekers hand their words to WorkBuddy; employers have HireBuddy hire for them here.
-  $('#go').hidden = p === 'student';
+  const go = $('#go');
+  if (go) go.hidden = p === 'student';
   $('#handoff').hidden = p !== 'student';
   $('#tg').hidden = p !== 'student' || !telegramOn;
   $('#prompt-label').textContent = p === 'student' ? 'Introduce yourself' : 'Describe the job';
   $('#ideas').innerHTML = IDEAS[p].map(([label], i) => `<li><button type="button" class="secondary" data-i="${i}">${esc(label)}</button></li>`).join('');
   $('#ideas').querySelectorAll('button').forEach(b => b.onclick = () => {
-    window.HB.readControl(`${b.textContent.trim()}. Idea for what to write. Your introduction was not changed.`);
+    const prompt = $('#prompt');
+    const [label, starter] = IDEAS[p][Number(b.dataset.i)];
+    prompt.value += (prompt.value && !prompt.value.endsWith('\n') ? '\n' : '') + starter;
+    prompt.focus();
+    prompt.setSelectionRange(prompt.value.length, prompt.value.length);
+    announce(`${label} starter added. Complete it in the introduction field.`);
   });
   $('#examples').innerHTML = EXAMPLES[p].map((e, i) => `<li><button type="button" data-i="${i}"><span><b>Example ${i + 1}:</b> ${esc(e)}</span></button></li>`).join('');
   $('#examples').querySelectorAll('button').forEach(b => b.onclick = () => {
