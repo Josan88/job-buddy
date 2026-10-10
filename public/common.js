@@ -17,6 +17,21 @@ document.querySelectorAll('details.menu').forEach(m => {
   document.addEventListener('click', e => { if (m.open && !m.contains(e.target)) m.open = false; });
 });
 
+// Preserve punctuation as short utterances. Browsers add a clearer pause between queued
+// utterances than they do inside one long string, especially after commas and full stops.
+function speechParts(text) {
+  const clean = String(text || '')
+    .replace(/\r?\n+/g, '. ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .replace(/([,.;:!?])(?=\S)/g, '$1 ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const clauses = clean.match(/[^,.;:!?]+[,.;:!?]+|[^,.;:!?]+$/g) || [clean];
+  return clauses.flatMap(clause => clause.length <= 180
+    ? [clause.trim()]
+    : (clause.match(/.{1,180}(?:\s|$)/g) || [clause]).map(part => part.trim())).filter(Boolean);
+}
+
 window.HB = {
   debug(stage, details = {}) {
     const line = `${new Date().toLocaleTimeString()} ${stage} ${JSON.stringify(details)}`;
@@ -92,7 +107,7 @@ window.HB = {
     if (!('speechSynthesis' in window)) return;
     if (speechSynthesis.speaking) { speechSynthesis.cancel(); if (button) button.textContent = 'Read aloud'; return; }
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-GB'; u.rate = 0.75;
+    u.lang = 'en-GB'; u.rate =0.9;
     u.onend = () => { if (button) button.textContent = 'Read aloud'; };
     speechSynthesis.speak(u);
     if (button) button.textContent = 'Stop reading';
@@ -100,13 +115,12 @@ window.HB = {
   // Read newly focused controls for people using the site's built-in speech rather than a screen reader.
   readFocus(text) {
     if (!('speechSynthesis' in window)) { console.error('[HireBuddy speech] speechSynthesis is unavailable'); return; }
-    const clean = String(text || '').replace(/\s+/g, ' ').trim();
-    const chunks = clean.match(/.{1,180}(?:[.!?](?=\s|$)|\s|$)/g) || [clean];
-    console.info('[HireBuddy speech] queue', { characters: clean.length, chunks: chunks.length, text: clean });
+    const chunks = speechParts(text);
+    console.info('[HireBuddy speech] queue', { chunks: chunks.length, text: chunks.join(' ') });
     speechSynthesis.resume();
     chunks.filter(Boolean).forEach(chunk => {
       const u = new SpeechSynthesisUtterance(chunk.trim());
-      u.lang = 'en-GB'; u.rate = 0.75;
+      u.lang = 'en-GB'; u.rate = 0.9;
       u.onstart = () => { window.HB._speechStarted = true; console.info('[HireBuddy speech] started', chunk.trim()); };
       u.onend = () => console.info('[HireBuddy speech] ended', chunk.trim());
       u.onerror = event => console.error('[HireBuddy speech] error', event.error, chunk.trim());
@@ -120,15 +134,17 @@ window.HB = {
     const speak = source => {
       if (spoken) return;
       spoken = true;
-      const u = new SpeechSynthesisUtterance(String(text || '').replace(/\s+/g, ' ').trim());
-      u.lang = 'en-GB'; u.rate = 0.75;
       const voices = speechSynthesis.getVoices();
-      u.voice = voices.find(v => /^en(-|_)/i.test(v.lang)) || voices[0] || null;
-      u.onstart = () => { window.HB._speechStarted = true; console.info('[HireBuddy speech] control started', { source, text: u.text, voice: u.voice?.name }); };
-      u.onend = () => console.info('[HireBuddy speech] control ended', u.text);
-      u.onerror = event => console.error('[HireBuddy speech] control error', event.error, u.text);
+      const voice = voices.find(v => /^en(-|_)/i.test(v.lang)) || voices[0] || null;
       speechSynthesis.resume();
-      speechSynthesis.speak(u);
+      speechParts(text).forEach(part => {
+        const u = new SpeechSynthesisUtterance(part);
+        u.lang = 'en-GB'; u.rate = 0.9; u.voice = voice;
+        u.onstart = () => { window.HB._speechStarted = true; console.info('[HireBuddy speech] control started', { source, text: u.text, voice: u.voice?.name }); };
+        u.onend = () => console.info('[HireBuddy speech] control ended', u.text);
+        u.onerror = event => console.error('[HireBuddy speech] control error', event.error, u.text);
+        speechSynthesis.speak(u);
+      });
     };
     const voices = speechSynthesis.getVoices();
     console.info('[HireBuddy speech] control request', { text, voices: voices.length });
