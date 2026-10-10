@@ -14,7 +14,7 @@ From that one sentence, with no further questions, HireBuddy:
 4. **Applies** with a short note naming the job and her real skills. The employer also receives her interview needs ("send documents as Word or plain text, not scanned images").
 5. **Books interviews** inside the employer's interview hours and her free time, never overlapping, by phone where offered. In-person interviews must be reachable by public transport.
 6. **Emails her each interview** in plain text with the time on line one and how to join on line two.
-7. **Verifies everything** (28 checks in the demo run) and is **not allowed to finish** until they pass. Then it gives a summary written to be heard on a screen reader.
+7. **Verifies everything** (25 checks in the Nadia demo run) and is **not allowed to finish** until they pass. Then it gives a summary written to be heard on a screen reader.
 
 ## What makes it an agent, not a button
 
