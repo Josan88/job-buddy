@@ -216,7 +216,7 @@ Run `npm run test:application` to test keyboard activation, Telegram hand-off, r
 
 ## Demo data
 
-The project contains 16 fictional job-seeker profiles and 17 fictional jobs. Their roles, locations, pay, and shifts are modelled on or designed around Klang Valley part-time work. Seeded email addresses use `example.com` and are never delivered.
+The project contains 12 fictional job seekers and 9 fictional open jobs. Their roles, locations, pay, and shifts are modelled on Klang Valley part-time listings reviewed on 10 October 2026. Seeded email addresses use `example.com` and are never delivered.
 
 See [docs/demo-data.md](docs/demo-data.md) for the data and sources.
 
