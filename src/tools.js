@@ -371,6 +371,9 @@ tools.register_student = {
   description: 'Create or update the job seeker\'s profile so employers can find them. Record any sight-related needs exactly as they described them.',
   parameters: S('object', {
     name: { type: 'string' }, email: { type: 'string' }, area: { type: 'string' }, campus: { type: 'string' },
+    phone: { type: 'string', description: 'Applicant phone number provided by the user or extracted from their resume' },
+    education: { type: 'string', description: 'Education provided by the user or extracted from their resume' },
+    qualifications: { type: 'string', description: 'Qualifications provided by the user or extracted from their resume' },
     skills: { type: 'array', items: { type: 'string' } }, availability: scheduleSchema,
     expectedRate: { type: 'number', description: 'RM per hour' }, bio: { type: 'string', description: 'Short first-person summary built only from facts the seeker gave' },
     needs: needsSchema,
@@ -389,6 +392,9 @@ tools.register_student = {
     const skills = a.skills.map(x => x.toLowerCase());
     if (needs?.screenReader && !skills.includes('screen reader')) skills.push('screen reader');
     const fields = { name: a.name, email, area, campus: a.campus || s?.campus || '', skills, availability: a.availability, expectedRate: a.expectedRate || null, bio: a.bio, needs };
+    for (const key of ['phone', 'education', 'qualifications']) {
+      if (typeof a[key] === 'string') fields[key] = a[key].trim().slice(0, 1000);
+    }
     if (s) Object.assign(s, fields); else { s = { id: store.id('stu'), ...fields }; store.db.students.push(s); }
     store.save();
     ctx.run.studentId = s.id;
@@ -474,7 +480,7 @@ tools.apply_to_job = {
     const asks = fit.asks.some(a => /screen reader/.test(a)) ? `\n\nQuestion: does your setup work with ${s.needs.tool || 'a screen reader'}? HireBuddy checked your listing and it does not say.` : '';
     const email = {
       id: store.id('mail'), to: mail.APPLICATION_INBOX, kind: 'application',
-      subject: `${j.ownerEmail || 'owner@example.com'} — New applicant for ${j.title}: ${s.name}`,
+      subject: `${require('./application').companyEmailFor(j)} — New applicant for ${j.title}: ${s.name}`,
       body: `${s.name}${s.area ? ` (${s.area})` : ''} applied for ${j.title}.\n\n${coverNote}${accessNote(s)}${asks}\n\nMatch score: ${app.score}/100\nReply to: ${s.email}\nJob page: ${jobUrl(ctx, j.id)}`,
       at: new Date().toISOString(), runId: ctx.run.id,
     };
