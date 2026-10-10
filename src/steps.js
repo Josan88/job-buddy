@@ -62,7 +62,8 @@ steps.hirebuddy_1_understand = {
     properties: {
       prompt: { type: 'string', description: 'The user\'s words, unchanged' },
       applicantDetails: { type: 'object', description: 'Optional facts extracted from this applicant’s resume or explicitly supplied by the user. Never invent missing details.',
-        properties: { phone: { type: 'string' }, education: { type: 'string' }, qualifications: { type: 'string' } }, additionalProperties: false },
+        properties: { phone: { type: 'string' }, education: { type: 'string' }, qualifications: { type: 'string' },
+          age: { type: 'number' }, workExperience: { type: 'string' }, interestedPosition: { type: 'string' } }, additionalProperties: false },
       daily: { type: 'boolean', description: 'true for the scheduled background check: look only for NEW jobs and book up to 3 new interviews; a day with nothing new is a normal result' },
       listings: { type: 'array', maxItems: 20, description: 'Optional: jobs you found on real job sites, copied as written (title, employer, companyEmail, site, url, pay, location, hours, description). Leave out anything you did not see.', items: { type: 'object' } },
     },
@@ -91,7 +92,8 @@ steps.hirebuddy_1_understand = {
     const p = parse.student(run.prompt);
     const reg = await agent.callTool(ctx, 'register_student', { name: p.name, email: p.email || undefined, area: p.area, campus: p.campus || undefined, skills: p.skills,
       availability: p.availability, expectedRate: p.expectedRate || undefined, bio: p.bio, needs: p.needs || undefined,
-      phone: args.applicantDetails?.phone, education: args.applicantDetails?.education, qualifications: args.applicantDetails?.qualifications });
+      phone: args.applicantDetails?.phone, education: args.applicantDetails?.education, qualifications: args.applicantDetails?.qualifications,
+      age: args.applicantDetails?.age, workExperience: args.applicantDetails?.workExperience, interestedPosition: args.applicantDetails?.interestedPosition });
     if (!reg.ok) return bad((reg.problems || [reg.error]).join(' '), 'Tell the user what is missing in one sentence.');
     const s = student(ctx);
     run.search = { maxDistanceKm: 25, minPay: p.minPay || 0, maxWalkMin: p.needs?.maxWalkMin, askAboutTech: false };

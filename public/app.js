@@ -245,6 +245,8 @@ $('#tg-test').onclick = async () => {
 };
 
 // Hand the sentence to WorkBuddy: make a task to paste, then follow the run here once WorkBuddy starts it.
+let intakePrompt = '';
+let intakeDetails = {};
 $('#handoff').onclick = async () => {
   const prompt = $('#prompt').value.trim();
   const err = $('#prompt-error');
@@ -255,12 +257,37 @@ $('#handoff').onclick = async () => {
     return $('#prompt').focus();
   }
   err.hidden = true;
+  if (intakePrompt !== prompt) { intakePrompt = prompt; intakeDetails = {}; $('#intake-fields').innerHTML = ''; }
+  document.querySelectorAll('[data-intake-field]').forEach(input => { intakeDetails[input.dataset.intakeField] = input.value.trim(); });
+  let studentId;
+  try { const me = JSON.parse(localStorage.getItem('hirebuddy.me')); if (me?.role === 'student') studentId = me.id; } catch {}
+  let collected;
+  try {
+    collected = await fetch('/api/job-search/details', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt, studentId, details: intakeDetails }) }).then(r => r.json());
+  } catch {
+    err.hidden = false;
+    err.textContent = 'Could not check your details. Check your connection and try again.';
+    announce(err.textContent);
+    return $('#handoff').focus();
+  }
+  intakeDetails = collected.details;
+  if (!collected.complete) {
+    $('#applicant-intake').hidden = false;
+    $('#intake-fields').innerHTML = collected.missing.map(key => `<p><label for="intake-${key}">${esc(collected.labels[key])}</label><input id="intake-${key}" data-intake-field="${key}" ${key === 'age' ? 'type="number" min="1" max="120"' : 'type="text"'} aria-describedby="intake-help" required></p>`).join('');
+    const help = `Before finding jobs, please provide: ${collected.missing.map(key => collected.labels[key]).join(', ')}. Then press Hand it to WorkBuddy again. No work experience is an accepted answer.`;
+    $('#intake-help').textContent = help;
+    announce(help);
+    $('#intake-fields input').focus();
+    return;
+  }
+  $('#applicant-intake').hidden = true;
   // One hand-off at a time: a second press (or a stray Enter) while this one is under way does nothing.
   if ($('#handoff').getAttribute('aria-disabled') === 'true') return;
   $('#handoff').setAttribute('aria-disabled', 'true');
   setTimeout(() => $('#handoff').removeAttribute('aria-disabled'), 15000);
   if (tgKey()) announce('Sending to WorkBuddy through Telegram.');
-  const h = await fetch('/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, key: tgKey() || undefined }) }).then(r => r.json()).catch(() => null);
+  const h = await fetch('/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, studentId, details: intakeDetails, key: tgKey() || undefined }) }).then(r => r.json()).catch(() => null);
   if (!h?.task) {
     $('#handoff').removeAttribute('aria-disabled');
     err.hidden = false;
