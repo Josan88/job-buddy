@@ -209,6 +209,7 @@ function decisionSummary(ctx) {
 async function autopilotHirer(ctx) {
   if (ctx.run.options?.replaceInterviewId) return autopilotReplace(ctx);
   const spec = { ...parse.hirer(ctx.run.prompt), ...(ctx.run.options || {}) };
+  if (!spec.area) return say(ctx, `Where is the job? Tell me the area, for example "Need a weekend barista in Petaling Jaya, RM12/hr", and run me again. I won't guess the location.`);
   const goal = Math.max(3, spec.hires);
   ctx.run.goal = goal;
   say(ctx, `Understood the brief: ${spec.title} in ${spec.area}, RM${spec.pay}/${spec.payUnit}, ${L.describeSchedule(spec.schedule)}, start ${spec.startDate}. Must have: ${spec.requirements.join(', ')}. Goal: ${goal} interviews booked.`);
@@ -353,7 +354,7 @@ async function autopilotStudent(ctx) {
   const goal = SEEKER_GOAL;
   ctx.run.goal = goal;
   const n = p.needs;
-  say(ctx, `Understood: ${p.name}, based in ${p.area}, free ${L.describeSchedule(p.availability)}, skills ${p.skills.join(', ')}.`
+  say(ctx, `Understood: ${p.name}, ${p.area ? `based in ${p.area}` : 'area not given'}, free ${L.describeSchedule(p.availability)}, skills ${p.skills.join(', ')}.`
     + `${n ? ` Needs: ${n.vision}, uses ${n.tool}${n.remoteOnly ? ', remote work only' : `, up to a ${n.maxWalkMin}-minute walk from a stop`}${n.interviewFormat ? `, ${n.interviewFormat} interviews` : ''}.` : ''}`
     + `${p.minPay ? ` At least RM${p.minPay}/h.` : ''} Goal: ${goal} interviews.`);
   await callTool(ctx, 'set_plan', { steps: [

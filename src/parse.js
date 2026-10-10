@@ -95,7 +95,7 @@ function startDate(text, now = new Date()) {
 function hirer(prompt) {
   const t = prompt.toLowerCase();
   const role = ROLES.find(r => r.re.test(t)) || { title: 'Part-timer', biz: 'business', req: ['customer service'], nice: [] };
-  const area = L.findArea(prompt) || 'Subang Jaya';
+  const area = L.findArea(prompt);
   const pay = parsePay(prompt) || { pay: 10, payUnit: 'hour' };
   const schedule = parseSchedule(prompt, role.title === 'Barista' ? '08:00-14:00' : '09:00-17:00');
   const weekend = Object.keys(schedule).every(d => d === 'Sat' || d === 'Sun');
@@ -137,7 +137,7 @@ function student(prompt) {
   if (/coffee|barista/.test(t) && !skills.includes('espresso')) skills.push('espresso');
   const pay = parsePay(prompt);
   return {
-    name, campus, area: L.findArea(prompt) || 'Subang Jaya', email: parseEmail(prompt),
+    name, campus, area: L.findArea(prompt), email: parseEmail(prompt),
     skills: skills.length ? skills : ['customer service'],
     availability: parseSchedule(prompt, '09:00-18:00'),
     expectedRate: pay ? pay.pay : null,
