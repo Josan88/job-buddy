@@ -255,11 +255,11 @@ function showResult(e, live) {
   const out = outcome.outside || [];
   const others = out.length ? `<h3>Jobs WorkBuddy found on other sites</h3>
     <p>HireBuddy can't apply or book interviews on other sites, so nothing was sent. Each job worth asking about has an application ready for you to send.</p>
-    <ol class="joblist">${out.map((r, i) => `<li><h4>${r.url ? `<a href="${esc(r.url)}">${esc(r.title)}</a>` : esc(r.title)} at ${esc(r.employer)}, on ${esc(r.site)}</h4>
+    <ol class="joblist">${out.map((r, i) => `<li><h4>${r.url ? `<a href="${esc(r.url)}">${esc(r.title)}</a>` : esc(r.title)}${r.employer ? ` at ${esc(r.employer)}` : ''}${r.site ? `, on ${esc(r.site)}` : ''}</h4>
       <p><span class="status-word ${r.verdict === 'not suitable' ? 'bad' : 'good'}">${r.verdict === 'not suitable' ? 'Not suitable' : 'Worth asking'}</span>
       ${esc(r.verdict === 'not suitable' ? r.blockers.join('; ') : r.reasons.join('; '))}.</p>
-      ${r.draft ? `<details><summary>Application ready to send, with ${r.questions.length} question${r.questions.length === 1 ? '' : 's'} for ${esc(r.employer)}</summary>
-        <pre id="draft-${i}">${esc(r.draft)}</pre><p><button type="button" class="secondary" data-copy="draft-${i}">Copy the application for ${esc(r.employer)}</button></p></details>` : ''}</li>`).join('')}</ol>` : '';
+      ${r.draft ? `<details><summary>Application ready to send, with ${r.questions.length} question${r.questions.length === 1 ? '' : 's'} for ${esc(r.employer || 'the employer')}</summary>
+        <pre id="draft-${i}">${esc(r.draft)}</pre><p><button type="button" class="secondary" data-copy="draft-${i}">Copy the application for ${esc(r.employer || r.title)}</button></p></details>` : ''}</li>`).join('')}</ol>` : '';
   const rest = lines.slice(1).filter(l => !/^\d+\. /.test(l) || !booked.length);
   $('#result-body').innerHTML = `<p><span class="status-word ${e.verified && !refused ? 'good' : 'bad'}">${refused ? 'Refused: pay is below the legal minimum' : e.verified ? 'Checked and verified' : ok ? 'Done' : 'Needs attention'}</span></p>
     <p class="lede">${linkify(esc(head))}</p>${interviews}${others}${rest.map(l => `<p>${linkify(esc(l))}</p>`).join('')}

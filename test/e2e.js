@@ -76,12 +76,14 @@ const cases = [
     { title: 'Customer Service Executive (Inbound Calls)', employer: 'Example Telco', site: 'JobStreet', url: 'https://example.com/1', pay: 'RM2,600 - RM3,000 per month', location: 'Subang Jaya', hours: 'Mon - Fri, 9am - 6pm', description: 'Answer customer calls in English and Malay. Near SS15 LRT.' },
     { title: 'Despatch Rider', employer: 'Example Courier', site: 'Indeed', pay: 'RM1,800 a month', location: 'Petaling Jaya', description: 'Own motorcycle and valid driving licence required.' },
     { title: 'Part-time Call Agent', employer: 'Example Contact Centre', site: 'Hiredly', pay: 'RM9 per hour', location: 'Remote', hours: 'Weekdays 9am to 1pm', description: 'Work from home. OKU candidates welcome.' },
+    { title: 'Customer Service Representative' }, // a bare search snippet: no pay or hours, so they become questions
   ];
   const ro = await run(NADIA, found);
   const emailsBefore = ro.events.filter(e => e.type === 'tool_result' && e.tool === 'send_email').length;
   const o = ro.events.find(e => e.type === 'tool_result' && e.tool === 'check_outside_listings')?.result;
-  const outOk = ro.verified && o && o.checked === 3 && o.results[0].verdict === 'worth asking' && /NVDA/.test(o.results[0].draft)
-    && o.results.slice(1).every(r => r.verdict === 'not suitable') && /nothing was sent/.test(ro.summary) && emailsBefore === 0;
+  const outOk = ro.verified && o && o.checked === 4 && o.results[0].verdict === 'worth asking' && /NVDA/.test(o.results[0].draft)
+    && o.results.slice(1, 3).every(r => r.verdict === 'not suitable')
+    && o.results[3].verdict === 'worth asking' && /What is the pay\?/.test(o.results[3].draft) && /working hours/.test(o.results[3].draft) && /nothing was sent/.test(ro.summary) && emailsBefore === 0;
   if (!outOk) fail++;
   console.log(`${outOk ? 'PASS' : 'FAIL'} other-site listings: ${ro.summary.slice(ro.summary.indexOf('I also checked'))}`);
   const mcp = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }).then(r => r.json());

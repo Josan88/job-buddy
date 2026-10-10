@@ -12,10 +12,11 @@ const clip = (v, n = 3000) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(
 
 function clean(listings) {
   if (!Array.isArray(listings)) return [];
+  // A search-result snippet may arrive as plain text, or with only a title: missing details become questions.
   return listings.slice(0, MAX_LISTINGS).map(l => (typeof l === 'string' ? { description: l } : l || {})).map(l => ({
-    title: clip(l.title, 160) || 'Untitled job',
-    employer: clip(l.employer || l.company, 160) || 'the employer',
-    site: clip(l.site || l.source, 80) || (/^https?:\/\/([^/]+)/i.exec(l.url || '') || [])[1] || 'another site',
+    title: clip(l.title, 160) || clip(String(l.description || '').split(/[.,;]/)[0], 80) || 'A job',
+    employer: clip(l.employer || l.company, 160) || null,
+    site: clip(l.site || l.source, 80) || (/^https?:\/\/(?:www\.)?([^/]+)/i.exec(l.url || '') || [])[1] || null,
     url: /^https?:\/\//i.test(l.url || '') ? clip(l.url, 500) : null,
     pay: clip(l.pay || l.salary, 120),
     location: clip(l.location, 160),
@@ -64,9 +65,10 @@ function assess(l, s) {
   if (!p) out.asks.push('What is the pay?');
   else {
     const wage = L.checkWage(p.pay, p.payUnit);
-    const hourly = L.hourlyRate(p);
+    // Monthly pay to hourly the way the Minimum Wages Order does it: x 12 / 52 / 45.
+    const hourly = p.payUnit === 'month' ? p.pay * 12 / 52 / 45 : L.hourlyRate(p);
     payText = `RM${p.pay.toLocaleString('en-MY')}/${p.payUnit}`;
-    if (!wage.ok) out.blockers.push(`it pays ${payText}, below the legal minimum of RM${L.MIN_WAGE[p.payUnit]}/${p.payUnit}`);
+    if (!wage.ok) out.blockers.push(`it pays ${payText}, below the legal minimum of RM${L.MIN_WAGE[p.payUnit].toLocaleString('en-MY')}/${p.payUnit}`);
     else if (s.expectedRate && hourly < s.expectedRate) out.blockers.push(`it pays ${payText}${p.payUnit === 'hour' ? '' : `, about RM${hourly.toFixed(2)} an hour`}, below your RM${s.expectedRate} an hour`);
     else out.reasons.push(`pays ${payText}`);
   }
@@ -108,9 +110,9 @@ function draft(l, s, asks) {
   const lines = [
     `Subject: Application for ${l.title}`,
     '',
-    `Dear ${l.employer === 'the employer' ? 'hiring team' : `${l.employer} hiring team`},`,
+    `Dear ${l.employer ? `${l.employer} hiring team` : 'hiring team'},`,
     '',
-    `I would like to apply for the ${l.title} role I saw on ${l.site}. My strengths are ${skills.length > 1 ? `${skills.slice(0, -1).join(', ')} and ${skills[skills.length - 1]}` : skills[0] || 'customer service'}, and I am free ${L.describeSchedule(s.availability || {})}.`,
+    `I would like to apply for the ${l.title} role I saw${l.site ? ` on ${l.site}` : ' advertised'}. My strengths are ${skills.length > 1 ? `${skills.slice(0, -1).join(', ')} and ${skills[skills.length - 1]}` : skills[0] || 'customer service'}, and I am free ${L.describeSchedule(s.availability || {})}.`,
   ];
   if (n.vision) lines.push('', `I am ${n.vision === 'blind' ? 'blind' : 'low vision'} and use ${n.tool || (n.screenReader ? 'a screen reader' : 'screen magnification')}.${n.interviewFormat ? ` A ${n.interviewFormat} interview would suit me best.` : ''} Please send any documents or tests as Word or plain text, not scanned images.`);
   if (asks.length) lines.push('', 'Could you tell me:', ...asks.map((a, i) => `${i + 1}. ${a}`));
@@ -122,14 +124,16 @@ function assessAll(listings, s) {
   return clean(listings).map(l => assess(l, s));
 }
 
+const named = (r, site = true) => `${r.title}${r.employer ? ` at ${r.employer}` : ''}${site && r.site ? ` on ${r.site}` : ''}`;
+
 // One paragraph for the spoken summary.
 function summarise(results) {
   if (!results.length) return '';
   const ok = results.filter(r => r.verdict !== 'not suitable');
   const no = results.filter(r => r.verdict === 'not suitable');
   let t = ` I also checked ${results.length} job${results.length === 1 ? '' : 's'} WorkBuddy found on other sites.`;
-  if (ok.length) t += ` Worth asking about: ${ok.map(r => `${r.title} at ${r.employer} on ${r.site}`).join('; ')}. I drafted an application for ${ok.length === 1 ? 'it' : 'each'} that asks what the listing leaves out, but I can't apply or book interviews on other sites, so nothing was sent.`;
-  if (no.length) t += ` Not suitable: ${no.map(r => `${r.title} at ${r.employer}, because ${r.blockers[0]}`).join('; ')}.`;
+  if (ok.length) t += ` Worth asking about: ${ok.map(r => named(r)).join('; ')}. I drafted an application for ${ok.length === 1 ? 'it' : 'each'} that asks what the listing leaves out, but I can't apply or book interviews on other sites, so nothing was sent.`;
+  if (no.length) t += ` Not suitable: ${no.map(r => `${named(r, false)}, because ${r.blockers[0]}`).join('; ')}.`;
   return t;
 }
 
