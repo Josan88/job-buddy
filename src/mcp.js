@@ -30,6 +30,7 @@ const HIGH_LEVEL = [
             type: 'object',
             properties: {
               title: { type: 'string' }, employer: { type: 'string' }, site: { type: 'string', description: 'e.g. JobStreet' },
+              companyEmail: { type: 'string', description: 'Original company application email, only if the listing provides one. Retained as data; demo applications go only to the demo inbox.' },
               url: { type: 'string' }, pay: { type: 'string', description: 'As written, e.g. "RM2,500 - RM3,000 per month"' },
               location: { type: 'string' }, hours: { type: 'string', description: 'As written, e.g. "Mon - Fri, 9am - 6pm"' },
               description: { type: 'string', description: 'The listing text, including requirements' },

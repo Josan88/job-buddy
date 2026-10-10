@@ -16,6 +16,7 @@ function clean(listings) {
   return listings.slice(0, MAX_LISTINGS).map(l => (typeof l === 'string' ? { description: l } : l || {})).map(l => ({
     title: clip(l.title, 160) || clip(String(l.description || '').split(/[.,;]/)[0], 80) || 'A job',
     employer: clip(l.employer || l.company, 160) || null,
+    companyEmail: clip(l.companyEmail || l.ownerEmail || l.email, 254) || null,
     site: clip(l.site || l.source, 80) || (/^https?:\/\/(?:www\.)?([^/]+)/i.exec(l.url || '') || [])[1] || null,
     url: /^https?:\/\//i.test(l.url || '') ? clip(l.url, 500) : null,
     pay: clip(l.pay || l.salary, 120),

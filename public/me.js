@@ -175,6 +175,7 @@ function bind(me) {
       if (e.key !== 'Enter' || e.target !== card || e.repeat) return;
       console.info('[HireBuddy application] Enter pressed on My details job card', { jobId: card.querySelector('[data-apply-job]').dataset.applyJob, studentId: me.id });
       e.preventDefault();
+      window.HB.debug('job card Enter', { jobId: card.querySelector('[data-apply-job]').dataset.applyJob });
       card.querySelector('[data-apply-job]').click();
     });
   });

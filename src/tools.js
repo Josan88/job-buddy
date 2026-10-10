@@ -548,7 +548,8 @@ tools.check_outside_listings = {
     const results = outside.assessAll(ctx.run.options?.listings || [], s);
     ctx.run.outside = results;
     return { ok: true, checked: results.length, worthAsking: results.filter(r => r.verdict !== 'not suitable').length,
-      results: results.map(r => ({ title: r.title, employer: r.employer, site: r.site, url: r.url, verdict: r.verdict, blockers: r.blockers, reasons: r.reasons, questions: r.asks, draft: r.draft })),
+      results: results.map(r => ({ title: r.title, employer: r.employer, companyEmail: r.companyEmail, site: r.site, url: r.url,
+        location: r.location, pay: r.pay, hours: r.hours, verdict: r.verdict, blockers: r.blockers, reasons: r.reasons, questions: r.asks, draft: r.draft })),
       note: 'Nothing was sent. HireBuddy can only apply and book interviews for jobs listed on HireBuddy.' };
   },
 };
