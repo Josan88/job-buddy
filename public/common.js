@@ -37,7 +37,6 @@ window.HB = {
   // Read newly focused controls for people using the site's built-in speech rather than a screen reader.
   readFocus(text) {
     if (!('speechSynthesis' in window)) return;
-    speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(String(text || '').replace(/\s+/g, ' ').trim());
     u.lang = 'en-GB'; u.rate = 1;
     speechSynthesis.resume();
@@ -69,6 +68,15 @@ window.HB = {
     return () => rec.stop();
   },
 };
+
+// Start every page with its heading and introduction. Browsers that permit speech on load read it
+// immediately; otherwise the native screen reader still receives the same semantic page content.
+window.addEventListener('load', () => {
+  const main = document.querySelector('main');
+  const title = main?.querySelector('h1')?.textContent;
+  const intro = main?.querySelector('h1 + p, .lede, #job-help')?.textContent;
+  if (title) window.HB.readFocus(`${title}. ${intro || ''}`);
+});
 
 // Voice commands: press Alt+V (or the "Voice command" button), say a button's name, such as
 // "Hand it to WorkBuddy", "first example" or "read aloud", then press Enter. "What can I say" lists the buttons on screen.
