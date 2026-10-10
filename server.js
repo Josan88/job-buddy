@@ -141,7 +141,8 @@ async function route(req, res) {
     const body = JSON.parse(await readBody(req) || '{}');
     const prompt = String(body.prompt || '').trim().slice(0, 2000);
     if (!prompt) return json(res, 400, { error: 'prompt required' });
-    const run = agent.newRun(prompt, ['hirer', 'student'].includes(body.persona) ? body.persona : null);
+    const listings = Array.isArray(body.listings) && body.listings.length ? body.listings : null;
+    const run = agent.newRun(prompt, ['hirer', 'student'].includes(body.persona) ? body.persona : listings ? 'student' : null, 'web', { listings });
     agent.execute(run, base);
     return json(res, 201, { id: run.id, persona: run.persona, url: `${base}/runs/${run.id}` });
   }

@@ -146,4 +146,4 @@ function student(prompt) {
   };
 }
 
-module.exports = { hirer, student, parseEmail, needs };
+module.exports = { hirer, student, parseEmail, needs, parsePay, parseSchedule };

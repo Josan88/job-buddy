@@ -2,12 +2,17 @@
 // Run the HireBuddy agent from one prompt and print the verified result.
 // Usage: node hirebuddy.js "Need a weekend barista in Subang, RM12/hr, start next week"
 const BASE = (process.env.HIREBUDDY_URL || 'https://hirebuddy-k543.onrender.com').replace(/\/$/, '');
-const prompt = process.argv.slice(2).join(' ').trim();
-if (!prompt) { console.error('Usage: node hirebuddy.js "<your request>"'); process.exit(1); }
+// Optional: --listings found.json, a JSON array of jobs WorkBuddy found on other job sites.
+const args = process.argv.slice(2);
+let listings;
+const li = args.indexOf('--listings');
+if (li >= 0) { listings = JSON.parse(require('fs').readFileSync(args[li + 1], 'utf8')); args.splice(li, 2); }
+const prompt = args.join(' ').trim();
+if (!prompt) { console.error('Usage: node hirebuddy.js [--listings found.json] "<your request>"'); process.exit(1); }
 
 (async () => {
   const start = await fetch(`${BASE}/api/runs`, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }),
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, listings }),
   }).then(r => r.json());
   console.log(`Run started: ${start.url}`);
   let run;

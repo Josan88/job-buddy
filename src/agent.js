@@ -5,6 +5,7 @@ const store = require('./store');
 const L = require('./lib');
 const llm = require('./llm');
 const parse = require('./parse');
+const outside = require('./outside');
 const { tools, HIRER_TOOLS, STUDENT_TOOLS, MINIMUM_MATCH, jobUrl, matchJobs } = require('./tools');
 
 const bus = new EventEmitter();
@@ -347,6 +348,7 @@ async function autopilotStudent(ctx) {
     { title: 'Apply, with your interview needs', tool: 'apply_to_job' },
     { title: `Book up to ${goal} interviews`, tool: 'book_interview' },
     { title: 'Email you each interview, time first', tool: 'send_email' },
+    ...(ctx.run.options?.listings?.length ? [{ title: `Check the ${outside.clean(ctx.run.options.listings).length} jobs WorkBuddy found on other sites`, tool: 'check_outside_listings' }] : []),
     { title: 'Check everything again', tool: 'verify_applications' },
     { title: 'Tell you the result', tool: 'finish' },
   ] });
@@ -404,6 +406,7 @@ async function autopilotStudent(ctx) {
     opts = { ...opts, ...best.change };
   }
 
+  if (ctx.run.options?.listings?.length) await callTool(ctx, 'check_outside_listings', { studentId: s.id });
   const check = await callTool(ctx, 'verify_applications', { studentId: s.id });
   const ivs = store.db.interviews.filter(i => (ctx.run.interviews || []).includes(i.id)).sort((a, b) => a.start.localeCompare(b.start));
   const lines = ivs.map((iv, i) => { const j = store.db.jobs.find(x => x.id === iv.jobId); return `${i + 1}. ${j.title} at ${j.business}, ${iv.whenLong}, ${iv.format}${s.needs?.interviewFormat && iv.format !== s.needs.interviewFormat ? ` (they only offer ${(j.access?.interviewFormats || []).join(' or ')})` : ''}. ${iv.howToJoin}`; });
@@ -413,8 +416,8 @@ async function autopilotStudent(ctx) {
   if (closest.length) ctx.run.suggestions = (ctx.run.suggestions || []).concat(`Closest other jobs: ${closest.map(r => `${r.title} at ${r.business}, not booked because ${why(r)}`).join('; ')}.`);
   await callTool(ctx, 'finish', { summary: ivs.length
     ? `You have ${ivs.length} interview${ivs.length === 1 ? '' : 's'}.\n${lines.join('\n')}\nEach one is in your email with the time first and a calendar invite.`
-      + `${skipped ? ` I left out ${skipped} job${skipped === 1 ? '' : 's'} that did not suit your needs.` : ''}${decisionSummary(ctx)}${(ctx.run.suggestions || []).map(x => ` ${x}`).join('')} ${check.passed} of ${check.total} checks passed.`
-    : `No job suits you right now, so I booked nothing. Your profile is saved and employers can find you.${decisionSummary(ctx)} ${check.passed} of ${check.total} checks passed.` });
+      + `${skipped ? ` I left out ${skipped} job${skipped === 1 ? '' : 's'} that did not suit your needs.` : ''}${decisionSummary(ctx)}${(ctx.run.suggestions || []).map(x => ` ${x}`).join('')}${outside.summarise(ctx.run.outside || [])} ${check.passed} of ${check.total} checks passed.`
+    : `No job on HireBuddy suits you right now, so I booked nothing. Your profile is saved and employers can find you.${decisionSummary(ctx)}${outside.summarise(ctx.run.outside || [])} ${check.passed} of ${check.total} checks passed.` });
 }
 
 // The seeker said they can't make an interview: find another time with the same employer,
@@ -475,6 +478,7 @@ Weekly schedules use day keys Mon Tue Wed Thu Fri Sat Sun with 24h ranges, e.g. 
 User: a job seeker, often blind or low vision. Goal: ${GOAL} booked interviews for jobs that truly suit them.
 Steps: register_student (bio built only from what they said; fill needs with their sight loss, the tool they use (e.g. NVDA), remote-only, longest walk from a stop, preferred interview format), search_jobs (each result has access.fit and suitable), apply_to_job to suitable jobs only (personal cover note naming the job and a real skill), book_interview for each, send_email each interview to the seeker with interviewId (plain text; line 1 the exact "when", line 2 how to join, then the rest), and keep going until ${GOAL} are booked.
 If too few jobs suit them, call log_decision with the real options (askAboutTech to include jobs that do not state screen reader support, maxWalkMin 15, maxDistanceKm 60, lower minPay to the legal minimum, or stop), choose the one that adds suitable jobs without giving up a need they stated, then search again. Never apply to a job with access blockers or illegal pay.
+If the message says WorkBuddy found jobs on other sites, call check_outside_listings once before verify_applications and include its result in the summary: which are worth asking about (drafted, not sent) and which do not suit and why. Say plainly that you cannot apply or book on other sites.
 If the message has rescheduleInterviewId, they can't make that interview: log_decision, book_interview again for the same job (a new time is found automatically), email them, verify_applications, finish.
 Finish with a short summary written to be heard on a screen reader: number of interviews, then one line each with job, employer, day and time, format and how to join.`;
   return `${common}
@@ -505,7 +509,11 @@ async function llmLoop(ctx) {
   if (ctx.run.persona === 'hirer') ctx.run.goal = ctx.run.options?.replaceInterviewId ? 1 : Math.max(3, parse.hirer(ctx.run.prompt).hires);
   const messages = [
     { role: 'system', content: systemPrompt(ctx.run.persona, ctx.baseUrl, ctx.run.goal) },
-    { role: 'user', content: ctx.run.prompt + (Object.keys(ctx.run.options || {}).length ? `\n(Details: ${JSON.stringify(ctx.run.options)})` : '') },
+    { role: 'user', content: (() => {
+      const { listings, ...rest } = ctx.run.options || {};
+      return ctx.run.prompt + (Object.keys(rest).length ? `\n(Details: ${JSON.stringify(rest)})` : '')
+        + (listings?.length ? `\n(WorkBuddy found ${outside.clean(listings).length} jobs on other sites. Check them with check_outside_listings.)` : '');
+    })() },
   ];
   const defs = toOpenAiTools(names);
   let nudges = 0, lastFail = '', repeats = 0, failStreak = 0;

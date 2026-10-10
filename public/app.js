@@ -21,7 +21,7 @@ const TOOL_LABEL = {
   screen_candidates: 'Screened candidates', verify_screening: 'Self-check: screening', schedule_interviews: 'Booked interviews',
   send_email: 'Sent an email', verify_hiring_outcome: 'Final self-check', register_student: 'Saved the profile',
   search_jobs: 'Checked jobs against your needs', apply_to_job: 'Applied', book_interview: 'Booked an interview',
-  verify_applications: 'Final self-check', finish: 'Delivered the result', relax_requirement: 'Relaxed a must-have',
+  verify_applications: 'Final self-check', check_outside_listings: 'Checked jobs WorkBuddy found on other sites', finish: 'Delivered the result', relax_requirement: 'Relaxed a must-have',
   record_fit_judgement: 'Judged fit from their own words',
 };
 
@@ -160,6 +160,7 @@ function render(e, live) {
       if (e.ok && e.tool === 'book_interview') outcome.booked = (outcome.booked || []).concat(e.result);
       if (e.ok && e.tool === 'schedule_interviews') outcome.slots = (outcome.slots || []).concat(e.result.scheduled);
       if (e.ok && e.tool === 'screen_candidates') outcome.screen = e.result.details;
+      if (e.ok && e.tool === 'check_outside_listings') outcome.outside = e.result.results;
       li.querySelector('.out').innerHTML = (e.ok ? '' : '<p><b>Problem found.</b></p>') + pretty(e.tool, e.result, e.ok);
       break;
     }
@@ -251,13 +252,25 @@ function showResult(e, live) {
     : (outcome.slots || []).length
       ? `<h3>Interviews booked</h3><ul>${outcome.slots.map(s => `<li>${esc(s.name)}: ${esc(s.when)}. <a href="${esc(s.icsUrl)}">Calendar file for ${esc(s.name)}</a></li>`).join('')}</ul>`
       : '';
+  const out = outcome.outside || [];
+  const others = out.length ? `<h3>Jobs WorkBuddy found on other sites</h3>
+    <p>HireBuddy can't apply or book interviews on other sites, so nothing was sent. Each job worth asking about has an application ready for you to send.</p>
+    <ol class="joblist">${out.map((r, i) => `<li><h4>${r.url ? `<a href="${esc(r.url)}">${esc(r.title)}</a>` : esc(r.title)} at ${esc(r.employer)}, on ${esc(r.site)}</h4>
+      <p><span class="status-word ${r.verdict === 'not suitable' ? 'bad' : 'good'}">${r.verdict === 'not suitable' ? 'Not suitable' : 'Worth asking'}</span>
+      ${esc(r.verdict === 'not suitable' ? r.blockers.join('; ') : r.reasons.join('; '))}.</p>
+      ${r.draft ? `<details><summary>Application ready to send, with ${r.questions.length} question${r.questions.length === 1 ? '' : 's'} for ${esc(r.employer)}</summary>
+        <pre id="draft-${i}">${esc(r.draft)}</pre><p><button type="button" class="secondary" data-copy="draft-${i}">Copy the application for ${esc(r.employer)}</button></p></details>` : ''}</li>`).join('')}</ol>` : '';
   const rest = lines.slice(1).filter(l => !/^\d+\. /.test(l) || !booked.length);
   $('#result-body').innerHTML = `<p><span class="status-word ${e.verified && !refused ? 'good' : 'bad'}">${refused ? 'Refused: pay is below the legal minimum' : e.verified ? 'Checked and verified' : ok ? 'Done' : 'Needs attention'}</span></p>
-    <p class="lede">${linkify(esc(head))}</p>${interviews}${rest.map(l => `<p>${linkify(esc(l))}</p>`).join('')}
+    <p class="lede">${linkify(esc(head))}</p>${interviews}${others}${rest.map(l => `<p>${linkify(esc(l))}</p>`).join('')}
     ${(outcome.decisions || []).length ? `<h3>Decisions HireBuddy made</h3><ul>${outcome.decisions.map(d => `<li><b>${esc(d.choice)}.</b> ${esc(d.reason)}</li>`).join('')}</ul>` : ''}
     <p class="actions"><button type="button" class="secondary" id="read-aloud">Read aloud</button>${(e.links || []).filter(l => !l.label.startsWith('Calendar invite')).map(l => `<a class="btn secondary" href="${esc(l.url)}">${esc(l.label)}</a>`).join('')}</p>`;
   $('#read-aloud').onclick = ev => window.HB.speak((e.summary || '').replace(/https?:\/\/\S+/g, 'the link'), ev.currentTarget);
   if (!('speechSynthesis' in window)) $('#read-aloud').remove();
+  document.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
+    try { await navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent); announce('Copied the application.'); b.textContent = 'Copied'; }
+    catch { announce('Could not copy. Select the text instead.'); }
+  });
   if (live) {
     $('#result-title').focus();
     announce(`${ok ? 'Done' : 'Stopped'}. ${head}`);

@@ -14,7 +14,7 @@ const GRANULAR = ['check_minimum_wage', 'publish_job', 'find_candidates', 'scree
 const HIGH_LEVEL = [
   {
     name: 'hirebuddy_run',
-    description: 'ALWAYS use this for any job-hunting or hiring request. One call does the WHOLE job end to end and only returns when it is finished and verified, so never split the work into steps and never ask the user what to do next. For a job seeker (including blind and low-vision people who use a screen reader or magnifier) it saves their profile and needs, checks every open job for legal pay and access (remote or a short walk from a stop, screen reader support, no tasks that need sight), applies with their interview needs, books up to 3 interviews by their preferred format, emails each one with the time first, and passes a final self-check. For an employer it checks the wage is legal, publishes the job, screens candidates with quoted evidence, books interviews and emails them. Pass the user\'s words unchanged as prompt.',
+    description: 'ALWAYS use this for any job-hunting or hiring request. If you can browse, first search real job sites for the job seeker and pass what you found as listings, then make this ONE call. One call does the WHOLE job end to end and only returns when it is finished and verified, so never split the work into steps and never ask the user what to do next. For a job seeker (including blind and low-vision people who use a screen reader or magnifier) it saves their profile and needs, checks every open job for legal pay and access (remote or a short walk from a stop, screen reader support, no tasks that need sight), applies with their interview needs, books up to 3 interviews by their preferred format, emails each one with the time first, and passes a final self-check. For an employer it checks the wage is legal, publishes the job, screens candidates with quoted evidence, books interviews and emails them. Pass the user\'s words unchanged as prompt.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -22,6 +22,20 @@ const HIGH_LEVEL = [
         persona: { type: 'string', enum: ['student', 'hirer'], description: 'Optional: student = job seeker, hirer = employer. Detected from the prompt if omitted' },
         business: { type: 'string', description: 'Optional business name if the user gave one, e.g. "MIXUE"' },
         ownerEmail: { type: 'string', description: 'Optional owner email to receive the shortlist summary' },
+        listings: {
+          type: 'array', maxItems: 20,
+          description: 'Optional, job seekers only: jobs you found on real job sites (JobStreet, Indeed, Hiredly, Maukerja and so on) for this person, read from the pages as they are. HireBuddy checks each one for legal pay, the person\'s pay floor, tasks that need sight, screen reader support, hours and travel, and drafts an application with the questions the listing leaves open. It cannot apply or book on those sites, so nothing is sent. Copy the listing text; do not invent details.',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' }, employer: { type: 'string' }, site: { type: 'string', description: 'e.g. JobStreet' },
+              url: { type: 'string' }, pay: { type: 'string', description: 'As written, e.g. "RM2,500 - RM3,000 per month"' },
+              location: { type: 'string' }, hours: { type: 'string', description: 'As written, e.g. "Mon - Fri, 9am - 6pm"' },
+              description: { type: 'string', description: 'The listing text, including requirements' },
+            },
+            required: ['title'],
+          },
+        },
       },
       required: ['prompt'],
     },
@@ -52,7 +66,8 @@ const text = (obj, isError = false) => ({ content: [{ type: 'text', text: typeof
 
 async function callTool(name, args, sessionId, baseUrl) {
   if (name === 'hirebuddy_run') {
-    const run = agent.newRun(args.prompt, args.persona, 'mcp', { business: args.business, ownerEmail: args.ownerEmail });
+    const listings = Array.isArray(args.listings) && args.listings.length ? args.listings : null;
+    const run = agent.newRun(args.prompt, args.persona || (listings ? 'student' : undefined), 'mcp', { business: args.business, ownerEmail: args.ownerEmail, listings });
     await agent.execute(run, baseUrl);
     const checks = [...run.events].reverse().find(e => e.type === 'checks');
     return text({
@@ -65,8 +80,10 @@ async function callTool(name, args, sessionId, baseUrl) {
         return { job: j?.title, employer: j?.business, person: i.name, when: i.whenLong || i.when, format: i.format || i.mode, howToJoin: i.howToJoin || i.meetUrl || null };
       }),
       decisions: (run.decisions || []).map(d => `${d.choice}. ${d.reason}`),
+      otherSites: (run.outside || []).map(r => ({ job: r.title, employer: r.employer, site: r.site, url: r.url, verdict: r.verdict,
+        why: r.verdict === 'not suitable' ? r.blockers.join('; ') : r.reasons.join('; '), questionsForEmployer: r.asks, draftApplication: r.draft })),
       note: run.done
-        ? 'The job is COMPLETE and verified. Give the user the summary as short plain sentences (it may be read by a screen reader): no tables, no emoji, the most important fact first, one line per interview with the day, time and how to join. Mention the number of self-checks passed and the run link. Do not offer or ask about further steps.'
+        ? 'The job is COMPLETE and verified. Give the user the summary as short plain sentences (it may be read by a screen reader): no tables, no emoji, the most important fact first, one line per interview with the day, time and how to join. Mention the number of self-checks passed and the run link. If otherSites is not empty, say which jobs from other sites are worth asking about and that their applications are drafted but NOT sent (HireBuddy cannot apply on other sites), and which do not suit and why, one short sentence each. Do not offer or ask about further steps.'
         : 'The run did not finish. Tell the user what failed using the status and summary.',
     });
   }
@@ -115,7 +132,7 @@ async function handle(req, res, body, baseUrl, allTools = false) {
             protocolVersion: m.params?.protocolVersion || PROTOCOL,
             capabilities: { tools: { listChanged: false } },
             serverInfo: { name: 'hirebuddy', title: 'HireBuddy hiring agent', version: '1.0.0' },
-            instructions: 'For any hiring or job-hunting request, call hirebuddy_run ONCE with the user\'s words. It completes the whole job (publish, screen, book interviews, email, verify) autonomously. Then report the outcome, self-checks and links. Never stop halfway or ask the user for the next step.',
+            instructions: 'For any hiring or job-hunting request, call hirebuddy_run ONCE with the user\'s words. For a job seeker, if you can browse, first search real job sites (JobStreet, Indeed, Hiredly, Maukerja) and pass up to 5 listings you found, copied as written, as listings in that same call. It completes the whole job (publish, screen, book interviews, email, verify) autonomously. Then report the outcome, self-checks and links. Never stop halfway or ask the user for the next step.',
           } });
           break;
         case 'ping': reply({ result: {} }); break;

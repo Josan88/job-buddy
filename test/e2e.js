@@ -11,8 +11,8 @@ const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {
 const base = `http://localhost:${PORT}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function run(prompt) {
-  const { id } = await fetch(`${base}/api/runs`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }) }).then(r => r.json());
+async function run(prompt, listings) {
+  const { id } = await fetch(`${base}/api/runs`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, listings }) }).then(r => r.json());
   for (let i = 0; i < 120; i++) {
     await sleep(250);
     const r = await fetch(`${base}/api/runs/${id}`).then(r => r.json());
@@ -71,6 +71,19 @@ const cases = [
   const reOk = rs.verified && now.status === 'interview' && now.interview.start !== first.interview.start && rs.decisions.length >= 1;
   if (!reOk) fail++;
   console.log(`${reOk ? 'PASS' : 'FAIL'} can't make it, rebooked: ${rs.summary}`);
+  // WorkBuddy passes jobs it found on real sites: each is checked, suitable ones get a draft, nothing is sent.
+  const found = [
+    { title: 'Customer Service Executive (Inbound Calls)', employer: 'Example Telco', site: 'JobStreet', url: 'https://example.com/1', pay: 'RM2,600 - RM3,000 per month', location: 'Subang Jaya', hours: 'Mon - Fri, 9am - 6pm', description: 'Answer customer calls in English and Malay. Near SS15 LRT.' },
+    { title: 'Despatch Rider', employer: 'Example Courier', site: 'Indeed', pay: 'RM1,800 a month', location: 'Petaling Jaya', description: 'Own motorcycle and valid driving licence required.' },
+    { title: 'Part-time Call Agent', employer: 'Example Contact Centre', site: 'Hiredly', pay: 'RM9 per hour', location: 'Remote', hours: 'Weekdays 9am to 1pm', description: 'Work from home. OKU candidates welcome.' },
+  ];
+  const ro = await run(NADIA, found);
+  const emailsBefore = ro.events.filter(e => e.type === 'tool_result' && e.tool === 'send_email').length;
+  const o = ro.events.find(e => e.type === 'tool_result' && e.tool === 'check_outside_listings')?.result;
+  const outOk = ro.verified && o && o.checked === 3 && o.results[0].verdict === 'worth asking' && /NVDA/.test(o.results[0].draft)
+    && o.results.slice(1).every(r => r.verdict === 'not suitable') && /nothing was sent/.test(ro.summary) && emailsBefore === 0;
+  if (!outOk) fail++;
+  console.log(`${outOk ? 'PASS' : 'FAIL'} other-site listings: ${ro.summary.slice(ro.summary.indexOf('I also checked'))}`);
   const mcp = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }).then(r => r.json());
   const mcpOk = mcp.result.tools.some(t => t.name === 'hirebuddy_run');
   if (!mcpOk) fail++;

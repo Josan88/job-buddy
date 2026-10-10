@@ -3,6 +3,7 @@
 const store = require('./store');
 const L = require('./lib');
 const mail = require('./mail');
+const outside = require('./outside');
 
 const MINIMUM_MATCH = 50; // below this, or with under half the must-haves, a match is not worth pursuing
 
@@ -542,6 +543,20 @@ tools.book_interview = {
   },
 };
 
+tools.check_outside_listings = {
+  description: 'Check the jobs WorkBuddy found on other job sites (passed to this run as listings) against the seeker: legal pay and their pay floor, tasks that need sight, screen reader support, hours and travel. Drafts an application with the open questions for each one worth asking about. HireBuddy cannot apply or book on other sites, so nothing is sent.',
+  parameters: S('object', { studentId: { type: 'string' } }, ['studentId']),
+  run: async ({ studentId }, ctx) => {
+    const s = store.db.students.find(x => x.id === studentId);
+    if (!s) return { ok: false, problems: ['Unknown student'] };
+    const results = outside.assessAll(ctx.run.options?.listings || [], s);
+    ctx.run.outside = results;
+    return { ok: true, checked: results.length, worthAsking: results.filter(r => r.verdict !== 'not suitable').length,
+      results: results.map(r => ({ title: r.title, employer: r.employer, site: r.site, url: r.url, verdict: r.verdict, blockers: r.blockers, reasons: r.reasons, questions: r.asks, draft: r.draft })),
+      note: 'Nothing was sent. HireBuddy can only apply and book interviews for jobs listed on HireBuddy.' };
+  },
+};
+
 tools.verify_applications = {
   description: 'Final self-check for a job seeker: every application is stored and the employer notified, pay is legal, access is re-checked with no blockers, each interview fits both calendars and never clashes, the format is accessible, in-person venues are a short walk from a stop, each .ics invite downloads and matches, and each email to the seeker states the time and how to join in its first lines, in plain text.',
   parameters: S('object', { studentId: { type: 'string' } }, ['studentId']),
@@ -590,6 +605,18 @@ tools.verify_applications = {
       add(`${j.business}: your email says the time and how to join in its first lines`, em && head.includes(iv.when) && (iv.meetUrl ? em.body.includes(iv.meetUrl) : head.includes(iv.howToJoin.split('.')[0])) && !/<[a-z][^>]*>/i.test(em.body),
         em ? `"${em.subject}"` : 'no email found');
     }
+    const given = outside.clean(ctx.run.options?.listings || []);
+    if (given.length) {
+      const done = ctx.run.outside || [];
+      add(`All ${given.length} jobs found on other sites were checked`, done.length === given.length, `${done.length} of ${given.length} checked`);
+      const fresh = outside.assessAll(ctx.run.options.listings, s);
+      const wrong = done.filter((r, i) => r.verdict !== 'not suitable' && fresh[i]?.verdict === 'not suitable');
+      add('No job from another site below your pay floor, the minimum wage, or needing sight is recommended', !wrong.length, wrong.map(r => r.title).join(', ') || 'none');
+      const ok = done.filter(r => r.verdict !== 'not suitable');
+      add('Each job worth asking about has a drafted application with its open questions', ok.every(r => r.draft && r.draft.includes(r.title) && r.asks.every(q => r.draft.includes(q))), `${ok.length} drafted`);
+      if (s.needs?.screenReader) add('Each draft asks about screen reader support unless the listing already mentions it', ok.every(r => r.reasons.includes('mentions accessibility or screen readers') || /screen reader|NVDA|JAWS|VoiceOver|TalkBack/.test(r.draft)), `${ok.length} checked`);
+      add('Nothing was sent to employers on other sites', !store.db.emails.some(e => e.runId === ctx.run.id && e.kind === 'outside'), 'drafts only');
+    }
     const pass = checks.every(c => c.pass);
     ctx.run.verified = pass;
     return { ok: true, pass, passed: checks.filter(c => c.pass).length, total: checks.length, checks };
@@ -613,6 +640,6 @@ tools.finish = {
 
 const HIRER_TOOLS = ['set_plan', 'check_minimum_wage', 'publish_job', 'find_candidates', 'screen_candidates', 'record_fit_judgement', 'verify_screening',
   'log_decision', 'relax_requirement', 'schedule_interviews', 'send_email', 'verify_hiring_outcome', 'finish'];
-const STUDENT_TOOLS = ['set_plan', 'register_student', 'search_jobs', 'check_minimum_wage', 'log_decision', 'apply_to_job', 'book_interview', 'send_email', 'verify_applications', 'finish'];
+const STUDENT_TOOLS = ['set_plan', 'register_student', 'search_jobs', 'check_outside_listings', 'check_minimum_wage', 'log_decision', 'apply_to_job', 'book_interview', 'send_email', 'verify_applications', 'finish'];
 
 module.exports = { tools, HIRER_TOOLS, STUDENT_TOOLS, MINIMUM_MATCH, jobUrl, matchJobs };

@@ -8,5 +8,9 @@ parameters:
     type: string
     required: true
     description: The user's request in their own words.
+  - name: listings
+    type: array
+    required: false
+    description: Jobs found on real job sites for a job seeker (title, employer, site, url, pay, location, hours, description), copied as written. HireBuddy checks each and drafts an application; nothing is sent.
 entry: scripts/hirebuddy.js
 instructions: SKILL.md
