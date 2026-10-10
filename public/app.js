@@ -547,7 +547,7 @@ function showResult(e, live) {
         <pre id="draft-${i}">${esc(r.draft)}</pre><p><button type="button" class="secondary" data-copy="draft-${i}">Copy the application for ${esc(r.employer || r.title)}</button></p></details>` : ''}</li>`).join('')}</ol>` : '';
   const rest = lines.slice(1);
   $('#result-body').innerHTML = `<p><span class="status-word ${e.verified && !refused ? 'good' : 'bad'}">${refused ? 'Refused: pay is below the legal minimum' : e.verified ? 'Checked and verified' : ok ? 'Done' : 'Needs attention'}</span></p>
-    <p class="lede">${linkify(esc(head))}</p>${others}${rest.map(l => `<p>${linkify(esc(l))}</p>`).join('')}
+    ${out.length ? '' : `<p class="lede">${linkify(esc(head))}</p>`}${others}${rest.map(l => `<p>${linkify(esc(l))}</p>`).join('')}
     ${(outcome.decisions || []).length ? `<h3>Decisions made on the way</h3><ul>${outcome.decisions.map(d => `<li><b>${esc(d.choice)}.</b> ${esc(d.reason)}</li>`).join('')}</ul>` : ''}
     <p class="actions"><button type="button" class="secondary" id="read-aloud">Read aloud</button>${(e.links || []).map(l => `<a class="btn secondary" href="${esc(l.url)}">${esc(l.label)}</a>`).join('')}</p>`;
   $('#read-aloud').onclick = ev => window.HB.speak((e.summary || '').replace(/https?:\/\/\S+/g, 'the link'), ev.currentTarget);
