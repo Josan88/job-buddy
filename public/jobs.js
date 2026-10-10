@@ -12,13 +12,14 @@ function report(text, ok) {
 }
 
 async function apply(button) {
+  if (button.disabled) return;
   if (!me || me.role !== 'student' || !me.id) {
     report('Choose your job seeker profile on My page before sending an application.', false);
     return;
   }
   button.disabled = true;
-  const response = await fetch(`/api/jobs/${encodeURIComponent(button.dataset.applyJob)}/apply/${encodeURIComponent(me.id)}`, { method: 'POST' });
-  const result = await response.json();
+  window.HB.announce('Sending application request to Telegram.');
+  const result = await window.HB.sendApplication(button.dataset.applyJob, me.id);
   report(result.ok ? result.message : (result.error || 'The application could not be sent.'), result.ok);
   if (!result.ok) button.disabled = false;
 }
@@ -28,7 +29,7 @@ cards.forEach(card => {
   card.addEventListener('focus', () => window.HB.readControl(`${card.innerText} Press Enter to send this application.`));
   button.addEventListener('click', () => apply(button));
   card.addEventListener('keydown', event => {
-    if (event.key !== 'Enter' || event.target !== card) return;
+    if (event.key !== 'Enter' || event.target !== card || event.repeat) return;
     event.preventDefault();
     button.click();
   });

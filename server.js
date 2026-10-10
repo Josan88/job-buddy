@@ -9,6 +9,8 @@ const mcp = require('./src/mcp');
 const llm = require('./src/llm');
 const telegram = require('./src/telegram');
 const mail = require('./src/mail');
+const application = require('./src/application');
+const pendingApplications = new Set();
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC = path.join(__dirname, 'public');
@@ -300,7 +302,7 @@ async function route(req, res) {
       const app = store.db.applications.find(a => a.jobId === jid && a.studentId === s.id);
       const iv = store.db.interviews.filter(i => i.jobId === jid && i.studentId === s.id).pop();
       const roundDone = store.db.interviews.some(i => i.jobId === jid);
-      const status = iv ? (iv.status === 'declined' ? 'declined' : 'interview') : roundDone ? 'not_selected' : 'applied';
+      const status = iv ? (iv.status === 'declined' ? 'declined' : 'interview') : app?.handoffStatus ? 'requested' : roundDone ? 'not_selected' : 'applied';
       return {
         jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`, url: `${base}/jobs/${j.id}`,
         status, applied: !!app, appliedAt: app?.at || null, score: app?.score ?? L.scoreMatch(j, s).total,
@@ -347,6 +349,9 @@ async function route(req, res) {
   }
   if (p === '/api/emails') return json(res, 200, store.db.emails.slice(-100).reverse());
   if ((m = p.match(/^\/api\/jobs\/([\w-]+)\/apply\/([\w-]+)$/)) && req.method === 'POST') {
+    const body = JSON.parse(await readBody(req) || '{}');
+    if (!telegram.configured()) return json(res, 503, { ok: false, error: 'Telegram is not set up. Configure Telegram before sending an application.' });
+    if (!telegram.keyOk(body.key)) return json(res, 403, { ok: false, error: 'Pair this browser with Telegram on Find work before sending an application.' });
     const j = store.db.jobs.find(x => x.id === m[1]);
     const s = store.db.students.find(x => x.id === m[2]);
     if (!j || !s) return json(res, 404, { ok: false, error: 'Job or job seeker not found.' });
@@ -357,21 +362,22 @@ async function route(req, res) {
     const wage = L.checkWage(j.pay, j.payUnit);
     const fit = L.accessFit(j, s, { minPay: s.expectedRate || 0, maxDistanceKm: 60, askAboutTech: true });
     if (!wage.ok || fit.fit === 'not suitable') return json(res, 409, { ok: false, error: !wage.ok ? wage.message : `This job does not suit your needs: ${fit.blockers.join('; ')}.` });
-    const skill = s.skills[0] || 'relevant experience';
-    const coverNote = `Hello ${j.business}, I would like to apply for the ${j.title} role. I have ${skill} experience and I am free ${L.describeSchedule(s.availability)}. Thank you.`;
-    const app = { id: store.id('app'), jobId: j.id, studentId: s.id, coverNote, at: new Date().toISOString(), score: L.scoreMatch(j, s).total, source: 'job card' };
-    store.db.applications.push(app);
-    const originalEmployer = j.ownerEmail || 'owner@example.com';
-    const email = {
-      id: store.id('mail'), to: mail.APPLICATION_INBOX, kind: 'application',
-      subject: `${originalEmployer} — New applicant for ${j.title}: ${s.name}`,
-      body: `${s.name}${s.area ? ` (${s.area})` : ''} applied for ${j.title} at ${j.business}.\n\n${coverNote}\n\nMatch score: ${app.score}/100\nReply to: ${s.email}\nOriginal employer email: ${originalEmployer}\nJob page: ${base}/jobs/${j.id}`,
-      at: new Date().toISOString(), runId: null,
-    };
-    email.delivery = await mail.deliver(email);
-    store.db.emails.push(email);
-    store.save();
-    return json(res, 200, { ok: true, message: `Application sent for ${j.title} at ${j.business}.`, delivery: email.delivery });
+    const requestId = `${j.id}:${s.id}`;
+    if (pendingApplications.has(requestId)) return json(res, 409, { ok: false, error: 'This application is already being sent to Telegram.' });
+    const data = application.prepare(j, s, base);
+    pendingApplications.add(requestId);
+    try {
+      await telegram.send(data.task);
+      store.db.applications.push({ id: store.id('app'), jobId: j.id, studentId: s.id,
+        coverNote: data.body, applicationData: data, at: new Date().toISOString(),
+        score: L.scoreMatch(j, s).total, source: 'job card', handoffStatus: 'sent to Telegram' });
+      store.save();
+      return json(res, 200, { ok: true, sent: 'telegram', message: `Application request for ${j.title} at ${j.business} sent to Telegram. WorkBuddy will send the email to ${mail.APPLICATION_INBOX}. Email delivery is not yet confirmed.` });
+    } catch (e) {
+      return json(res, 502, { ok: false, error: `Could not send the application request to Telegram: ${e.message}` });
+    } finally {
+      pendingApplications.delete(requestId);
+    }
   }
   // Before a demo: one button puts the demo data back to the start (fresh jobs, no applications or runs).
   if (p === '/reset') {
