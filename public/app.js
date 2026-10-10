@@ -115,15 +115,25 @@ function tgShowSaved() {
   $('#handoff').textContent = bot ? 'Hand it to WorkBuddy on Telegram' : 'Hand it to WorkBuddy';
 }
 let handoffTask = null;
-function sendViaTelegram(bot, task) {
-  $('#handoff-tg-link').href = `https://t.me/${bot}?text=${encodeURIComponent(task)}`;
+// Telegram opens in a new tab at t.me, which keeps the typed-in task and has its own button to open the app.
+// Browsers only let a page open a tab or an app straight from a click, so the hand-off button opens the tab
+// first (win) and fills in the address once HireBuddy has made the task. This page stays open and follows the run.
+function sendViaTelegram(bot, task, win) {
+  const url = `https://t.me/${bot}?text=${encodeURIComponent(task)}`;
+  $('#handoff-tg-link').href = url;
   $('#handoff-how').hidden = true;
   $('#handoff-tg').hidden = false;
-  // The tg: address opens the Telegram app without leaving this page, which keeps following the run.
-  location.href = `tg://resolve?domain=${bot}&text=${encodeURIComponent(task)}`;
+  if (win) win.location.href = url;
+  else if ((win = window.open(url, '_blank'))) win.opener = null;
+  if (win === null) {
+    // The browser blocked the new tab: the link in the panel opens it with one more key press.
+    $('#handoff-title').textContent = 'Open Telegram to send the task';
+    $('#handoff-tg-link').focus();
+    return announce('Press Enter to open Telegram, then send the task to WorkBuddy. I will tell you each step here.');
+  }
   $('#handoff-title').textContent = 'Press Send in Telegram';
   $('#handoff-title').focus();
-  announce('Telegram is opening your WorkBuddy chat with the task typed in. Press Send there. I will tell you each step here.');
+  announce('Telegram opened in a new tab with the task typed in. Press Send Message, then Send. I will tell you each step here.');
 }
 // The setting sits inside the main form, so Enter in it saves the username instead of starting a run.
 $('#tg-bot').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); tgSave(); } });
@@ -167,7 +177,17 @@ $('#handoff').onclick = async () => {
   if ($('#handoff').getAttribute('aria-disabled') === 'true') return;
   $('#handoff').setAttribute('aria-disabled', 'true');
   setTimeout(() => $('#handoff').removeAttribute('aria-disabled'), 15000);
-  const h = await fetch('/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }) }).then(r => r.json());
+  // Open the Telegram tab now, while this still counts as the person's click (see sendViaTelegram).
+  const tgWin = tgBot() ? window.open('', '_blank') : null;
+  if (tgWin) tgWin.opener = null;
+  const h = await fetch('/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }) }).then(r => r.json()).catch(() => null);
+  if (!h?.task) {
+    if (tgWin) tgWin.close();
+    $('#handoff').removeAttribute('aria-disabled');
+    err.hidden = false;
+    err.textContent = 'Error: HireBuddy could not make the task. Check your internet connection and try again.';
+    return $('#handoff').focus();
+  }
   $('#handoff-task').value = h.task;
   // Copy straight away, in the same key press: a screen reader user shouldn't have to find a second button.
   const copy = async () => {
@@ -185,7 +205,7 @@ $('#handoff').onclick = async () => {
   // the copy-and-paste steps still work.
   const bot = tgBot();
   const viaBridge = bot ? null : await sendViaBridge(h.id);
-  if (bot) sendViaTelegram(bot, h.task);
+  if (bot) sendViaTelegram(bot, h.task, tgWin);
   else if (viaBridge === 'sent') {
     $('#handoff-title').textContent = 'Sent to WorkBuddy';
     $('#handoff-status').textContent = 'WorkBuddy has the task. This page follows each step.';
