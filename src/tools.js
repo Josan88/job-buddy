@@ -403,7 +403,7 @@ function matchJobs(s, { maxDistanceKm = 25, minPay = 0, maxWalkMin, askAboutTech
       : sc.missing.length ? `it asks for ${sc.missing.join(' and ')}` : 'it is a weak match for your skills';
     out.push({
       jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`,
-      score: sc.total, requiredCoverage: sc.requiredCoverage, why: L.explain(j, s, sc), evidence: sc.evidence, missing: sc.missing,
+      score: sc.total, breakdown: sc.breakdown, requiredCoverage: sc.requiredCoverage, why: L.explain(j, s, sc), evidence: sc.evidence, missing: sc.missing,
       legalPay: wage.ok, belowMinPay: L.hourlyRate(j) < minPay, warning: wage.ok ? null : wage.message,
       access, suitable, whyNot, applied, workMode: access.workMode,
     });
