@@ -50,7 +50,7 @@ async function showStudent(me) {
         ${a.interview ? `<p class="when">${esc(a.interview.when)} · ${esc(a.interview.mode)}</p><a href="${esc(a.interview.ics)}">Add to calendar</a>` : ''}
         ${!a.applied && a.interview ? '<p class="muted small">The business found you in the talent pool and invited you.</p>' : ''}</article>`;
     }).join('') : '<p class="muted">No applications yet.</p>'}
-    <h2>Open jobs for you</h2>
+    <h2>Open jobs for you</h2><p class="muted small"><a href="/about#demo-data">Demo data, modelled on real listings</a></p>
     ${d.open.map(j => `<a class="card row" href="${esc(j.url)}"><div><b>${esc(j.title)}</b><div class="muted small">${esc(j.business)} · ${esc(j.area)}${j.distanceKm != null ? ` (${j.distanceKm} km)` : ''} · ${esc(j.schedule)}</div></div>
       <div class="right"><span class="chip">${esc(j.pay)}</span><div class="small muted">match ${j.score}/100</div></div></a>`).join('') || '<p class="muted">No open jobs right now.</p>'}`;
 }

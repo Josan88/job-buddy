@@ -111,7 +111,7 @@ Every run started from WorkBuddy also appears in the web app's **Recent runs**, 
 
 ## Demo data
 
-The seeded talent pool holds 12 fictional students and 6 open gigs around the Klang Valley, including one bakery paying an illegal RM7/hour to show the wage guard. All seeded emails use `example.com` and are never delivered.
+The talent pool holds 12 fictional students. The 9 open gigs use made-up shop names, but their role, area, pay and shifts are **modelled on real Klang Valley part-time listings** read on 10 Oct 2026. That includes a weekend cashier at RM55/day, which is below the legal daily minimum, just like a real listing we found. See [docs/demo-data.md](docs/demo-data.md) for the table and sources. All seeded emails use `example.com` and are never delivered.
 
 ## License
 

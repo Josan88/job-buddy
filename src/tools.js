@@ -316,7 +316,7 @@ tools.search_jobs = {
       results.push({
         jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`,
         score: sc.total, requiredCoverage: sc.requiredCoverage, why: L.explain(j, s, sc), evidence: sc.evidence,
-        legalPay: wage.ok, belowMinPay: j.pay < minPay, warning: wage.ok ? null : wage.message, url: jobUrl(ctx, j.id),
+        legalPay: wage.ok, belowMinPay: L.hourlyRate(j) < minPay, warning: wage.ok ? null : wage.message, url: jobUrl(ctx, j.id),
       });
     }
     results.sort((a, b) => b.score - a.score);

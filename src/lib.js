@@ -15,7 +15,7 @@ const AREAS = {
   'puchong': [3.0250, 101.6160], 'cyberjaya': [2.9213, 101.6559], 'putrajaya': [2.9264, 101.6964],
   'klang': [3.0449, 101.4456], 'seri kembangan': [3.0220, 101.7050], 'kajang': [2.9930, 101.7880],
   'ampang': [3.1500, 101.7600], 'setapak': [3.1960, 101.7180], 'kepong': [3.2100, 101.6350],
-  'mont kiara': [3.1720, 101.6510], 'semenyih': [2.9510, 101.8430],
+  'mont kiara': [3.1720, 101.6510], 'semenyih': [2.9510, 101.8430], 'sri petaling': [3.0680, 101.6880], 'wangsa maju': [3.2050, 101.7370],
 };
 
 // Pretty names keyed by the canonical lowercase key.
@@ -195,7 +195,8 @@ function scoreMatch(job, person) {
   }
 
   const exp = Number(person.expectedRate || 0);
-  const payFit = !exp || exp <= job.pay ? 5 : exp - job.pay <= 2 ? 2 : 0;
+  const rate = hourlyRate(job);
+  const payFit = !exp || exp <= rate ? 5 : exp - rate <= 2 ? 2 : 0;
 
   const breakdown = { skills, niceToHave: niceScore, availability, distance, experience, payFit };
   const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
@@ -206,13 +207,18 @@ function scoreMatch(job, person) {
   };
 }
 
+// Compare pay on an hourly basis: a day is taken as an 8-hour shift, a month as 26 days of 8 hours.
+function hourlyRate(job) {
+  return job.payUnit === 'day' ? job.pay / 8 : job.payUnit === 'month' ? job.pay / (26 * 8) : job.pay;
+}
+
 function explain(job, person, s) {
   const bits = [];
   bits.push(`${s.evidence.filter(e => e.required).length}/${(job.requirements || []).length} required skills`);
   bits.push(`free ${Math.round(s.overlapMinutes / 60)}h of the ${Math.round(s.scheduleMinutes / 60)}h shift`);
   if (s.distanceKm != null) bits.push(`${s.distanceKm} km away`);
   if (s.missing.length) bits.push(`missing ${s.missing.join(', ')}`);
-  if (person.expectedRate > job.pay) bits.push(`asks RM${person.expectedRate}/h vs RM${job.pay}`);
+  if (person.expectedRate > hourlyRate(job)) bits.push(`asks RM${person.expectedRate}/h vs about RM${Math.round(hourlyRate(job) * 100) / 100}/h`);
   return bits.join(', ');
 }
 
@@ -247,6 +253,6 @@ module.exports = {
   DAYS, DAY_NAMES, AREAS, findArea, distanceKm, coords,
   toMin, toHHMM, ranges, overlapMinutes, totalMinutes, describeSchedule,
   mytParts, mytDate, fmtMyt, MIN_WAGE, checkWage,
-  termsFor, evidenceFor, sentences, scoreMatch, explain,
+  termsFor, evidenceFor, sentences, scoreMatch, explain, hourlyRate,
   makeIcs, parseIcs,
 };

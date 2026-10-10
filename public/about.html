@@ -59,6 +59,17 @@
     <p>HireBuddy is also an MCP server at <code>/mcp</code>, and the repo includes a WorkBuddy Skill. From WorkBuddy, the owner types the same one prompt. WorkBuddy calls <code>hirebuddy_run</code> and gets back the verified result, the self-check list and links. The step-by-step tools are exposed too, so WorkBuddy's own model can run the plan itself. Every run, from either place, appears on this site's run log.</p>
   </section>
 
+  <section class="card" id="demo-data">
+    <h2>Demo data, modelled on real listings</h2>
+    <p>The open jobs use made-up shop names and descriptions in our own words. Their role, area, pay and shifts are modelled on public part-time listings in the Klang Valley that we read on 10 Oct 2026 (Indeed Malaysia and Glassdoor search pages for Petaling Jaya, Subang Jaya and Kuala Lumpur). We did not scrape them or copy any listing text.</p>
+    <ul>
+      <li>Entry-level part-time pay seen: <b>RM9–12/hour</b> (barista, crew, retail, kitchen), RM12–18/hour for fashion retail, and RM120–150/day for event promoters.</li>
+      <li>One real weekend cashier listing in Subang Jaya offered <b>RM50–60/day</b>. For an 8-hour shift that's below the RM65.38/day legal minimum. The demo bakery job copies that pay, so you can watch HireBuddy refuse it.</li>
+      <li>All students are fictional, and their example.com emails are never delivered.</li>
+    </ul>
+    <p class="muted small">Full table and source links: <a href="https://github.com/Josan88/job-buddy/blob/main/docs/demo-data.md">docs/demo-data.md</a></p>
+  </section>
+
   <section class="card">
     <h2>Brains</h2>
     <p>With an LLM key (any OpenAI-compatible API, including Tencent Hunyuan), the model does the planning and writing, and the deterministic tools and checks keep it honest. Without a key, a rule-based autopilot drives the same tools, so a demo never fails because of a network issue.</p>

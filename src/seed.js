@@ -89,48 +89,71 @@ const students = [
 ];
 
 // Open gigs posted by other small businesses (for the student flow).
+// Demo data: shop names are made up; role, area, pay and shift pattern are modelled on public
+// part-time listings in the Klang Valley read on 10 Oct 2026 (see docs/demo-data.md).
 const jobs = [
   {
-    id: 'job-tutor-ss15', business: 'BrightPath Learning Centre', ownerEmail: 'hello@brightpath.example.com',
-    title: 'Weekend SPM Maths Tutor', area: 'Subang Jaya', pay: 25, payUnit: 'hour',
-    schedule: { Sat: ['09:00-12:00'], Sun: ['09:00-12:00'] },
-    requirements: ['mathematics', 'tutoring'], niceToHave: ['physics', 'mandarin'],
-    description: 'Teach small groups of 4 to 6 Form 4 and Form 5 students in SS15.', status: 'open',
-  },
-  {
-    id: 'job-events-kl', business: 'Gather Events Sdn Bhd', ownerEmail: 'crew@gather.example.com',
-    title: 'Concert Event Crew', area: 'Kuala Lumpur', pay: 15, payUnit: 'hour',
-    schedule: { Fri: ['17:00-23:00'], Sat: ['15:00-23:00'] },
-    requirements: ['customer service', 'event crew'], niceToHave: ['photography'],
-    description: 'Ticket scanning, crowd guidance and merch booth at Bukit Jalil.', status: 'open',
-  },
-  {
-    id: 'job-social-pj', business: 'Kopi Kaki PJ', ownerEmail: 'owner@kopikaki.example.com',
-    title: 'Part-time Social Media Assistant', area: 'Petaling Jaya', pay: 14, payUnit: 'hour',
-    schedule: { Tue: ['14:00-18:00'], Thu: ['14:00-18:00'] },
-    requirements: ['social media', 'canva'], niceToHave: ['video editing', 'copywriting'],
-    description: 'Plan and post 4 Instagram and TikTok posts a week for a neighbourhood cafe.', status: 'open',
-  },
-  {
-    id: 'job-data-cyber', business: 'Lumen Accounting', ownerEmail: 'ops@lumen.example.com',
-    title: 'Excel Data Entry Assistant', area: 'Cyberjaya', pay: 13, payUnit: 'hour',
-    schedule: { Mon: ['18:00-22:00'], Wed: ['18:00-22:00'] },
-    requirements: ['data entry', 'excel'], niceToHave: ['python'],
-    description: 'Key in and reconcile invoices for SME clients, remote-friendly.', status: 'open',
-  },
-  {
-    id: 'job-barista-sunway', business: 'Brew & Bloom Sunway', ownerEmail: 'manager@brewbloom.example.com',
+    id: 'job-barista-sunway', business: 'Kopi Lane Sunway', ownerEmail: 'hello@kopilane.example.com',
     title: 'Weekend Barista', area: 'Bandar Sunway', pay: 12, payUnit: 'hour',
     schedule: { Sat: ['08:00-14:00'], Sun: ['08:00-14:00'] },
     requirements: ['espresso', 'customer service'], niceToHave: ['latte art'],
-    description: 'Morning shifts at a busy brunch cafe near Sunway Lagoon.', status: 'open',
+    description: 'Pull shots and run the counter during the weekend brunch rush near the Sunway campuses.', status: 'open', seed: true,
   },
   {
-    id: 'job-cashier-usj', business: 'Mak Cik Bakery USJ', ownerEmail: 'makcik@bakery.example.com',
-    title: 'Bakery Cashier (Weekends)', area: 'Subang Jaya', pay: 7, payUnit: 'hour',
-    schedule: { Sat: ['10:00-16:00'], Sun: ['10:00-16:00'] },
+    id: 'job-crew-subang', business: 'Daily Grind SS15', ownerEmail: 'team@dailygrind.example.com',
+    title: 'Front Service Crew (Barista)', area: 'Subang Jaya', pay: 10, payUnit: 'hour',
+    schedule: { Wed: ['14:00-18:00'], Sat: ['09:00-17:00'], Sun: ['09:00-17:00'] },
+    requirements: ['customer service', 'cashier'], niceToHave: ['espresso'],
+    description: 'Take orders, handle the till and help on the coffee bar. Weekday and weekend shifts, public holidays too.', status: 'open', seed: true,
+  },
+  {
+    id: 'job-cashier-usj', business: 'Roti Rumah USJ', ownerEmail: 'owner@rotirumah.example.com',
+    title: 'Weekend Cashier', area: 'Subang Jaya', pay: 55, payUnit: 'day',
+    schedule: { Sat: ['10:00-18:00'], Sun: ['10:00-18:00'] },
     requirements: ['cashier', 'customer service'], niceToHave: ['bahasa melayu'],
-    description: 'Serve customers and handle the till at a neighbourhood bakery.', status: 'open',
+    description: 'Serve customers and run the till at a neighbourhood bakery on weekends and public holidays.', status: 'open', seed: true,
+  },
+  {
+    id: 'job-retail-sunway', business: 'Threadline Sunway', ownerEmail: 'staff@threadline.example.com',
+    title: 'Part-time Retail Assistant', area: 'Bandar Sunway', pay: 10, payUnit: 'hour',
+    schedule: { Fri: ['18:00-22:00'], Sat: ['10:00-18:00'], Sun: ['10:00-18:00'] },
+    requirements: ['customer service', 'cashier'], niceToHave: ['english', 'mandarin'],
+    description: 'Help shoppers, restock shelves and take payments at a mall fashion store.', status: 'open', seed: true,
+  },
+  {
+    id: 'job-kitchen-kl', business: 'Nasi & Co KL Sentral', ownerEmail: 'hr@nasiandco.example.com',
+    title: 'Kitchen Helper / Waiter', area: 'Kuala Lumpur', pay: 10, payUnit: 'hour',
+    schedule: { Sat: ['11:00-19:00'], Sun: ['11:00-19:00'] },
+    requirements: ['food handling', 'customer service'], niceToHave: ['bahasa melayu'],
+    description: 'Prep, serve and clear tables in a busy food court outlet. Rotating weekend and holiday shifts.', status: 'open', seed: true,
+  },
+  {
+    id: 'job-fashion-kl', business: 'Mode Avenue', ownerEmail: 'people@modeavenue.example.com',
+    title: 'Fashion Retail Ambassador', area: 'Kuala Lumpur', pay: 14, payUnit: 'hour',
+    schedule: { Fri: ['14:00-22:00'], Sat: ['10:00-22:00'], Sun: ['10:00-22:00'] },
+    requirements: ['customer service', 'english'], niceToHave: ['social media'],
+    description: 'Style customers and keep the floor looking sharp. Three-to-five month contract, about 24 hours a week.', status: 'open', seed: true,
+  },
+  {
+    id: 'job-promoter-kl', business: 'Brightside Events', ownerEmail: 'crew@brightside.example.com',
+    title: 'Weekend Event Promoter', area: 'Kuala Lumpur', pay: 135, payUnit: 'day',
+    schedule: { Sat: ['10:00-19:00'], Sun: ['10:00-19:00'] },
+    requirements: ['customer service', 'event crew'], niceToHave: ['photography'],
+    description: 'Promote travel packages at an exhibition booth in KL for a weekend fair.', status: 'open', seed: true,
+  },
+  {
+    id: 'job-tutor-pj', business: 'Bright Minds Tuition', ownerEmail: 'hello@brightminds.example.com',
+    title: 'Weekend Maths & Science Tutor', area: 'Petaling Jaya', pay: 40, payUnit: 'hour',
+    schedule: { Sat: ['09:00-13:00'], Sun: ['09:00-13:00'] },
+    requirements: ['tutoring', 'mathematics'], niceToHave: ['physics', 'english'],
+    description: 'Teach small groups of secondary students maths and science on weekend mornings.', status: 'open', seed: true,
+  },
+  {
+    id: 'job-data-sripetaling', business: 'Ledger Lite Accounting', ownerEmail: 'ops@ledgerlite.example.com',
+    title: 'Part-time Data Entry Assistant', area: 'Sri Petaling', pay: 11, payUnit: 'hour',
+    schedule: { Mon: ['18:00-22:00'], Wed: ['18:00-22:00'], Sat: ['09:00-13:00'] },
+    requirements: ['data entry', 'excel'], niceToHave: ['python'],
+    description: 'Key in and check invoices for small business clients. Evenings and Saturday mornings.', status: 'open', seed: true,
   },
 ];
 

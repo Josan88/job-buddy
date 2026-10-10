@@ -54,7 +54,8 @@ function jobView(j, base) {
   <p class="eyebrow">${esc(j.business)} · ${esc(j.area)}</p>
   <h1>${esc(j.title)}</h1>
   <div class="chips"><span class="chip">RM${esc(j.pay)} / ${esc(j.payUnit)}</span><span class="chip">${esc(L.describeSchedule(j.schedule))}</span>
-  ${j.startDate ? `<span class="chip">Starts ${esc(j.startDate)}</span>` : ''}<span class="chip ${wage.ok ? 'ok' : 'bad'}">${wage.ok ? 'Legal minimum wage met' : 'Below minimum wage'}</span></div>
+  ${j.startDate ? `<span class="chip">Starts ${esc(j.startDate)}</span>` : ''}<span class="chip ${wage.ok ? 'ok' : 'bad'}">${wage.ok ? 'Legal minimum wage met' : 'Below minimum wage'}</span>
+  ${j.seed ? '<a class="chip" href="/about#demo-data">Demo data, modelled on real listings</a>' : ''}</div>
   <p>${esc(j.description)}</p>
   <h3>Must have</h3><p>${j.requirements.map(r => `<span class="tag">${esc(r)}</span>`).join(' ')}</p>
   ${j.niceToHave?.length ? `<h3>Nice to have</h3><p>${j.niceToHave.map(r => `<span class="tag soft">${esc(r)}</span>`).join(' ')}</p>` : ''}
@@ -215,7 +216,7 @@ async function route(req, res) {
   // ---- Pages ----
   if (p === '/jobs') {
     const list = [...store.db.jobs].reverse().map(j => `<a class="card row" href="/jobs/${esc(j.id)}"><div><strong>${esc(j.title)}</strong><br><span class="muted">${esc(j.business)} · ${esc(j.area)}</span></div><span class="chip">RM${esc(j.pay)}/${esc(j.payUnit)}</span></a>`).join('');
-    return html(res, 200, page('Open jobs', `<h1>Open jobs</h1>${list}`));
+    return html(res, 200, page('Open jobs', `<h1>Open jobs</h1><p class="muted"><span class="chip">Demo data, modelled on real listings</span> <a href="/about#demo-data">Where the pay comes from</a></p>${list}`));
   }
   if ((m = p.match(/^\/jobs\/([\w-]+)$/))) {
     const j = store.db.jobs.find(x => x.id === m[1]);
