@@ -46,6 +46,18 @@ window.HB = {
       speechSynthesis.speak(u);
     });
   },
+  readControl(text) {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const speak = () => {
+      const u = new SpeechSynthesisUtterance(String(text || '').replace(/\s+/g, ' ').trim());
+      u.lang = 'en-GB'; u.rate = 1;
+      speechSynthesis.resume();
+      speechSynthesis.speak(u);
+    };
+    if (speechSynthesis.getVoices().length) speak();
+    else speechSynthesis.addEventListener('voiceschanged', speak, { once: true });
+  },
   readPage() {
     const main = document.querySelector('main');
     if (main) window.HB.readFocus(main.innerText);
@@ -80,6 +92,15 @@ window.HB = {
 // Read all visible main content from top to bottom when the page loads.
 window.addEventListener('load', () => {
   window.HB.readPage();
+});
+
+// Every button announces itself when reached with Tab, including dynamically added buttons.
+document.addEventListener('focusin', event => {
+  const button = event.target.closest?.('button');
+  if (!button) return;
+  const name = button.getAttribute('aria-label') || button.textContent.trim() || 'Unnamed';
+  const context = button.dataset.label ? `${button.dataset.label}. ` : '';
+  window.HB.readControl(`${context}${name}. Button. Press Enter to activate.`);
 });
 
 // Voice commands: press Alt+V (or the "Voice command" button), say a button's name, such as

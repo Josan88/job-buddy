@@ -25,8 +25,7 @@ async function apply(button) {
 
 cards.forEach(card => {
   const button = card.querySelector('[data-apply-job]');
-  card.addEventListener('focus', () => window.HB.readFocus(`${card.innerText} Press Enter to send this application.`));
-  button.addEventListener('focus', () => window.HB.readFocus(`${button.dataset.label}. Send application button. Press Enter to send.`));
+  card.addEventListener('focus', () => window.HB.readControl(`${card.innerText} Press Enter to send this application.`));
   button.addEventListener('click', () => apply(button));
   card.addEventListener('keydown', event => {
     if (event.key !== 'Enter' || event.target !== card) return;

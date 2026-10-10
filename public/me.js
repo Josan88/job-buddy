@@ -169,7 +169,7 @@ function bind(me) {
     }
   });
   document.querySelectorAll('[data-job-card]').forEach(card => {
-    card.addEventListener('focus', () => window.HB.readFocus(`${card.innerText} Press Enter to send this application.`));
+    card.addEventListener('focus', () => window.HB.readControl(`${card.innerText} Press Enter to send this application.`));
     card.addEventListener('keydown', e => {
       if (e.key !== 'Enter' || e.target !== card) return;
       e.preventDefault();
@@ -187,9 +187,6 @@ function bind(me) {
     announce(msg.textContent);
     if (!r.ok) b.disabled = false;
   });
-  document.querySelectorAll('[data-apply-job]').forEach(b => b.addEventListener('focus', () => {
-    window.HB.readFocus(`${b.dataset.label}. Send application button. Press Enter to send.`);
-  }));
 }
 
 async function showOwner(me, focus) {
