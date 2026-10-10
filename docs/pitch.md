@@ -2,6 +2,8 @@
 
 About 380 spoken words. Most of the time goes to the live demo.
 
+Every factual claim below is verified against the source code in [code-review.md](./code-review.md).
+
 ## Before going on stage
 
 - Open https://hirebuddy-k543.onrender.com 5 minutes early (the free tier sleeps when idle).
@@ -47,9 +49,9 @@ On the slide: Goal → Plan → Tools → Verify → Fix → Deliver.
 
 ### Slide 4: Proof and close (2:40–3:00)
 
-On the slide: 0 WCAG 2.2 AA violations · refuses illegal pay · 25/25 checks · repo and live app links.
+On the slide: WCAG 2.2 AA built in (AAA contrast) · refuses illegal pay · 25/25 checks · repo and live app links.
 
-> No WCAG 2.2 AA violations on any page. It refuses illegal pay from both sides. One sentence in, three interviews booked and verified. HireBuddy: work that gets done.
+> Every page is built to WCAG 2.2 AA, with AAA contrast colours, skip links and keyboard-only navigation. It refuses illegal pay from both sides. One sentence in, three interviews booked and verified. HireBuddy: work that gets done.
 
 ### Slide 5: Links (for Q&A)
 
@@ -68,10 +70,10 @@ The LLM only chooses which tool to call. The tools are deterministic and the fin
 WorkBuddy is where the user already works. Our Skill and MCP let it do the whole job end to end, not just chat about it.
 
 **How do you know it works for blind users?**
-Built to NVDA and keyboard-only patterns, axe-core in tests, polite live-region updates per step. Next we'd test with users through groups like MAB, the Malaysian Association for the Blind. (Only say you've tested with real users if you have.)
+Built to NVDA and keyboard-only patterns, AAA contrast colours (7:1), skip links, labelled landmarks, and polite live-region updates per step. Next we'd test with users through groups like MAB, the Malaysian Association for the Blind. (Only say you've tested with real users if you have.)
 
 **Privacy and disability disclosure?**
-Her needs go to the employer only as interview arrangements, such as "send documents as Word or plain text." (Check the code shares exactly that before you say it.)
+The employer receives only what they need to arrange the interview: that she is blind and uses NVDA, her preferred interview format (phone), and that documents should be sent as Word or plain text. When a listing doesn't mention screen readers, the application asks about that. Nothing else about her personal life is shared.
 
 **What if no job suits her?**
 It stops, says what came closest and why, and tells her what changing her pay floor or walking limit would add. The choice stays hers.
