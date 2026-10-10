@@ -34,11 +34,22 @@
 
 <section id="handoff-panel" class="panel" aria-labelledby="handoff-title" hidden>
   <h2 id="handoff-title" tabindex="-1">Your task for WorkBuddy</h2>
-  <p>It is already copied. Press <kbd>Alt</kbd>+<kbd>Tab</kbd> to WorkBuddy, <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste, then <kbd>Enter</kbd>. WorkBuddy searches job sites, applies through HireBuddy, books interviews and saves the results in your Documents folder. This page follows each step and reads out the result.</p>
+  <p id="handoff-how">It is already copied. Press <kbd>Alt</kbd>+<kbd>Tab</kbd> to WorkBuddy, <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste, then <kbd>Enter</kbd>. WorkBuddy searches job sites, applies through HireBuddy, books interviews and saves the results in your Documents folder. This page follows each step and reads out the result.</p>
+  <p id="handoff-tg" hidden>Telegram opens your WorkBuddy chat with the task already typed. Press <strong>Send</strong> there. If Telegram did not open, use this link: <a id="handoff-tg-link" href="#" target="_blank" rel="noopener">Open WorkBuddy in Telegram</a>. If the message box is empty, paste the task, which is already copied. This page follows each step and reads out the result.</p>
   <label for="handoff-task">Task for WorkBuddy</label>
   <textarea id="handoff-task" readonly rows="5"></textarea>
   <p class="actions"><button type="button" id="handoff-copy">Copy the task</button></p>
   <p id="handoff-status" role="status">Waiting for WorkBuddy to start.</p>
+
+  <form id="tg-form" novalidate>
+    <h3 id="tg-title">Send through Telegram</h3>
+    <p id="tg-help">If your WorkBuddy is connected to a Telegram bot (in WorkBuddy: Assistant, Assistant Settings, Channels, Telegram), type the bot's username. This browser remembers it. After that, Hand it to WorkBuddy opens that chat with the task typed in, on this computer or on your phone.</p>
+    <label for="tg-bot">Your WorkBuddy bot's username</label>
+    <span class="hint" id="tg-hint">It ends in "bot", for example nadia_workbuddy_bot.</span>
+    <input id="tg-bot" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="tg-hint tg-error">
+    <p id="tg-error" class="panel bad" hidden></p>
+    <p class="actions"><button type="submit">Save</button> <button type="button" id="tg-forget" class="secondary" hidden>Stop using Telegram</button></p>
+  </form>
 </section>
 
 <section id="runview" aria-labelledby="run-title" hidden>
