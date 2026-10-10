@@ -79,7 +79,7 @@ function page(title, inner, { current = '', scripts = '', description = 'HireBud
 <p>Say “What can I say?” or “Help” to hear how voice commands work and the navigation tabs, buttons, options, and sections available on the current page. Say “Stop” to stop speech.</p></details>
 <main id="main" tabindex="-1">${inner}</main>
 <footer><p>Built to work with screen readers (NVDA, JAWS, VoiceOver, TalkBack), with a keyboard alone, and at large text sizes. People and employers in this demo are fictional.</p></footer>
-<script src="/common.js?v=20261011-12"></script>${scripts}
+<script src="/common.js?v=20261011-13"></script>${scripts}
 </body></html>`;
 }
 

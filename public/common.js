@@ -17,8 +17,8 @@ document.querySelectorAll('details.menu').forEach(m => {
   document.addEventListener('click', e => { if (m.open && !m.contains(e.target)) m.open = false; });
 });
 
-// Preserve punctuation as short utterances. Browsers add a clearer pause between queued
-// utterances than they do inside one long string, especially after commas and full stops.
+// Split at punctuation so the queued utterances still pause naturally. Remove trailing
+// full stops from the spoken chunks because some installed voices pronounce them as "stop".
 function speechParts(text) {
   const clean = String(text || '')
     .replace(/\r?\n+/g, '. ')
@@ -26,10 +26,13 @@ function speechParts(text) {
     .replace(/([,.;:!?])(?=\S)/g, '$1 ')
     .replace(/\s+/g, ' ')
     .trim();
-  const clauses = clean.match(/[^,.;:!?]+[,.;:!?]+|[^,.;:!?]+$/g) || [clean];
+  // Only split punctuation at a word boundary, so decimal values such as 8.72 stay intact.
+  const clauses = clean.match(/.+?(?:[,.;:!?]+(?=\s|$)|$)/g) || [clean];
   return clauses.flatMap(clause => clause.length <= 180
     ? [clause.trim()]
-    : (clause.match(/.{1,180}(?:\s|$)/g) || [clause]).map(part => part.trim())).filter(Boolean);
+    : (clause.match(/.{1,180}(?:\s|$)/g) || [clause]).map(part => part.trim()))
+    .map(part => part.replace(/\.+$/, '').trim())
+    .filter(Boolean);
 }
 
 window.HB = {
@@ -107,7 +110,7 @@ window.HB = {
     if (!('speechSynthesis' in window)) return;
     if (speechSynthesis.speaking) { speechSynthesis.cancel(); if (button) button.textContent = 'Read aloud'; return; }
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-GB'; u.rate =0.9;
+    u.lang = 'en-GB'; u.rate = 1;
     u.onend = () => { if (button) button.textContent = 'Read aloud'; };
     speechSynthesis.speak(u);
     if (button) button.textContent = 'Stop reading';
@@ -120,7 +123,7 @@ window.HB = {
     speechSynthesis.resume();
     chunks.filter(Boolean).forEach(chunk => {
       const u = new SpeechSynthesisUtterance(chunk.trim());
-      u.lang = 'en-GB'; u.rate = 0.9;
+      u.lang = 'en-GB'; u.rate = 1;
       u.onstart = () => { window.HB._speechStarted = true; console.info('[HireBuddy speech] started', chunk.trim()); };
       u.onend = () => console.info('[HireBuddy speech] ended', chunk.trim());
       u.onerror = event => console.error('[HireBuddy speech] error', event.error, chunk.trim());
@@ -139,7 +142,7 @@ window.HB = {
       speechSynthesis.resume();
       speechParts(text).forEach(part => {
         const u = new SpeechSynthesisUtterance(part);
-        u.lang = 'en-GB'; u.rate = 0.9; u.voice = voice;
+        u.lang = 'en-GB'; u.rate = 1; u.voice = voice;
         u.onstart = () => { window.HB._speechStarted = true; console.info('[HireBuddy speech] control started', { source, text: u.text, voice: u.voice?.name }); };
         u.onend = () => console.info('[HireBuddy speech] control ended', u.text);
         u.onerror = event => console.error('[HireBuddy speech] control error', event.error, u.text);
