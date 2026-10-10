@@ -26,6 +26,8 @@ const bridge = path.resolve(__dirname, 'hirebuddy-mcp.js').split(path.sep).join(
 
   console.log('3/3 Done. Paste this into WorkBuddy\'s MCP server settings (also saved to workbuddy/mcp_servers.local.json):\n');
   console.log(JSON.stringify(entry, null, 2));
+  console.log('\nSo the run never stops for approval: in a new task, set the permissions dropdown (under the message box) to "Full Access" and confirm.');
+  console.log('If WorkBuddy still asks before a hirebuddy tool, choose "Always allow". CodeBuddy-style settings files can also allow them with: { "permissions": { "allow": ["mcp__hirebuddy"] } }');
   console.log('\nThen restart WorkBuddy and type: I\'m Nadia Rahim. I\'m blind and use NVDA. I live in Subang Jaya and take the LRT. I did customer service calls at a bank hotline for a year and type fast in English and Malay. Free weekdays 9am to 5pm, at least RM12 an hour, phone interviews please. Check JobStreet and Indeed too.');
   console.log('\nNo MCP settings in your WorkBuddy? Give it this task instead:');
   console.log(`  Run: node "${path.resolve(__dirname, 'hirebuddy-skill', 'scripts', 'hirebuddy.js').split(path.sep).join('/')}" "I am Nadia Rahim. I am blind and use NVDA. I live in Subang Jaya and take the LRT. I did customer service calls at a bank hotline for a year and type fast in English and Malay. Free weekdays 9am to 5pm, at least RM12 an hour, phone interviews please." and show me the result.`);

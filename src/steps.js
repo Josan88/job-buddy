@@ -28,6 +28,31 @@ function widenFor(ctx, s) {
   }));
 }
 
+const h = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// A small page for the user's own computer: headings and lists a screen reader can jump through,
+// no scripts, large text, works offline. Calendar files sit next to it in the same folder.
+function resultsPage(s, ivs, run, check, baseUrl) {
+  const job = iv => store.db.jobs.find(x => x.id === iv.jobId);
+  const ok = (run.outside || []).filter(r => r.verdict !== 'not suitable');
+  const no = (run.outside || []).filter(r => r.verdict === 'not suitable');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Your interviews, ${h(s.name)}</title>
+<style>body{font:1.25rem/1.6 system-ui,sans-serif;max-width:44rem;margin:0 auto;padding:1rem;color:#0b0c0c;background:#fff}h1,h2,h3{line-height:1.25}a{color:#003f8a}pre{white-space:pre-wrap;background:#f4f6f5;padding:.75rem;font-size:1rem}li{margin:.5rem 0}
+@media (prefers-color-scheme:dark){body{color:#f7f7f5;background:#0d0f0f}a{color:#9ecbff}pre{background:#1a1e1d}}</style></head><body><main>
+<h1>Your interviews, ${h(s.name)}</h1>
+<p>${ivs.length} interview${ivs.length === 1 ? '' : 's'} booked. ${check.passed} of ${check.total} checks passed.</p>
+<h2>Interviews</h2>
+${ivs.length ? `<ol>${ivs.map(iv => { const j = job(iv); return `<li><h3>${h(j.title)} at ${h(j.business)}</h3><p><b>When:</b> ${h(iv.whenLong)} (Malaysia time)</p><p><b>How:</b> ${h(iv.howToJoin)}</p><p><a href="Interview - ${h(fileSafe(j.business))}.ics">Add the ${h(j.business)} interview to your calendar</a></p></li>`; }).join('')}</ol>` : '<p>None booked yet.</p>'}
+${ok.length || no.length ? `<h2>Jobs found on other sites</h2><p>HireBuddy cannot apply on other sites, so nothing was sent. The applications below are ready for you to send.</p>
+${ok.map(r => `<h3>${h(r.title)}${r.employer ? ` at ${h(r.employer)}` : ''}${r.site ? `, on ${h(r.site)}` : ''}</h3>${r.url ? `<p><a href="${h(r.url)}">Open the listing</a></p>` : ''}<p>Worth asking: ${h(r.reasons.join('; ') || 'nothing rules it out')}.</p><pre>${h(r.draft)}</pre>`).join('')}
+${no.length ? `<h3>Not suitable</h3><ul>${no.map(r => `<li>${h(r.title)}${r.employer ? ` at ${h(r.employer)}` : ''}: ${h(r.blockers[0])}.</li>`).join('')}</ul>` : ''}` : ''}
+${(run.decisions || []).length ? `<h2>Decisions made on the way</h2><ul>${run.decisions.map(d => `<li>${h(d.choice)}. ${h(d.reason)}</li>`).join('')}</ul>` : ''}
+<h2>Checks</h2><details><summary>${check.passed} of ${check.total} checks passed. Show all checks</summary><ul>${check.checks.map(c => `<li>${c.pass ? 'Passed' : 'Failed'}: ${h(c.name)}</li>`).join('')}</ul></details>
+<p><a href="${h(baseUrl)}/runs/${h(run.id)}">Everything the agent did, step by step</a></p>
+</main></body></html>`;
+}
+
 const steps = {};
 
 steps.hirebuddy_1_understand = {
@@ -194,6 +219,7 @@ steps.hirebuddy_4_verify = {
     store.save();
     const folder = `HireBuddy - ${fileSafe(s.name)}`;
     const files = [
+      { path: `${folder}/Results.html`, content: resultsPage(s, ivs, run, check, baseUrl), open: true },
       { path: `${folder}/Summary.txt`, content: `${summary}\n\nRun log: ${baseUrl}/runs/${run.id}\n` },
       ...await Promise.all(ivs.map(async iv => {
         const j = store.db.jobs.find(x => x.id === iv.jobId);
@@ -208,7 +234,7 @@ steps.hirebuddy_4_verify = {
       saveToComputer: { folder: `Documents/${folder}`, files },
       runLog: `${baseUrl}/runs/${run.id}`,
       next: check.pass
-        ? `Save every file in saveToComputer into the user's Documents folder (write each file's content exactly as given). Then give the user the summary in short plain sentences for a screen reader: interviews first, one line each, then the jobs from other sites (drafted, not sent), then "${check.passed} of ${check.total} checks passed" and where the files are. Do not ask anything else.`
+        ? `Save every file in saveToComputer into the user's Documents folder (write each file's content exactly as given), and open Results.html in your preview if you can. Then give the user the summary in short plain sentences for a screen reader: interviews first, one line each, then the jobs from other sites (drafted, not sent), then "${check.passed} of ${check.total} checks passed" and where the files are. Do not ask anything else.`
         : 'Tell the user which checks failed, in one sentence each.',
     };
   },

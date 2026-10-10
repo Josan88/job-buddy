@@ -12,14 +12,21 @@ description: Use FIRST, instead of answering from your own web search or writing
 - An employer wants to hire: "Need a weekend barista for MIXUE in Subang, RM12/hr, start next week"
 
 ## Plan for a job seeker (do all of it, in order)
-1. **Search job sites.** Search JobStreet and Indeed (also Hiredly or Maukerja if you like) for their kind of work in their area. Take up to 5 good results and copy, as written: title, employer, site, url, pay, location, hours, description. If pages don't load, use what the search results show, even just a title and employer. Never invent a detail and never judge pay yourself. Do not sign in or apply on those sites. Spend only a few searches; if you can't browse, skip this step.
+1. **Search job sites, in parallel.** Search JobStreet and Indeed at the same time (also Hiredly or Maukerja if you like) for their kind of work in their area; use sub-agents or parallel tasks if you have them. Take up to 5 good results and copy, as written: title, employer, site, url, pay, location, hours, description. If pages don't load, use what the search results show, even just a title and employer. Never invent a detail and never judge pay yourself. Do not sign in or apply on those sites. Spend only a few searches; if you can't browse, skip this step.
 2. **`hirebuddy_1_understand`** with `{"prompt": "<the user's words>", "listings": [...]}`. It saves their profile and needs and returns a `runId`.
 3. **`hirebuddy_2_check_jobs`** with the `runId`. It checks every job, including yours from step 1, and returns the suitable ones with `jobId`s.
 4. **`hirebuddy_3_apply_and_book`** with the `runId` and those `jobIds`. It applies, books interviews and emails each one with the time first.
 5. **If fewer than 3 interviews:** you decide how to widen. Call `hirebuddy_2_check_jobs` again with `change` set to one of the `allowed` options it returned and a one-sentence `reason`, then step 4 again. Never choose an option that gives up something the user asked for (their pay floor, a walking limit they stated); HireBuddy refuses those.
 6. **`hirebuddy_4_verify`** with the `runId`. It re-checks everything and returns `summary`, `selfChecks` and `saveToComputer`.
-7. **Save every file in `saveToComputer`** in the user's Documents folder, exactly as given: the summary, a calendar file per interview, and a drafted application for each job-site listing worth asking about.
-8. **Tell the user the result** (below).
+7. **Save every file in `saveToComputer`** in the user's Documents folder, exactly as given: Results.html (an accessible results page), the summary, a calendar file per interview, and a drafted application for each job-site listing worth asking about. Open Results.html in your preview panel.
+8. **Check your own work:** open the saved Summary.txt and each .ics file and confirm the number of interviews and each time match the summary from step 6. If a file is missing or different, save it again.
+9. **Tell the user the result** (below).
+
+### Optional, if you have these features (skip any that fail; never stop the run for them)
+- **Memory:** remember the user's profile and needs (name, area, sight and the tool they use, free time, pay floor, interview format). Next time, if they say something like "find me more work", build the prompt for step 2 from memory instead of asking them again.
+- **Scheduled task / reminder:** set a reminder 1 hour before each interview, saying the time and how to join.
+
+Never apply, sign in, email or fill a form on a job site or with a real employer: HireBuddy's drafts are for the user to send.
 
 Every HireBuddy result has a `next` field: do exactly what it says, straight away.
 
@@ -34,6 +41,6 @@ The user may be listening with a screen reader. Short plain sentences, most impo
 1. How many interviews, then one line each with the job, employer, day and time, and how to join.
 2. Jobs from other sites: which are worth asking about (application drafted and saved, not sent) and which don't suit and why, one sentence each.
 3. Any decision made on the way, including yours, in one sentence each.
-4. How many self-checks passed, and the folder where you saved the files.
+4. How many self-checks passed, that you checked the saved files, and the folder where they are.
 
 HireBuddy never applies to a job paying below Malaysia's minimum wage (RM8.72 an hour), below the user's own floor, or with tasks that need sight, and it refuses to publish an underpaid job for an employer. Relay that to the user.
