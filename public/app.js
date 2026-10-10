@@ -28,13 +28,14 @@ const TOOL_LABEL = {
 let persona = 'student';
 let outcome = {};
 let lastActive = -1;
+let telegramOn = false;
 
 function setPersona(p) {
   persona = p;
   document.querySelectorAll('input[name="persona"]').forEach(r => { r.checked = r.value === p; });
   $('#go').textContent = p === 'student' ? 'Find me work' : 'Hire for me';
   $('#handoff').hidden = p !== 'student';
-  $('#tg').hidden = p !== 'student';
+  $('#tg').hidden = p !== 'student' || !telegramOn;
   $('#examples').innerHTML = EXAMPLES[p].map((e, i) => `<li><button type="button" data-i="${i}"><span><b>Use this example:</b> ${esc(e)}</span></button></li>`).join('');
   $('#examples').querySelectorAll('button').forEach(b => b.onclick = () => {
     $('#prompt').value = EXAMPLES[p][b.dataset.i];
@@ -49,6 +50,8 @@ fetch('/api/config').then(r => r.json()).then(c => {
   $('#mode').textContent = c.llm
     ? `Thinking with ${c.model}. Every step is checked by the same tools and self-checks.`
     : 'Running the built-in planner (no AI key set). Same tools, same self-checks.';
+  telegramOn = !!c.telegram;
+  $('#tg').hidden = persona !== 'student' || !telegramOn;
 });
 
 // Speak instead of typing, where the browser supports it (useful on phones and for low vision).
@@ -101,54 +104,43 @@ async function sendViaBridge(handoff) {
   } catch { return null; } finally { clearTimeout(slow); }
 }
 
-// WorkBuddy can be reached through Telegram when the person has connected it to their own Telegram bot
-// (WorkBuddy: Assistant, Channels, Telegram). Each person has their own bot, so its username lives only in
-// this browser. HireBuddy can't message that bot itself (Telegram bots never see other bots' messages), so it
-// opens the chat with the task typed in and the person presses Send.
-const TG_KEY = 'hirebuddy.workbuddyBot';
-function tgBot() { try { return localStorage.getItem(TG_KEY) || ''; } catch (e) { return ''; } }
+// When HireBuddy is set up with Telegram (src/telegram.js), the server sends the task to WorkBuddy's Telegram
+// bot itself. Only a browser paired with the hand-off key may do that, so the key lives in this browser.
+const TG_KEY = 'hirebuddy.telegramKey';
+function tgKey() { try { return localStorage.getItem(TG_KEY) || ''; } catch (e) { return ''; } }
+let tgBot = '';
 function tgShowSaved() {
-  const bot = tgBot();
-  $('#tg-bot').value = bot;
-  $('#tg-forget').hidden = !bot;
-  $('#tg-title').textContent = bot ? `WorkBuddy on Telegram: @${bot}` : 'Send to WorkBuddy through Telegram';
-  $('#handoff').textContent = bot ? 'Hand it to WorkBuddy on Telegram' : 'Hand it to WorkBuddy';
+  const on = !!tgKey();
+  $('#tg-key').value = '';
+  $('#tg-forget').hidden = !on;
+  $('#tg-title').textContent = on ? `Paired: tasks go to WorkBuddy on Telegram${tgBot ? ` (@${tgBot})` : ''}` : 'Send to WorkBuddy automatically, through Telegram';
+  $('#handoff').textContent = on ? 'Hand it to WorkBuddy on Telegram' : 'Hand it to WorkBuddy';
 }
-let handoffTask = null;
-function sendViaTelegram(bot, task) {
-  $('#handoff-tg-link').href = `https://t.me/${bot}?text=${encodeURIComponent(task)}`;
-  $('#handoff-how').hidden = true;
-  $('#handoff-tg').hidden = false;
-  // The tg: address opens the Telegram app without leaving this page, which keeps following the run.
-  location.href = `tg://resolve?domain=${bot}&text=${encodeURIComponent(task)}`;
-  $('#handoff-title').textContent = 'Press Send in Telegram';
-  $('#handoff-title').focus();
-  announce('Telegram is opening your WorkBuddy chat with the task typed in. Press Send there. I will tell you each step here.');
-}
-// The setting sits inside the main form, so Enter in it saves the username instead of starting a run.
-$('#tg-bot').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); tgSave(); } });
-$('#tg-save').onclick = () => tgSave();
-function tgSave() {
-  const bot = $('#tg-bot').value.trim().replace(/^(https?:\/\/)?(t\.me\/|telegram\.me\/)?@?/i, '').replace(/[/?].*$/, '');
+// The setting sits inside the main form, so Enter in it pairs instead of starting a run.
+$('#tg-key').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); tgPair(); } });
+$('#tg-save').onclick = () => tgPair();
+async function tgPair() {
+  const key = $('#tg-key').value.trim();
   const err = $('#tg-error');
-  if (!/^[A-Za-z][A-Za-z0-9_]{3,30}bot$/i.test(bot)) {
+  const r = key ? await fetch('/api/telegram/check', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key }) }).then(r => r.json()).catch(() => ({ error: 'HireBuddy could not be reached. Try again.' })) : { error: 'Type the hand-off key first.' };
+  if (!r.ok) {
     err.hidden = false;
-    err.textContent = 'Error: a bot username is 5 to 32 letters, numbers or underscores and ends in "bot", for example nadia_workbuddy_bot.';
-    $('#tg-bot').setAttribute('aria-invalid', 'true');
-    return $('#tg-bot').focus();
+    err.textContent = `Error: ${r.error}`;
+    $('#tg-key').setAttribute('aria-invalid', 'true');
+    return $('#tg-key').focus();
   }
   err.hidden = true;
-  $('#tg-bot').removeAttribute('aria-invalid');
-  try { localStorage.setItem(TG_KEY, bot); } catch (e) {}
+  $('#tg-key').removeAttribute('aria-invalid');
+  try { localStorage.setItem(TG_KEY, key); } catch (e) {}
+  tgBot = r.bot || '';
   tgShowSaved();
-  if (handoffTask) sendViaTelegram(bot, handoffTask);
-  else announce(`Saved. Hand it to WorkBuddy will open @${bot} in Telegram.`);
+  announce('Paired. Hand it to WorkBuddy now sends the task through Telegram by itself.');
 }
 $('#tg-forget').onclick = () => {
   try { localStorage.removeItem(TG_KEY); } catch (e) {}
   tgShowSaved();
-  $('#tg-bot').focus();
-  announce('Telegram is off. Hand it to WorkBuddy copies the task for you to paste.');
+  $('#tg-key').focus();
+  announce('Unpaired. Hand it to WorkBuddy copies the task for you to paste.');
 };
 tgShowSaved();
 
@@ -167,26 +159,42 @@ $('#handoff').onclick = async () => {
   if ($('#handoff').getAttribute('aria-disabled') === 'true') return;
   $('#handoff').setAttribute('aria-disabled', 'true');
   setTimeout(() => $('#handoff').removeAttribute('aria-disabled'), 15000);
-  const h = await fetch('/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }) }).then(r => r.json());
+  if (tgKey()) announce('Sending to WorkBuddy through Telegram.');
+  const h = await fetch('/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, key: tgKey() || undefined }) }).then(r => r.json()).catch(() => null);
+  if (!h?.task) {
+    $('#handoff').removeAttribute('aria-disabled');
+    err.hidden = false;
+    err.textContent = 'Error: HireBuddy could not make the task. Check your internet connection and try again.';
+    return $('#handoff').focus();
+  }
   $('#handoff-task').value = h.task;
+  $('#handoff-panel').hidden = false;
+  $('#handoff-copy').onclick = () => navigator.clipboard.writeText(h.task).catch(() => $('#handoff-task').select());
+  if (h.sent === 'telegram') {
+    // The server already sent it: nothing to paste, just follow the run.
+    $('#handoff-how').hidden = true;
+    $('#handoff-title').textContent = 'Sent to WorkBuddy on Telegram';
+    $('#handoff-status').textContent = `HireBuddy sent the task to @${h.bot}. Waiting for WorkBuddy to start. This page follows each step.`;
+    $('#handoff-title').focus();
+    announce('Sent to WorkBuddy on Telegram. I will tell you each step here.');
+    return followHandoff(h.id, 'WorkBuddy has not started yet. Check that WorkBuddy is open on your computer with its Telegram channel on, then reload this page.');
+  }
+  if (h.sendError) {
+    err.hidden = false;
+    err.textContent = `Error: Telegram did not take the task (${h.sendError}). Paste it into WorkBuddy instead.`;
+  }
   // Copy straight away, in the same key press: a screen reader user shouldn't have to find a second button.
   const copy = async () => {
     try { await navigator.clipboard.writeText(h.task); $('#handoff-title').textContent = 'Copied. Paste it into WorkBuddy'; $('#handoff-copy').textContent = 'Copy again'; return true; }
     catch { $('#handoff-title').textContent = 'Press Control C to copy, then paste it into WorkBuddy'; $('#handoff-task').select(); return false; }
   };
   const copied = await copy();
-  handoffTask = h.task;
-  $('#handoff-panel').hidden = false;
   $('#handoff-how').hidden = false;
-  $('#handoff-tg').hidden = true;
   $('#handoff-copy').onclick = copy;
-  // Telegram first when this browser knows the person's WorkBuddy bot. Otherwise the HireBuddy bridge on this
-  // computer pastes the task into WorkBuddy after a Yes/No box, and without it (or if the person says No),
-  // the copy-and-paste steps still work.
-  const bot = tgBot();
-  const viaBridge = bot ? null : await sendViaBridge(h.id);
-  if (bot) sendViaTelegram(bot, h.task);
-  else if (viaBridge === 'sent') {
+  // With the HireBuddy bridge running on this computer, it pastes the task into WorkBuddy after a Yes/No
+  // box. Without it (or if the person says No), the copy-and-paste steps still work.
+  const viaBridge = await sendViaBridge(h.id);
+  if (viaBridge === 'sent') {
     $('#handoff-title').textContent = 'Sent to WorkBuddy';
     $('#handoff-status').textContent = 'WorkBuddy has the task. This page follows each step.';
     $('#handoff-title').focus();
@@ -195,17 +203,22 @@ $('#handoff').onclick = async () => {
     if (copied) $('#handoff-title').focus(); else $('#handoff-task').focus();
     announce(copied ? 'Copied. Press Alt Tab to WorkBuddy, Control V, then Enter.' : 'Press Control C to copy the selected task, then paste it into WorkBuddy.');
   }
+  followHandoff(h.id, 'WorkBuddy has not started this task yet. Paste the task into WorkBuddy, then reload this page.');
+};
+
+// Follow the run here as soon as WorkBuddy starts it with the handoff code (for up to 20 minutes).
+async function followHandoff(id, notStarted) {
   for (let i = 0; i < 600; i++) {
     await new Promise(r => setTimeout(r, 2000));
-    const st = await fetch(`/api/handoffs/${h.id}`).then(r => r.json()).catch(() => null);
+    const st = await fetch(`/api/handoffs/${id}`).then(r => r.json()).catch(() => null);
     if (st?.runId) {
       announce('WorkBuddy has started. Following it here.');
       history.pushState({}, '', `/runs/${st.runId}`);
       return openRun(st.runId, false);
     }
   }
-  $('#handoff-status').textContent = tgBot() ? 'WorkBuddy has not started this task yet. Check that WorkBuddy is open on your computer, send the task in Telegram, then reload this page.' : 'WorkBuddy has not started this task yet. Paste the task into WorkBuddy, then reload this page.';
-};
+  $('#handoff-status').textContent = notStarted;
+}
 
 // ---------------------------------------------------------------------------
 

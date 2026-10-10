@@ -7,6 +7,11 @@
     "start": "node server.js",
     "test": "node test/e2e.js"
   },
-  "engines": { "node": ">=20" },
-  "license": "MIT"
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "telegram": "2.26.22"
+  }
 }
