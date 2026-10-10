@@ -88,6 +88,31 @@ const progressSound = (() => {
       clearInterval(timer);
       timer = null;
       console.info('[HireBuddy progress sound] stopped');
+    },
+    complete() {
+      this.stop();
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      try {
+        context ||= new AudioContext();
+        context.resume().then(() => {
+          [523, 659, 784].forEach((frequency, index) => {
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            const start = context.currentTime + index * 0.13;
+            oscillator.type = 'sine';
+            oscillator.frequency.value = frequency;
+            gain.gain.setValueAtTime(0.05, start);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
+            oscillator.connect(gain).connect(context.destination);
+            oscillator.start(start);
+            oscillator.stop(start + 0.16);
+          });
+          console.info('[HireBuddy progress sound] completion chime played');
+        }).catch(error => console.warn('[HireBuddy progress sound] completion chime could not play', error));
+      } catch (error) {
+        console.warn('[HireBuddy progress sound] completion chime could not play', error);
+      }
     }
   };
 })();
@@ -420,7 +445,9 @@ function logItem(html, cls = '') {
   const li = document.createElement('li');
   li.className = cls;
   li.innerHTML = html;
-  $('#timeline').appendChild(li);
+  // Keep transient event state available to the result renderer without exposing
+  // the internal agent trace in the user interface.
+  $('#timeline')?.appendChild(li);
   return li;
 }
 
@@ -526,7 +553,7 @@ function pretty(tool, r, ok) {
 }
 
 function showResult(e, live) {
-  progressSound.stop();
+  if (live) progressSound.complete(); else progressSound.stop();
   const ok = e.status === 'done';
   const refused = /^I did not publish/.test(e.summary || '');
   $('#run-title').textContent = ok ? 'Done' : 'Stopped';
@@ -544,22 +571,23 @@ function showResult(e, live) {
       <p><span class="status-word ${r.verdict === 'not suitable' ? 'bad' : 'good'}">${r.verdict === 'not suitable' ? 'Not suitable' : 'Worth asking'}</span>
       ${esc(r.verdict === 'not suitable' ? r.blockers.join('; ') : r.reasons.join('; '))}.</p>
       ${r.draft ? `<p><button type="button" data-result-apply="${i}">Apply for ${esc(r.title)} at ${esc(r.employer || 'this company')} through Telegram</button></p><p data-application-status role="status" tabindex="-1"></p><details><summary>Application ready to send, with ${(r.questions || r.asks || []).length} question${(r.questions || r.asks || []).length === 1 ? '' : 's'} for ${esc(r.employer || 'the employer')}</summary>
-        <pre id="draft-${i}">${esc(r.draft)}</pre><p><button type="button" class="secondary" data-copy="draft-${i}">Copy the application for ${esc(r.employer || r.title)}</button></p></details>` : ''}</li>`).join('')}</ol>` : '';
+        <pre>${esc(r.draft)}</pre></details>` : ''}</li>`).join('')}</ol>` : '';
   const rest = lines.slice(1);
+  const visibleLinks = (e.links || []).filter(link => link.label !== 'Agent run log');
   $('#result-body').innerHTML = `<p><span class="status-word ${e.verified && !refused ? 'good' : 'bad'}">${refused ? 'Refused: pay is below the legal minimum' : e.verified ? 'Checked and verified' : ok ? 'Done' : 'Needs attention'}</span></p>
     ${out.length ? '' : `<p class="lede">${linkify(esc(head))}</p>`}${others}${rest.map(l => `<p>${linkify(esc(l))}</p>`).join('')}
     ${(outcome.decisions || []).length ? `<h3>Decisions made on the way</h3><ul>${outcome.decisions.map(d => `<li><b>${esc(d.choice)}.</b> ${esc(d.reason)}</li>`).join('')}</ul>` : ''}
-    <p class="actions"><button type="button" class="secondary" id="read-aloud">Read aloud</button>${(e.links || []).map(l => `<a class="btn secondary" href="${esc(l.url)}">${esc(l.label)}</a>`).join('')}</p>`;
-  $('#read-aloud').onclick = ev => window.HB.speak((e.summary || '').replace(/https?:\/\/\S+/g, 'the link'), ev.currentTarget);
+    ${visibleLinks.length ? `<p class="actions">${visibleLinks.map(l => `<a class="btn secondary" href="${esc(l.url)}">${esc(l.label)}</a>`).join('')}</p>` : ''}`;
   window.HB.bindResultApplications($('#result-body'), window.HB.resultRunId);
-  if (!('speechSynthesis' in window)) $('#read-aloud').remove();
-  document.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
-    try { await navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent); announce('Copied the application.'); b.textContent = 'Copied'; }
-    catch { announce('Could not copy. Select the text instead.'); }
-  });
   if (live) {
     $('#result-title').focus();
-    announce(`${ok ? 'Done' : 'Stopped'}. ${head}`);
+    const cardHint = out.some(result => result.draft)
+      ? 'Press Tab to focus a job card, then Enter to ask WorkBuddy on Telegram to email your application to the demo inbox.'
+      : '';
+    const spokenResult = `${ok ? 'Result done' : 'Process stopped'}. ${e.summary || head}. ${cardHint}`.trim();
+    announce(spokenResult);
+    // Let the completion chime finish before the built-in voice reads the result.
+    setTimeout(() => window.HB.readControl(spokenResult), 520);
   }
 }
 
