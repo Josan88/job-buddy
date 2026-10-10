@@ -37,6 +37,7 @@ The agent builds her profile and ranks the open gigs. It **skips jobs that pay b
 **Live app: https://hirebuddy-k543.onrender.com** (free tier, so the first load after idle can take about a minute)
 
 - **Web app:** type a prompt on the home page, or click an example, and watch the plan, tool calls, self-fixes and checks stream in live.
+- **My page (`/me`):** pick who you are, with no password. A student sees open jobs and their own applications with a live status (applied, interview booked, not selected). A business owner sees only the jobs they published, with the interviews the agent booked.
 - **From WorkBuddy:** see [WorkBuddy setup](#workbuddy-setup).
 - **From a terminal:** `node workbuddy/hirebuddy-skill/scripts/hirebuddy.js "Need a weekend barista in Subang, RM12/hr"`
 

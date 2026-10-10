@@ -38,6 +38,10 @@ const cases = [
     if (!pass) fail++;
     console.log(`${pass ? 'PASS' : 'FAIL'} ${name}: ${r.summary}`);
   }
+  const aina = await fetch(`${base}/api/me/student/stu-aina`).then(r => r.json());
+  const booked = aina.mine.some(a => a.status === 'interview' && a.interview?.when);
+  if (!booked) fail++;
+  console.log(`${booked ? 'PASS' : 'FAIL'} student view: Aina sees ${aina.mine.map(a => `${a.title}=${a.status}`).join(', ')}`);
   const mcp = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }).then(r => r.json());
   const mcpOk = mcp.result.tools.some(t => t.name === 'hirebuddy_run');
   if (!mcpOk) fail++;

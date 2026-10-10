@@ -122,3 +122,17 @@ table.rank tr.illegal td { opacity: .65; }
 .form input, .form textarea { font: inherit; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
 .mail pre { max-height: none; }
 .prose { max-width: 760px; } .prose li { margin: 4px 0; }
+
+/* My page */
+.me { max-width: 860px; }
+.me-head .btn { white-space: nowrap; }
+.me-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+.me h2 { margin-top: 22px; }
+.choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 14px; }
+.choice { background: var(--surface); color: var(--ink); border: 1px solid var(--line); text-align: left; display: grid; gap: 2px; font-weight: 400; }
+.choice:hover { border-color: var(--brand); }
+.choice span { color: var(--muted); font-size: 12.5px; }
+.app-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.card.app.interview { border-color: var(--good); }
+.card.app.not_selected { opacity: .75; }
+.plain { margin: 4px 0; padding-left: 18px; }

@@ -229,3 +229,6 @@ async function loadRecent() {
 const m = location.pathname.match(/^\/runs\/([\w-]+)/);
 if (m) openRun(m[1]); else loadRecent();
 window.onpopstate = () => location.reload();
+
+// Show who you are in the header when a person is picked on "My page".
+try { const me = JSON.parse(localStorage.getItem('hirebuddy.me')); if (me) { document.getElementById('me-link').textContent = me.name.split(' ')[0]; if (!m) setPersona(me.role === 'student' ? 'student' : 'hirer'); } } catch {}

@@ -42,7 +42,7 @@ function page(title, inner) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)}</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/style.css"></head>
 <body><header class="top"><a class="brand" href="/"><img src="/favicon.svg" alt="" width="26" height="26">HireBuddy</a>
-<nav><a href="/">Agent</a><a href="/jobs">Jobs</a><a href="/outbox">Outbox</a><a href="/about">How it works</a></nav></header>
+<nav><a href="/">Agent</a><a href="/me" id="me-link">My page</a><a href="/jobs">Jobs</a><a href="/outbox">Outbox</a><a href="/about">How it works</a></nav></header>
 <main class="wrap">${inner}</main></body></html>`;
 }
 
@@ -138,6 +138,58 @@ async function route(req, res) {
     return json(res, 200, { ...j, url: `${base}/jobs/${j.id}`, applicants, interviews });
   }
   if (p === '/api/students') return json(res, 200, store.db.students.map(({ email, ...s }) => s));
+
+  // ---- Role views (no passwords: you pick who you are, the browser remembers it) ----
+  if (p === '/api/people') {
+    const businesses = [...new Set(store.db.jobs.map(j => j.business))].reverse();
+    return json(res, 200, {
+      students: store.db.students.map(s => ({ id: s.id, name: s.name, area: s.area, campus: s.campus })),
+      businesses: businesses.map(b => ({ name: b, jobs: store.db.jobs.filter(j => j.business === b).length })),
+    });
+  }
+  if ((m = p.match(/^\/api\/me\/student\/([\w-]+)$/))) {
+    const s = store.db.students.find(x => x.id === m[1]);
+    if (!s) return json(res, 404, { error: 'not found' });
+    const jobIds = new Set([
+      ...store.db.applications.filter(a => a.studentId === s.id).map(a => a.jobId),
+      ...store.db.interviews.filter(i => i.studentId === s.id).map(i => i.jobId),
+    ]);
+    const mine = [...jobIds].map(jid => {
+      const j = store.db.jobs.find(x => x.id === jid);
+      if (!j) return null;
+      const app = store.db.applications.find(a => a.jobId === jid && a.studentId === s.id);
+      const iv = store.db.interviews.filter(i => i.jobId === jid && i.studentId === s.id).pop();
+      const roundDone = store.db.interviews.some(i => i.jobId === jid);
+      const status = iv ? 'interview' : roundDone ? 'not_selected' : 'applied';
+      return {
+        jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`, url: `${base}/jobs/${j.id}`,
+        status, applied: !!app, appliedAt: app?.at || null, score: app?.score ?? L.scoreMatch(j, s).total,
+        interview: iv ? { when: iv.when, mode: iv.mode, ics: `${base}/ics/${iv.id}.ics` } : null,
+        updatedAt: iv ? (store.db.emails.find(e => e.interviewId === iv.id)?.at || iv.start) : app?.at,
+      };
+    }).filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+    const open = store.db.jobs.filter(j => j.status === 'open' && !jobIds.has(j.id) && L.checkWage(j.pay, j.payUnit).ok)
+      .map(j => ({ jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`,
+        schedule: L.describeSchedule(j.schedule), distanceKm: L.distanceKm(j.area, s.area), score: L.scoreMatch(j, s).total, url: `${base}/jobs/${j.id}` }))
+      .sort((a, b) => b.score - a.score);
+    return json(res, 200, { student: { id: s.id, name: s.name, area: s.area, campus: s.campus, skills: s.skills }, mine, open });
+  }
+  if (p === '/api/me/business') {
+    const name = url.searchParams.get('name') || '';
+    const jobs = store.db.jobs.filter(j => j.business === name).reverse().map(j => {
+      const ivs = store.db.interviews.filter(i => i.jobId === j.id).sort((a, b) => a.start.localeCompare(b.start));
+      const apps = store.db.applications.filter(a => a.jobId === j.id);
+      return {
+        id: j.id, title: j.title, area: j.area, pay: `RM${j.pay}/${j.payUnit}`, schedule: L.describeSchedule(j.schedule),
+        url: `${base}/jobs/${j.id}`, runId: j.runId || null, createdAt: j.createdAt || null,
+        applicants: apps.map(a => ({ name: store.db.students.find(x => x.id === a.studentId)?.name, score: a.score, at: a.at }))
+          .sort((a, b) => b.score - a.score),
+        interviews: ivs.map(i => ({ name: i.name, when: i.when, ics: `${base}/ics/${i.id}.ics`,
+          score: L.scoreMatch(j, store.db.students.find(x => x.id === i.studentId) || {}).total })),
+      };
+    });
+    return json(res, 200, { business: name, jobs });
+  }
   if (p === '/api/emails') return json(res, 200, store.db.emails.slice(-100).reverse());
   if (p === '/api/reset' && req.method === 'POST') {
     const token = process.env.RESET_TOKEN;
@@ -197,8 +249,8 @@ async function route(req, res) {
 <h3>${esc(e.subject)}</h3><p class="muted">To: ${esc(e.to)}</p><pre>${esc(e.body)}</pre>${e.attachment ? `<p><a href="${esc(e.attachment)}">📎 interview.ics</a></p>` : ''}</article>`).join('') || '<p class="muted">No emails yet.</p>';
     return html(res, 200, page('Outbox', `<h1>Outbox</h1><p class="muted">Every email the agent sends. Demo addresses (example.com) are kept here instead of being delivered.</p>${list}`));
   }
-  if (p === '/' || p === '/about' || /^\/runs\/[\w-]+$/.test(p)) {
-    return fs.createReadStream(path.join(PUBLIC, p === '/about' ? 'about.html' : 'index.html')).pipe((res.writeHead(200, { 'content-type': TYPES['.html'] }), res));
+  if (p === '/' || p === '/about' || p === '/me' || /^\/runs\/[\w-]+$/.test(p)) {
+    return fs.createReadStream(path.join(PUBLIC, p === '/about' ? 'about.html' : p === '/me' ? 'me.html' : 'index.html')).pipe((res.writeHead(200, { 'content-type': TYPES['.html'] }), res));
   }
 
   // ---- Static ----
