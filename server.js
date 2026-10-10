@@ -365,7 +365,7 @@ async function route(req, res) {
     const email = {
       id: store.id('mail'), to: mail.APPLICATION_INBOX, kind: 'application',
       subject: `${originalEmployer} — New applicant for ${j.title}: ${s.name}`,
-      body: `${s.name} (${s.area}) applied for ${j.title} at ${j.business}.\n\n${coverNote}\n\nMatch score: ${app.score}/100\nReply to: ${s.email}\nOriginal employer email: ${originalEmployer}\nJob page: ${base}/jobs/${j.id}`,
+      body: `${s.name}${s.area ? ` (${s.area})` : ''} applied for ${j.title} at ${j.business}.\n\n${coverNote}\n\nMatch score: ${app.score}/100\nReply to: ${s.email}\nOriginal employer email: ${originalEmployer}\nJob page: ${base}/jobs/${j.id}`,
       at: new Date().toISOString(), runId: null,
     };
     email.delivery = await mail.deliver(email);
@@ -426,7 +426,7 @@ async function route(req, res) {
     const email = (f.get('email') || '').trim().toLowerCase();
     let s = store.db.students.find(x => x.email === email);
     const fields = {
-      name: (f.get('name') || 'Applicant').slice(0, 80), email, area: L.findArea(f.get('area')) || f.get('area') || 'Subang Jaya',
+      name: (f.get('name') || 'Applicant').slice(0, 80), email, area: L.findArea(f.get('area')) || (f.get('area') || '').trim().slice(0, 80) || null,
       skills: (f.get('skills') || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean),
       availability: prof.availability, bio: (f.get('bio') || '').slice(0, 1000), campus: '',
     };

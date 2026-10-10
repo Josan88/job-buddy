@@ -374,11 +374,13 @@ tools.register_student = {
     skills: { type: 'array', items: { type: 'string' } }, availability: scheduleSchema,
     expectedRate: { type: 'number', description: 'RM per hour' }, bio: { type: 'string', description: 'Short first-person summary built only from facts the seeker gave' },
     needs: needsSchema,
-  }, ['name', 'area', 'skills', 'availability', 'bio']),
+  }, ['name', 'skills', 'availability', 'bio']),
   run: async (a, ctx) => {
-    const area = L.findArea(a.area);
+    // Only record an area the person actually named; never guess one (an LLM may try).
+    const named = typeof ctx.run?.prompt !== 'string' || L.findArea(ctx.run.prompt);
+    const area = a.area && named ? L.findArea(a.area) : null;
     const problems = [];
-    if (!area) problems.push(`Unknown area "${a.area}".`);
+    if (a.area && named && !area) problems.push(`Unknown area "${a.area}".`);
     if (!L.totalMinutes(a.availability)) problems.push('Availability has no hours. Use e.g. {"Mon":["09:00-17:00"]}.');
     if (problems.length) return { ok: false, problems };
     const email = a.email || `${a.name.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '')}@example.com`;
@@ -473,7 +475,7 @@ tools.apply_to_job = {
     const email = {
       id: store.id('mail'), to: mail.APPLICATION_INBOX, kind: 'application',
       subject: `${j.ownerEmail || 'owner@example.com'} — New applicant for ${j.title}: ${s.name}`,
-      body: `${s.name} (${s.area}) applied for ${j.title}.\n\n${coverNote}${accessNote(s)}${asks}\n\nMatch score: ${app.score}/100\nReply to: ${s.email}\nJob page: ${jobUrl(ctx, j.id)}`,
+      body: `${s.name}${s.area ? ` (${s.area})` : ''} applied for ${j.title}.\n\n${coverNote}${accessNote(s)}${asks}\n\nMatch score: ${app.score}/100\nReply to: ${s.email}\nJob page: ${jobUrl(ctx, j.id)}`,
       at: new Date().toISOString(), runId: ctx.run.id,
     };
     email.delivery = await mail.deliver(email);

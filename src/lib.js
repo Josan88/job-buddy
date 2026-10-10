@@ -7,7 +7,7 @@ const DAY_NAMES = { Sun: 'Sunday', Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesda
 
 // Approximate centre points for Klang Valley areas (lat, lng).
 const AREAS = {
-  'subang jaya': [3.0500, 101.5850], 'usj': [3.0450, 101.5800], 'ss15': [3.0760, 101.5880],
+  'subang jaya': [3.0500, 101.5850], 'subang': [3.0500, 101.5850], 'usj': [3.0450, 101.5800], 'ss15': [3.0760, 101.5880],
   'bandar sunway': [3.0680, 101.6070], 'sunway': [3.0680, 101.6070],
   'petaling jaya': [3.1073, 101.6067], 'pj': [3.1073, 101.6067], 'damansara': [3.1500, 101.6200],
   'shah alam': [3.0733, 101.5185], 'kuala lumpur': [3.1390, 101.6869], 'kl': [3.1390, 101.6869],
@@ -20,7 +20,7 @@ const AREAS = {
 
 // Pretty names keyed by the canonical lowercase key.
 const AREA_LABEL = Object.fromEntries(Object.keys(AREAS).map(k => [k, k.replace(/\b\w/g, c => c.toUpperCase())
-  .replace(/^Usj$/, 'USJ').replace(/^Ss15$/, 'SS15').replace(/^Pj$/, 'Petaling Jaya').replace(/^Kl$/, 'Kuala Lumpur')]));
+  .replace(/^Usj$/, 'USJ').replace(/^Ss15$/, 'SS15').replace(/^Pj$/, 'Petaling Jaya').replace(/^Kl$/, 'Kuala Lumpur').replace(/^Subang$/, 'Subang Jaya')]));
 
 function findArea(text) {
   const t = (text || '').toLowerCase();

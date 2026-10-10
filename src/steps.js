@@ -104,7 +104,7 @@ steps.hirebuddy_1_understand = {
     const n = s.needs;
     return {
       ok: true, runId: run.id, liveLog: `${baseUrl}/runs/${run.id}`,
-      understood: `${s.name}, ${s.area}, free ${L.describeSchedule(s.availability)}, skills ${s.skills.join(', ')}`
+      understood: `${s.name}, ${s.area || 'area not given'}, free ${L.describeSchedule(s.availability)}, skills ${s.skills.join(', ')}`
         + `${n ? `. ${n.vision}, uses ${n.tool}${n.remoteOnly ? ', remote work only' : `, up to a ${n.maxWalkMin || L.DEFAULT_WALK}-minute walk from a stop`}${n.interviewFormat ? `, ${n.interviewFormat} interviews` : ''}` : ''}`
         + `${s.expectedRate ? `. At least RM${s.expectedRate} an hour` : ''}.`,
       goal: `${GOAL} interviews`, alreadyBooked: kept.length, jobsFromOtherSites: outside.clean(listings || []).length,

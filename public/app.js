@@ -443,7 +443,7 @@ function pretty(tool, r, ok) {
       return `<p>${esc(r.message)} <span class="muted">(${esc(r.source)})</span></p>`;
     case 'register_student': {
       const n = r.profile.needs;
-      return `<p>${esc(r.profile.name)}, ${esc(r.profile.area)}. Skills: ${esc(r.profile.skills.join(', '))}.</p>${n ? `<p>Needs: ${esc(n.vision)}, uses ${esc(n.tool || 'assistive tech')}${n.remoteOnly ? ', remote only' : `, up to a ${esc(n.maxWalkMin)}-minute walk from a stop`}${n.interviewFormat ? `, ${esc(n.interviewFormat)} interviews` : ''}.</p>` : ''}`;
+      return `<p>${esc(r.profile.name)}${r.profile.area ? `, ${esc(r.profile.area)}` : ''}. Skills: ${esc(r.profile.skills.join(', '))}.</p>${n ? `<p>Needs: ${esc(n.vision)}, uses ${esc(n.tool || 'assistive tech')}${n.remoteOnly ? ', remote only' : `, up to a ${esc(n.maxWalkMin)}-minute walk from a stop`}${n.interviewFormat ? `, ${esc(n.interviewFormat)} interviews` : ''}.</p>` : ''}`;
     }
     case 'search_jobs':
       return `<p>${r.suitable} of ${r.count} jobs suit you.</p><table><caption>Jobs checked</caption><thead><tr><th scope="col">Job</th><th scope="col">Pay</th><th scope="col">Access</th><th scope="col">Match</th></tr></thead><tbody>${r.results.map(j => `<tr><th scope="row"><a href="${esc(j.url)}">${esc(j.title)}</a><br><span class="small">${esc(j.business)}, ${esc(j.workMode)}</span></th><td>${esc(j.pay)}${j.legalPay ? '' : `<br><span class="status-word bad">Illegal pay</span>`}${j.belowMinPay && j.legalPay ? '<br><span class="small">Below your minimum</span>' : ''}</td><td>${accessText(j.access)}</td><td>${j.score} out of 100</td></tr>`).join('')}</tbody></table>`;
