@@ -113,6 +113,33 @@ const apply = (job, key) => fetch(`${base}/api/jobs/${job}/apply/stu-nadia`, {
   assert(withResume.task.includes(`/api/me/student/${student.id}/resume`));
   assert(withResume.task.includes('without requesting compulsory missing details'));
   assert.equal((await handoff({ prompt: '' })).status, 400);
+  const tools = require('../src/tools').tools;
+  const searchCtx = { run: { id: 'filter-test' }, baseUrl: base, emit() {} };
+  const blindResults = await tools.search_jobs.run({ studentId: student.id, askAboutTech: true, maxDistanceKm: 60 }, searchCtx);
+  assert(blindResults.results.every(job => job.suitable));
+  assert(!blindResults.results.some(job => job.jobId === 'job-delivery-subang'));
+  const blindView = await fetch(`${base}/api/me/student/${student.id}`).then(r => r.json());
+  assert(blindView.open.every(job => job.suitable));
+  const blindJobsPage = await fetch(`${base}/jobs?studentId=${student.id}`).then(r => r.text());
+  assert(!blindJobsPage.includes('data-job-id="job-delivery-subang"'));
+  searchCtx.run.options = { listings: [
+    { title: 'Delivery Rider', description: 'Driving a motorcycle required' },
+    { title: 'Phone customer service', description: 'Remote customer service calls', pay: 'RM15/hour' }
+  ] };
+  const filteredListings = await tools.check_outside_listings.run({ studentId: student.id }, searchCtx);
+  assert(filteredListings.results.every(job => job.verdict !== 'not suitable'));
+  assert.equal(filteredListings.results[0].listingIndex, 1);
+  assert(!require('../src/outside').summarise(searchCtx.run.outside, student).includes('Delivery Rider'));
+  const applicant = store.db.applications[0];
+  const bookingCtx = { run: { id: 'reply-test', interviews: [] }, emit() {} };
+  const blockedBooking = await tools.book_interview.run({ studentId: applicant.studentId, jobId: applicant.jobId }, bookingCtx);
+  assert.equal(blockedBooking.ok, false);
+  assert(/employer response/.test(blockedBooking.problems[0]));
+  const beforeBooking = store.db.interviews.length;
+  applicant.employerResponse = { interviewRequested: true, message: 'Please attend an interview' };
+  const allowedBooking = await tools.book_interview.run({ studentId: applicant.studentId, jobId: applicant.jobId }, bookingCtx);
+  assert.equal(allowedBooking.ok, true);
+  assert.equal(store.db.interviews.length, beforeBooking + 1);
   console.log('PASS application handoff and searches with incomplete details or supplied resume');
 })().then(() => { fs.rmSync(dir, { recursive: true, force: true }); process.exit(0); })
   .catch(e => { console.error(e); fs.rmSync(dir, { recursive: true, force: true }); process.exit(1); });

@@ -323,7 +323,7 @@ async function route(req, res) {
     }).filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
     // Same matcher the agent uses, so "Suits you" here always agrees with what the agent would apply to.
     const open = require('./src/tools').matchJobs(s, { minPay: s.expectedRate || 0, maxDistanceKm: 60, askAboutTech: true })
-      .filter(r => !jobIds.has(r.jobId) && r.legalPay)
+      .filter(r => !jobIds.has(r.jobId) && r.legalPay && (s.needs?.vision !== 'blind' || r.suitable))
       .map(r => { const j = store.db.jobs.find(x => x.id === r.jobId); return { jobId: r.jobId, title: r.title, business: r.business, area: r.area, pay: r.pay,
         schedule: L.describeSchedule(j.schedule), distanceKm: L.distanceKm(j.area, s.area), score: r.score, url: `${base}/jobs/${r.jobId}`,
         workMode: r.workMode, access: s.needs ? r.access : null, suitable: r.suitable, whyNot: r.whyNot }; });
@@ -445,7 +445,11 @@ async function route(req, res) {
 
   // ---- Pages ----
   if (p === '/jobs') {
-    const open = [...store.db.jobs].reverse().filter(j => j.status === 'open');
+    const viewer = store.db.students.find(s => s.id === (url.searchParams.get('studentId') || 'stu-nadia'));
+    const visibleIds = viewer?.needs?.vision === 'blind'
+      ? new Set(require('./src/tools').matchJobs(viewer, { minPay: viewer.expectedRate || 0, maxDistanceKm: 60, askAboutTech: true }).filter(r => r.suitable).map(r => r.jobId))
+      : null;
+    const open = [...store.db.jobs].reverse().filter(j => j.status === 'open' && (!visibleIds || visibleIds.has(j.id)));
     const list = open.map((j, i) => {
       const access = j.access || {};
       const details = `${j.business}, ${j.area}. RM${j.pay} per ${j.payUnit}. ${L.describeSchedule(j.schedule)}. ${(access.workMode || 'on-site').replace(/^\w/, c => c.toUpperCase())}.`;

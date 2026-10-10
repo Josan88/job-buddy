@@ -168,7 +168,7 @@ async function bookTowardGoal(ctx, jobId, goal, { radius = RADII[0], relaxBudget
     const choice = best.gain > 0 ? best
       : options.find(o => o.rank === 1 && o.potential > 0 && relaxBudget > 0) || stop;
     await callTool(ctx, 'log_decision', {
-      situation: `${booked.length} of ${goal} interviews booked after round ${round}; ${qualifiedUnder(job, radius, skip).length || 'no'} other qualified candidate(s) within ${radius} km.`,
+      situation: `${booked.length} of ${goal} applications submitted after round ${round}; ${qualifiedUnder(job, radius, skip).length || 'no'} other qualified candidate(s) within ${radius} km.`,
       options: options.map(o => `${o.label} (${o.gain ? `+${o.gain} qualified` : 'adds nobody'})`),
       choice: choice.label,
       reason: `${choice.why[0].toUpperCase()}${choice.why.slice(1)}.`,
@@ -304,8 +304,7 @@ async function autopilotReplace(ctx) {
     : `${declined.name} declined and nobody else qualifies for ${job.title} right now, so the slot stays open.${decisionSummary(ctx)} ${check.passed}/${check.total} self-checks passed.` });
 }
 
-// Job seeker (often blind or low vision): find jobs that suit them, apply, book interviews,
-// and keep adapting until GOAL interviews are booked or no option is left.
+// Job seeker: submit suitable applications and await employer replies.
 const SEEKER_GOAL = 3;
 
 function seekerEmail(iv, job, s, ctx) {
@@ -325,11 +324,7 @@ async function applyAndBook(ctx, s, r) {
     + ` and I am free ${L.describeSchedule(s.availability)}. Thank you.`;
   const app = await callTool(ctx, 'apply_to_job', { studentId: s.id, jobId: r.jobId, coverNote: note });
   if (!app.ok) return null;
-  const iv = await callTool(ctx, 'book_interview', { studentId: s.id, jobId: r.jobId });
-  if (!iv.ok) return null;
-  const stored = store.db.interviews.find(i => i.id === iv.interviewId);
-  await callTool(ctx, 'send_email', { to: s.email, subject: `Interview ${iv.when}: ${r.title}, ${r.business}`, body: seekerEmail(stored, job, s, ctx), interviewId: iv.interviewId, kind: 'interview_invite' });
-  return iv;
+  return app;
 }
 
 // Ways to find more suitable jobs, each simulated first: jobs = what it would add.
@@ -355,14 +350,13 @@ async function autopilotStudent(ctx) {
   const n = p.needs;
   say(ctx, `Understood: ${p.name}, ${p.area ? `based in ${p.area}` : 'area not given'}, free ${L.describeSchedule(p.availability)}, skills ${p.skills.join(', ')}.`
     + `${n ? ` Needs: ${n.vision}, uses ${n.tool}${n.remoteOnly ? ', remote work only' : `, up to a ${n.maxWalkMin}-minute walk from a stop`}${n.interviewFormat ? `, ${n.interviewFormat} interviews` : ''}.` : ''}`
-    + `${p.minPay ? ` At least RM${p.minPay}/h.` : ''} Goal: ${goal} interviews.`);
+    + `${p.minPay ? ` At least RM${p.minPay}/h.` : ''} Goal: ${goal} applications; interviews require employer replies.`);
   await callTool(ctx, 'set_plan', { steps: [
     { title: 'Save your profile and needs', tool: 'register_student' },
     { title: 'Find jobs and check each one suits you', tool: 'search_jobs' },
     { title: 'If too few suit you: decide what to change', tool: 'log_decision' },
     { title: 'Apply, with your interview needs', tool: 'apply_to_job' },
-    { title: `Book up to ${goal} interviews`, tool: 'book_interview' },
-    { title: 'Email you each interview, time first', tool: 'send_email' },
+    { title: 'Wait for employer replies before arranging interviews', tool: 'apply_to_job' },
     ...(ctx.run.options?.listings?.length ? [{ title: `Check the ${outside.clean(ctx.run.options.listings).length} jobs WorkBuddy found on other sites`, tool: 'check_outside_listings' }] : []),
     { title: 'Check everything again', tool: 'verify_applications' },
     { title: 'Tell you the result', tool: 'finish' },
@@ -399,9 +393,9 @@ async function autopilotStudent(ctx) {
     const best = options.filter(o => o.jobs.length && !o.yours).sort((a, b) => a.cost - b.cost)[0];
     const askYou = options.filter(o => o.jobs.length && o.yours);
     if (!best && askYou.length) ctx.run.suggestions = askYou.map(o => `${o.label.replace(/^Lower your/, 'If you lower your').replace(/^Accept/, 'If you accept')}, I could apply to ${o.jobs.map(r => `${r.title} at ${r.business} (${r.pay})`).join(' and ')}. Tell me and I will.`);
-    const stopLabel = `Stop at ${booked.length} interview${booked.length === 1 ? '' : 's'} and tell you what came closest`;
+    const stopLabel = `Stop at ${booked.length} application${booked.length === 1 ? '' : 's'} and tell you what came closest`;
     await callTool(ctx, 'log_decision', {
-      situation: `${booked.length} of ${goal} interviews booked after round ${round}; no other job suits you with the current settings.`,
+      situation: `${booked.length} of ${goal} applications submitted after round ${round}; no other job suits you with the current settings.`,
       options: [...options.map(o => `${o.label} (${o.jobs.length ? `+${o.jobs.length} job${o.jobs.length === 1 ? '' : 's'}` : 'adds nothing'}${o.yours ? ', needs your OK' : ''})`), `${stopLabel} (adds nothing)`],
       choice: best ? best.label : stopLabel,
       reason: best ? `It adds ${best.jobs.map(r => `${r.title} at ${r.business}`).join(' and ')}, and nothing about your needs is given up.`.replace('and nothing about your needs is given up', best.change.askAboutTech ? 'and the application asks the question for you' : best.change.minPay === 0 ? 'and those jobs still pay at least the legal minimum' : 'and every other need still holds')
@@ -419,11 +413,13 @@ async function autopilotStudent(ctx) {
   const skipped = found.results.filter(r => r.legalPay && r.access.fit === 'not suitable' && r.score >= MINIMUM_MATCH).length;
   const why = r => r.whyNot;
   const closest = ivs.length < goal ? found.results.filter(r => r.legalPay && !r.suitable && !r.applied).slice(0, 2) : [];
-  if (closest.length) ctx.run.suggestions = (ctx.run.suggestions || []).concat(`Closest other jobs: ${closest.map(r => `${r.title} at ${r.business}, not booked because ${why(r)}`).join('; ')}.`);
-  await callTool(ctx, 'finish', { summary: ivs.length
+  if (closest.length && s.needs?.vision !== 'blind') ctx.run.suggestions = (ctx.run.suggestions || []).concat(`Closest other jobs: ${closest.map(r => `${r.title} at ${r.business}, not booked because ${why(r)}`).join('; ')}.`);
+  await callTool(ctx, 'finish', { summary: (ctx.run.applications || []).length
+    ? `Submitted ${ctx.run.applications.length} application(s). Awaiting employer replies before arranging interviews.${decisionSummary(ctx)}${outside.summarise(ctx.run.outside || [], s)} ${check.passed} of ${check.total} checks passed.`
+    : ivs.length
     ? `You have ${ivs.length} interview${ivs.length === 1 ? '' : 's'}.\n${lines.join('\n')}\nEach one is in your email with the time first and instructions for joining.`
-      + `${skipped ? ` I left out ${skipped} job${skipped === 1 ? '' : 's'} that did not suit your needs.` : ''}${decisionSummary(ctx)}${(ctx.run.suggestions || []).map(x => ` ${x}`).join('')}${outside.summarise(ctx.run.outside || [])} ${check.passed} of ${check.total} checks passed.`
-    : `No job on HireBuddy suits you right now, so I booked nothing. Your profile is saved and employers can find you.${decisionSummary(ctx)}${outside.summarise(ctx.run.outside || [])} ${check.passed} of ${check.total} checks passed.` });
+      + `${skipped ? ` I left out ${skipped} job${skipped === 1 ? '' : 's'} that did not suit your needs.` : ''}${decisionSummary(ctx)}${(ctx.run.suggestions || []).map(x => ` ${x}`).join('')}${outside.summarise(ctx.run.outside || [], s)} ${check.passed} of ${check.total} checks passed.`
+    : `No job on HireBuddy suits you right now, so I booked nothing. Your profile is saved and employers can find you.${decisionSummary(ctx)}${outside.summarise(ctx.run.outside || [], s)} ${check.passed} of ${check.total} checks passed.` });
 }
 
 // The seeker said they can't make an interview: find another time with the same employer,
@@ -481,8 +477,8 @@ Work fully autonomously from the single user prompt. Never ask the user question
 3. Before finishing you MUST run the final verify tool and it must pass. Then call finish with a short plain-language summary including links.
 Weekly schedules use day keys Mon Tue Wed Thu Fri Sat Sun with 24h ranges, e.g. {"Sat":["08:00-14:00"]}. Skills are short lowercase phrases.`;
   if (persona === 'student') return `${common}
-User: a job seeker, often blind or low vision. Goal: ${GOAL} booked interviews for jobs that truly suit them.
-Steps: register_student (leave area out if they did not say where they live; bio built only from what they said; fill needs with their sight loss, the tool they use (e.g. NVDA), remote-only, longest walk from a stop, preferred interview format), search_jobs (each result has access.fit and suitable), apply_to_job to suitable jobs only (personal cover note naming the job and a real skill), book_interview for each, send_email each interview to the seeker with interviewId (plain text; line 1 the exact "when", line 2 how to join, then the rest), and keep going until ${GOAL} are booked.
+User: a job seeker, often blind or low vision. Goal: ${GOAL} applications for suitable jobs, awaiting employer replies.
+Steps: register_student (leave area out if they did not say where they live; bio built only from what they said; fill needs with their sight loss, the tool they use (e.g. NVDA), remote-only, longest walk from a stop, preferred interview format), search_jobs (each result has access.fit and suitable), apply_to_job to suitable jobs only (personal cover note naming the job and a real skill), Do not book interviews during the initial application run; wait for an employer response inviting the applicant to interview, send_email each interview to the seeker with interviewId (plain text; line 1 the exact "when", line 2 how to join, then the rest), and submit up to ${GOAL} applications, then report that employer replies are awaited.
 If too few jobs suit them, call log_decision with the real options (askAboutTech to include jobs that do not state screen reader support, maxWalkMin 15, maxDistanceKm 60, lower minPay to the legal minimum, or stop), choose the one that adds suitable jobs without giving up a need they stated, then search again. Never apply to a job with access blockers or illegal pay.
 If the message says WorkBuddy found jobs on other sites, call check_outside_listings once before verify_applications and include its result in the summary: which are worth asking about (drafted, not sent) and which do not suit and why. Say plainly that you cannot apply or book on other sites.
 If the message has rescheduleInterviewId, they can't make that interview: log_decision, book_interview again for the same job (a new time is found automatically), email them, verify_applications, finish.
