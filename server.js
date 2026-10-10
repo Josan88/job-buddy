@@ -136,7 +136,7 @@ async function route(req, res) {
 
   // ---- API ----
   if (p === '/robots.txt') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('User-agent: *\nAllow: /\nDisallow: /reset\n'); }
-  if (p === '/health') return json(res, 200, { ok: true, mode: llm.enabled() ? `llm:${llm.MODEL}` : 'autopilot', jobs: store.db.jobs.length, students: store.db.students.length });
+  if (p === '/health') return json(res, 200, { ok: true, mode: llm.enabled() ? `llm:${llm.MODEL}` : 'autopilot', jobs: store.db.jobs.length, students: store.db.students.length, version: (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || 'local' });
   if (p === '/api/config') return json(res, 200, { llm: llm.enabled(), model: llm.enabled() ? llm.MODEL : null, email: !!process.env.RESEND_API_KEY });
 
   // Hand Nadia's sentence to WorkBuddy. The website never starts anything on a computer: it only makes

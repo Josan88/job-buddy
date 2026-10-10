@@ -33,11 +33,13 @@ const log = (...a) => { const line = `${new Date().toLocaleTimeString()} ${a.map
 // Run a PowerShell snippet. Values go in through environment variables, never pasted into the code.
 function ps(script, env = {}) {
   if (process.platform !== 'win32') { log('[powershell skipped: not Windows]', Object.values(env).join(' | ')); return { stdout: '', status: 0 }; }
-  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')],
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(`$ProgressPreference = 'SilentlyContinue'
+${script}`, 'utf16le').toString('base64')],
     { env: { ...process.env, ...env }, encoding: 'utf8', windowsHide: true, timeout: 120000 });
   const out = { stdout: (r.stdout || '').trim(), stderr: (r.stderr || '').trim(), status: r.status };
   if (r.error) log('powershell could not start:', r.error.message);
-  if (out.stderr) log('powershell error:', out.stderr.slice(0, 500));
+  // PowerShell's first-run progress messages arrive on stderr as CLIXML; they aren't errors.
+  if (out.stderr && !/^#< CLIXML[\s\S]*<\/Objs>$/.test(out.stderr) || /S="Error"/.test(out.stderr)) log('powershell error:', out.stderr.slice(0, 500));
   return out;
 }
 
