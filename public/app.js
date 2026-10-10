@@ -113,6 +113,7 @@ function tgShowSaved() {
   const on = !!tgKey();
   $('#tg-key').value = '';
   $('#tg-forget').hidden = !on;
+  $('#tg-tools').hidden = !on;
   $('#tg-title').textContent = on ? `Paired: tasks go to WorkBuddy on Telegram${tgBot ? ` (@${tgBot})` : ''}` : 'Send to WorkBuddy automatically, through Telegram';
   $('#handoff').textContent = on ? 'Hand it to WorkBuddy on Telegram' : 'Hand it to WorkBuddy';
 }
@@ -143,6 +144,51 @@ $('#tg-forget').onclick = () => {
   announce('Unpaired. Hand it to WorkBuddy copies the task for you to paste.');
 };
 tgShowSaved();
+
+// Whether HireBuddy is connected to Telegram, and WorkBuddy's latest replies to it (paired browsers only).
+const tgCall = (action = 'status') => fetch(`/api/telegram/${action}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: tgKey() }) })
+  .then(r => r.json()).catch(() => ({ error: 'HireBuddy could not be reached.' }));
+const clock = iso => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+// Oldest first. A reply WorkBuddy edits keeps its place in the server's list, so sort by time.
+const repliesSince = (s, since) => (s.replies || []).filter(r => !since || new Date(r.at) >= new Date(since) - 5000).sort((a, b) => new Date(a.at) - new Date(b.at));
+function showReplies(list, title, replies) {
+  title.hidden = !replies.length;
+  list.innerHTML = replies.slice().reverse().map(r => `<li><b>${clock(r.at)}:</b> ${esc(r.text)}</li>`).join('');
+}
+function tgSummary(s) {
+  if (!s.connected) return `Telegram is not working: ${s.error || 'not connected'}.`;
+  const last = repliesSince(s).at(-1);
+  return `Telegram is connected as ${s.account}, sending to @${s.bot}. ${last ? `WorkBuddy last replied at ${clock(last.at)}.` : 'No reply from WorkBuddy since HireBuddy last started.'}`;
+}
+$('#tg-check').onclick = async () => {
+  $('#tg-status').textContent = 'Checking Telegram…';
+  const s = await tgCall();
+  $('#tg-status').textContent = tgSummary(s);
+  showReplies($('#tg-replies'), $('#tg-replies-title'), repliesSince(s));
+};
+$('#tg-test').onclick = async () => {
+  if ($('#tg-test').getAttribute('aria-disabled') === 'true') return;
+  $('#tg-test').setAttribute('aria-disabled', 'true');
+  $('#tg-status').textContent = 'Sending a test message to WorkBuddy…';
+  const s = await tgCall('test');
+  if (s.sendError || !s.connected) {
+    $('#tg-test').removeAttribute('aria-disabled');
+    return $('#tg-status').textContent = s.sendError ? `The test message was not sent: ${s.sendError}` : tgSummary(s);
+  }
+  $('#tg-status').textContent = 'Sent. Waiting for WorkBuddy to reply, for up to 2 minutes.';
+  for (let i = 0; i < 40; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const t = await tgCall();
+    const fresh = repliesSince(t, s.lastSent);
+    if (fresh.length) {
+      $('#tg-test').removeAttribute('aria-disabled');
+      showReplies($('#tg-replies'), $('#tg-replies-title'), repliesSince(t));
+      return $('#tg-status').textContent = `WorkBuddy is answering. It replied at ${clock(fresh.at(-1).at)}: ${fresh.at(-1).text.slice(0, 200)}`;
+    }
+  }
+  $('#tg-test').removeAttribute('aria-disabled');
+  $('#tg-status').textContent = 'No reply from WorkBuddy after 2 minutes. Check that WorkBuddy is open on your computer and that its Assistant has the Telegram channel on.';
+};
 
 // Hand the sentence to WorkBuddy: make a task to paste, then follow the run here once WorkBuddy starts it.
 $('#handoff').onclick = async () => {
@@ -177,7 +223,7 @@ $('#handoff').onclick = async () => {
     $('#handoff-status').textContent = `HireBuddy sent the task to @${h.bot}. Waiting for WorkBuddy to start. This page follows each step.`;
     $('#handoff-title').focus();
     announce('Sent to WorkBuddy on Telegram. I will tell you each step here.');
-    return followHandoff(h.id, 'WorkBuddy has not started yet. Check that WorkBuddy is open on your computer with its Telegram channel on, then reload this page.');
+    return followHandoff(h.id, 'WorkBuddy has not started yet. Check that WorkBuddy is open on your computer with its Telegram channel on, then reload this page.', new Date().toISOString());
   }
   if (h.sendError) {
     err.hidden = false;
@@ -207,9 +253,17 @@ $('#handoff').onclick = async () => {
 };
 
 // Follow the run here as soon as WorkBuddy starts it with the handoff code (for up to 20 minutes).
-async function followHandoff(id, notStarted) {
+// When the task went through Telegram (sentAt), also show what WorkBuddy replies there while we wait.
+async function followHandoff(id, notStarted, sentAt) {
+  let heard = 0;
   for (let i = 0; i < 600; i++) {
     await new Promise(r => setTimeout(r, 2000));
+    if (sentAt && i % 3 === 2) {
+      const fresh = repliesSince(await tgCall(), sentAt);
+      showReplies($('#handoff-replies'), $('#handoff-replies-title'), fresh);
+      if (fresh.length && !heard) announce('WorkBuddy replied on Telegram. Its reply is below.');
+      heard = fresh.length;
+    }
     const st = await fetch(`/api/handoffs/${id}`).then(r => r.json()).catch(() => null);
     if (st?.runId) {
       announce('WorkBuddy has started. Following it here.');
