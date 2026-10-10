@@ -67,12 +67,15 @@ function page(title, inner, { current = '', scripts = '', description = 'HireBud
 <nav aria-label="Main"><ul>${nav}</ul></nav>
 <div class="textsize" role="group" aria-label="Text size"><span aria-hidden="true">Text size</span>
 <button type="button" class="secondary" data-size="normal" aria-label="Normal text">A</button><button type="button" class="secondary" data-size="large" aria-label="Large text">A+</button><button type="button" class="secondary" data-size="larger" aria-label="Largest text">A++</button></div>
-<button type="button" class="secondary" id="voice-command" aria-keyshortcuts="Alt+V" title="Alt+V, say a button, then Enter">Voice command</button>
+<button type="button" class="secondary" id="voice-command" aria-keyshortcuts="Space" title="Press Space, say a control or section, then Enter">Voice command</button>
 </div></header>
 <div id="announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+<details class="panel voice-guide" open><summary>Voice command guide</summary>
+<p>Press Space, say a button, navigation tab, or section name, then press Enter. The matching item receives focus; press Enter again to select it.</p>
+<p>Say “What can I say?” or “Help” to hear the controls and sections available on the current page. Say “Stop” to stop speech.</p></details>
 <main id="main" tabindex="-1">${inner}</main>
 <footer><p>Built to work with screen readers (NVDA, JAWS, VoiceOver, TalkBack), with a keyboard alone, and at large text sizes. People and employers in this demo are fictional.</p></footer>
-<script src="/common.js?v=20261011-6"></script>${scripts}
+<script src="/common.js?v=20261011-7"></script>${scripts}
 </body></html>`;
 }
 

@@ -529,4 +529,4 @@ async function loadRecent() {
 const m = location.pathname.match(/^\/runs\/([\w-]+)/);
 if (m) openRun(m[1], false); else loadRecent();
 window.onpopstate = () => location.reload();
-try { const me = JSON.parse(localStorage.getItem('hirebuddy.me')); setPersona(me?.role === 'owner' ? 'hirer' : 'student'); } catch (e) { setPersona('student'); }
+setPersona('student');

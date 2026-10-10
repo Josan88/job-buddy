@@ -96,7 +96,8 @@ window.HB = {
     const title = main.querySelector('h1')?.textContent?.trim() || document.title;
     const intro = main.querySelector('.lede, h1 + p, #job-help')?.textContent?.trim() || '';
     const sections = [...main.querySelectorAll('h2')].filter(h => h.getClientRects().length).map(h => h.textContent.trim());
-    const text = `${title}. ${intro}${sections.length ? ` This page has these sections: ${sections.join(', ')}.` : ''}`;
+    const tabs = [...document.querySelectorAll('header nav a, header nav summary')].filter(el => el.getClientRects().length).map(el => el.textContent.trim());
+    const text = `${tabs.length ? `Navigation tabs: ${tabs.join(', ')}. ` : ''}${title}. ${intro}${sections.length ? ` This page has these sections: ${sections.join(', ')}.` : ''}`;
     console.info('[HireBuddy speech] page introduction', { title, intro, sections, interrupt });
     (interrupt ? window.HB.readControl : window.HB.readFocus)(text);
   },
@@ -151,6 +152,14 @@ document.addEventListener('focusin', event => {
   window.HB.readControl(`${context}${name}. Button. Press Enter to activate.`);
 });
 
+// Navigation items are announced as tabs before their name and activation instruction.
+document.addEventListener('focusin', event => {
+  const tab = event.target.closest?.('header nav a, header nav summary');
+  if (!tab) return;
+  const name = tab.getAttribute('aria-label') || tab.textContent.trim();
+  window.HB.readControl(`${name}. Navigation tab. Press Enter to select.`);
+});
+
 // Voice commands: press Alt+V (or the "Voice command" button), say a button's name, such as
 // "Hand it to WorkBuddy", "first example" or "read aloud", then press Enter. "What can I say" lists the buttons on screen.
 // Without speech recognition in the browser, a box asks for the button's name instead.
@@ -161,16 +170,23 @@ document.addEventListener('focusin', event => {
   const visible = el => !el.disabled && !el.closest('[hidden]') && el.getClientRects().length > 0;
   const nameOf = el => norm(el.getAttribute('aria-label') || el.textContent).replace(/^use this example /, 'example ');
   // Buttons on the page first, then the menu; the text-size buttons are left out.
-  const targets = () => [...document.querySelectorAll('main button, main a.btn, main summary, main input[type=radio]'), ...document.querySelectorAll('header nav a')]
+  const targets = () => {
+    const controls = [...document.querySelectorAll('main button, main a.btn, main summary, main input[type=radio]'), ...document.querySelectorAll('header nav a, header nav summary')]
     .filter(el => el !== btn && visible(el))
-    .map(el => ({ el, name: el.matches('input') ? norm(el.closest('label')?.textContent) : nameOf(el) }))
-    .filter(t => t.name);
+    .map(el => ({ el, name: el.matches('input') ? norm(el.closest('label')?.textContent) : nameOf(el), kind: el.closest('header nav') ? 'navigation tab' : 'control' }));
+    const sections = [...document.querySelectorAll('main h1, main h2')].filter(visible).map(el => {
+      if (!el.hasAttribute('tabindex')) el.tabIndex = -1;
+      return { el, name: norm(el.textContent), kind: 'section' };
+    });
+    return [...controls, ...sections].filter(t => t.name);
+  }
   const say = text => { console.info('[HireBuddy voice] feedback', text); window.HB.announce(text); window.HB.readControl(text); };
   const short = n => n.split(' ').slice(0, 6).join(' ');
   const listing = () => {
     const names = targets().map(t => t.name.startsWith('example ') ? null : short(t.name)).filter(Boolean);
     const ex = targets().filter(t => t.name.startsWith('example ')).length;
-    return `You can say: ${[...new Set(names)].slice(0, 10).join(', ').replace(/\bi m\b/g, "I'm")}${ex ? `, or first example up to example ${ex}` : ''}.`;
+    const sections = targets().filter(t => t.kind === 'section').map(t => t.name);
+    return `You can say a control name such as ${[...new Set(names)].slice(0, 10).join(', ').replace(/\bi m\b/g, "I'm")}${ex ? `, or first example up to example ${ex}` : ''}.${sections.length ? ` You can also say a section name: ${sections.join(', ')}.` : ''}`;
   };
 
   function act(heard) {
@@ -198,7 +214,9 @@ document.addEventListener('focusin', event => {
     if (!best) { console.warn('[HireBuddy voice] no target matched', { heard, normalized: h }); return say(`I couldn't find a button called ${heard}. ${listing()}`); }
     console.info('[HireBuddy voice] activating target', { heard, target: best.name, score });
     best.el.focus();
-    say(`Focused ${best.name}. ${best.el.matches('button') ? 'Button. ' : ''}Press Enter to select.`);
+    say(best.kind === 'section'
+      ? `Focused ${best.name}. Section selected.`
+      : `Focused ${best.name}. ${best.kind === 'navigation tab' ? 'Navigation tab. ' : best.el.matches('button') ? 'Button. ' : ''}Press Enter to select.`);
   }
 
   let stop = null;
@@ -218,7 +236,8 @@ document.addEventListener('focusin', event => {
 
   if (btn) btn.addEventListener('click', start);
   document.addEventListener('keydown', e => {
-    if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'v' || e.key === 'V' || e.code === 'KeyV')) { e.preventDefault(); start(); }
+    const typing = e.target.matches?.('input, textarea, select, [contenteditable="true"]');
+    if (e.code === 'Space' && !e.altKey && !e.ctrlKey && !e.metaKey && !typing && e.target !== btn) { e.preventDefault(); start(); }
   });
   window.HB.voiceCommand = act;
 })();
