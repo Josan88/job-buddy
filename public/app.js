@@ -121,7 +121,8 @@ function setPersona(p) {
   persona = p;
   document.querySelectorAll('input[name="persona"]').forEach(r => { r.checked = r.value === p; });
   // Job seekers hand their words to WorkBuddy; employers have HireBuddy hire for them here.
-  $('#go').hidden = p === 'student';
+  const go = $('#go');
+  if (go) go.hidden = p === 'student';
   $('#handoff').hidden = p !== 'student';
   $('#tg').hidden = p !== 'student' || !telegramOn;
   $('#prompt-label').textContent = p === 'student' ? 'Introduce yourself' : 'Describe the job';

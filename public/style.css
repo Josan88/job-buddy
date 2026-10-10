@@ -132,6 +132,7 @@ button.mic[aria-pressed="true"] { background: var(--bad); border-color: var(--ba
 .ideas { list-style: none; padding: 0; margin: .5rem 0 1.5rem; display: flex; flex-wrap: wrap; gap: .5rem; }
 .ideas button::before { content: "+ "; }
 .examples { list-style: none; padding: 0; margin: .5rem 0 1rem; display: grid; gap: .5rem; }
+.examples[hidden] { display: none; }
 .examples button { width: 100%; justify-content: flex-start; text-align: left; font-weight: 400; background: var(--bg); color: var(--ink); border: 2px solid var(--line); }
 .examples button b { color: var(--brand); }
 
