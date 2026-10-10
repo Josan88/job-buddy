@@ -69,7 +69,7 @@ function page(title, inner, { current = '', scripts = '', description = 'HireBud
 </div></header>
 <main id="main" tabindex="-1">${inner}</main>
 <footer><p>Built to work with screen readers (NVDA, JAWS, VoiceOver, TalkBack), with a keyboard alone, and at large text sizes. People and employers in this demo are fictional.</p></footer>
-<script src="/common.js?v=20261011-2"></script>${scripts}
+<script src="/common.js?v=20261011-3"></script>${scripts}
 </body></html>`;
 }
 
