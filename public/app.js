@@ -486,7 +486,9 @@ function render(e, live) {
       const li = pending.get(e.tool) || logItem(`<h3>${esc(TOOL_LABEL[e.tool] || e.tool)}</h3><div class="out"></div>`, 'tool');
       pending.delete(e.tool);
       li.classList.add(e.ok ? 'ok' : 'fail');
+      if (e.ok && e.tool === 'register_student') outcome.studentId = e.result.studentId;
       if (e.ok && e.tool === 'screen_candidates') outcome.screen = e.result.details;
+      if (e.ok && e.tool === 'search_jobs') outcome.jobs = e.result.results;
       if (e.ok && e.tool === 'check_outside_listings') outcome.outside = e.result.results;
       li.querySelector('.out').innerHTML = (e.ok ? '' : '<p><b>Problem found.</b></p>') + pretty(e.tool, e.result, e.ok);
       break;
@@ -517,6 +519,11 @@ function accessText(a) {
 
 function checkList(r) {
   return `<p>${r.passed ?? r.checks.filter(c => c.pass).length} of ${r.total ?? r.checks.length} checks passed.</p><ul class="checks">${r.checks.map(c => `<li><span class="status-word ${c.pass ? 'good' : 'bad'}">${c.pass ? 'Passed' : 'Failed'}</span> ${esc(c.name)}${c.detail ? `<br><span class="muted small">${linkify(esc(c.detail))}</span>` : ''}</li>`).join('')}</ul>`;
+}
+
+function scoreCard(score) {
+  const value = Math.max(0, Math.min(100, Number(score) || 0));
+  return `<div class="match-score" aria-label="Match score ${value} out of 100"><b>${value}/100</b><span class="score-bar" aria-hidden="true"><i style="width:${value}%"></i></span></div>`;
 }
 
 function pretty(tool, r, ok) {
@@ -568,10 +575,16 @@ function showResult(e, live) {
   sec.className = `result panel ${ok && !refused ? 'good' : 'bad'}`;
   const lines = (e.summary || 'The agent stopped before finishing. Open the step-by-step list below.').split('\n');
   const head = lines[0];
+  const jobs = (outcome.jobs || []).filter(j => j.suitable && !j.applied);
+  const scoredJobs = jobs.length ? `<h3>Suitable jobs and match scores</h3><ol class="joblist">${jobs.map(j => `<li class="job-card" tabindex="0" data-result-card>
+    <div class="person-top"><h4><a href="${esc(j.url)}">${esc(j.title)}</a> at ${esc(j.business)}</h4>${scoreCard(j.score)}</div>
+    <p>${esc(j.pay)}. ${accessText(j.access)}</p><p>${esc(j.why || '')}</p>
+    <p><button type="button" data-job-apply="${esc(j.jobId)}" data-student-id="${esc(outcome.studentId || '')}">Apply for ${esc(j.title)} at ${esc(j.business)} through Telegram</button></p>
+    <p data-application-status role="status" tabindex="-1"></p></li>`).join('')}</ol>` : '';
   const out = outcome.outside || [];
   const others = out.length ? `<h3>Jobs WorkBuddy found on other sites</h3>
     <p>Press Tab to focus a job card, then Enter to ask WorkBuddy on Telegram to email your application to the demo inbox.</p>
-    <ol class="joblist">${out.map((r, i) => `<li class="job-card" ${r.draft ? `tabindex="0" data-result-card aria-labelledby="outside-title-${i}" aria-describedby="outside-detail-${i}"` : ''}><h4 id="outside-title-${i}">${r.url ? `<a href="${esc(r.url)}">${esc(r.title)}</a>` : esc(r.title)}${r.employer ? ` at ${esc(r.employer)}` : ''}${r.site ? `, on ${esc(r.site)}` : ''}</h4>
+    <ol class="joblist">${out.map((r, i) => `<li class="job-card" ${r.draft ? `tabindex="0" data-result-card aria-labelledby="outside-title-${i}" aria-describedby="outside-detail-${i}"` : ''}><div class="person-top"><h4 id="outside-title-${i}">${r.url ? `<a href="${esc(r.url)}">${esc(r.title)}</a>` : esc(r.title)}${r.employer ? ` at ${esc(r.employer)}` : ''}${r.site ? `, on ${esc(r.site)}` : ''}</h4>${scoreCard(r.score)}</div>
       <p id="outside-detail-${i}">${esc(r.location || '')} ${esc(r.pay || '')} ${esc(r.hours || '')}</p>
       <p><span class="status-word ${r.verdict === 'not suitable' ? 'bad' : 'good'}">${r.verdict === 'not suitable' ? 'Not suitable' : 'Worth asking'}</span>
       ${esc(r.verdict === 'not suitable' ? r.blockers.join('; ') : r.reasons.join('; '))}.</p>
@@ -580,7 +593,7 @@ function showResult(e, live) {
   const rest = lines.slice(1);
   const visibleLinks = (e.links || []).filter(link => link.label !== 'Agent run log');
   $('#result-body').innerHTML = `<p><span class="status-word ${e.verified && !refused ? 'good' : 'bad'}">${refused ? 'Refused: pay is below the legal minimum' : e.verified ? 'Checked and verified' : ok ? 'Done' : 'Needs attention'}</span></p>
-    ${out.length ? '' : `<p class="lede">${linkify(esc(head))}</p>`}${others}${rest.map(l => `<p>${linkify(esc(l))}</p>`).join('')}
+    ${out.length ? '' : `<p class="lede">${linkify(esc(head))}</p>`}${scoredJobs}${others}${rest.map(l => `<p>${linkify(esc(l))}</p>`).join('')}
     ${(outcome.decisions || []).length ? `<h3>Decisions made on the way</h3><ul>${outcome.decisions.map(d => `<li><b>${esc(d.choice)}.</b> ${esc(d.reason)}</li>`).join('')}</ul>` : ''}
     ${visibleLinks.length ? `<p class="actions">${visibleLinks.map(l => `<a class="btn secondary" href="${esc(l.url)}">${esc(l.label)}</a>`).join('')}</p>` : ''}`;
   window.HB.bindResultApplications($('#result-body'), window.HB.resultRunId);
