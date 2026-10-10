@@ -306,7 +306,7 @@ $('#handoff').onclick = async () => {
   followHandoff(h.id, 'WorkBuddy has not started this task yet. Paste the task into WorkBuddy, then reload this page.');
 };
 
-// Follow the run here as soon as WorkBuddy starts it with the handoff code (for up to 20 minutes).
+// Follow the run here as soon as WorkBuddy starts it with the person's sentence (for up to 20 minutes).
 // When the task went through Telegram (sentAt), also show what WorkBuddy replies there while we wait.
 async function followHandoff(id, notStarted, sentAt) {
   let heard = 0;
