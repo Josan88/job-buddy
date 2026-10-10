@@ -1,0 +1,41 @@
+<Slide style={{ width: '1280px', height: '720px', background: '#0F172A', padding: '20px 60px 20px 60px', justifyContent: 'space-between' }}>
+  <Box style={{ height: '80px', justifyContent: 'center' }}>
+    <Text style={{ fontSize: 36, fontWeight: 'bold', color: '#3B82F6' }}>Proof</Text>
+  </Box>
+  <Box style={{ height: '520px', flexDirection: 'column', gap: '20px' }}>
+    <Box style={{ flexDirection: 'row', gap: '40px', height: '360px' }}>
+      <Box style={{ width: '620px', flexDirection: 'column', gap: '16px', justifyContent: 'center' }}>
+        <Box style={{ flexDirection: 'row', gap: '16px', alignItems: 'center' }}>
+          <FAIcon name='check-circle' style={{ fill: '#10B981', width: 40, height: 40 }} />
+          <Text style={{ fontSize: 72, fontWeight: 'bold', color: '#10B981', lineHeight: 1.0 }}>25/25</Text>
+        </Box>
+        <Text style={{ fontSize: 22, color: '#F1F5F9', lineHeight: 1.5 }}>verification checks pass for Nadia</Text>
+        <Text style={{ fontSize: 18, color: '#94A3B8', lineHeight: 1.5 }}>Goal, Plan, Tools, Verify, Fix, Deliver</Text>
+      </Box>
+      <Box style={{ width: '500px', flexDirection: 'column', gap: '32px', justifyContent: 'center' }}>
+        <Box style={{ flexDirection: 'column', gap: '8px' }}>
+          <Box style={{ flexDirection: 'row', gap: '12px', alignItems: 'center' }}>
+            <FAIcon name='check-circle' style={{ fill: '#3B82F6', width: 28, height: 28 }} />
+            <Text style={{ fontSize: 40, fontWeight: 'bold', color: '#3B82F6', lineHeight: 1.1 }}>WCAG 2.2 AA</Text>
+          </Box>
+          <Text style={{ fontSize: 18, color: '#94A3B8', lineHeight: 1.4, paddingLeft: '40px' }}>AAA contrast (7:1), skip links, keyboard nav</Text>
+        </Box>
+        <Box style={{ flexDirection: 'column', gap: '8px' }}>
+          <Box style={{ flexDirection: 'row', gap: '12px', alignItems: 'center' }}>
+            <FAIcon name='check-circle' style={{ fill: '#3B82F6', width: 28, height: 28 }} />
+            <Text style={{ fontSize: 40, fontWeight: 'bold', color: '#3B82F6', lineHeight: 1.1 }}>RM8.72/hr</Text>
+          </Box>
+          <Text style={{ fontSize: 18, color: '#94A3B8', lineHeight: 1.4, paddingLeft: '40px' }}>refuses illegal pay from both sides</Text>
+        </Box>
+      </Box>
+    </Box>
+    <Box style={{ height: '140px', borderTop: '2px solid #1E293B', paddingTop: '24px', flexDirection: 'column', gap: '12px', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 24, color: '#F1F5F9', lineHeight: 1.4, fontWeight: 'bold' }}>One sentence in. Three interviews booked and verified.</Text>
+      <Text style={{ fontSize: 24, color: '#3B82F6', lineHeight: 1.4, fontWeight: 'bold' }}>HireBuddy: work that gets done.</Text>
+    </Box>
+  </Box>
+  <Box style={{ height: '40px', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+    <Text style={{ fontSize: 14, color: '#475569' }}>HireBuddy</Text>
+    <Text style={{ fontSize: 14, color: '#475569' }}>04 / 05</Text>
+  </Box>
+</Slide>
