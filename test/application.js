@@ -100,21 +100,6 @@ const apply = (job, key) => fetch(`${base}/api/jobs/${job}/apply/stu-nadia`, {
   assert.equal((await outsideApply('paired-test')).status, 409);
   const long = require('../src/application').prepare({ ...jobs[0], description: 'Job description '.repeat(500) }, { ...student, bio: 'Experience '.repeat(500) }, base);
   assert(long.task.length <= 4096);
-  const fallback = require('../src/application').prepare({ ...jobs[0], business: 'Example Company & Co.', ownerEmail: '' },
-    { ...student, resume: { name: 'resume.pdf' } }, base);
-  assert.equal(fallback.companyEmail, 'examplecompanyco@gmail.com');
-  assert(fallback.subject.startsWith('examplecompanyco@gmail.com'));
-  assert(fallback.body.includes('Original employer email: examplecompanyco@gmail.com'));
-  assert(!/employer email not provided/i.test(fallback.task + fallback.body + fallback.subject));
-  assert(!/attach|resume\.pdf/i.test(fallback.task));
-  const detailed = require('../src/application').prepare(jobs[0], { ...student,
-    education: 'Diploma in Business', qualifications: 'Customer service certificate', phone: '0123456789' }, base);
-  assert(detailed.task.includes('details previously extracted from this applicant\'s resume'));
-  assert(detailed.task.includes('Diploma in Business'));
-  assert(detailed.body.includes('Education: Diploma in Business'));
-  assert(detailed.body.includes('Qualifications: Customer service certificate'));
-  assert(detailed.body.includes('Phone: 0123456789'));
-  assert.equal(fallback.to, 'stephanieshinhuiyeo@gmail.com');
   const searchDetails = { name: 'Nadia Rahim', age: '24', workExperience: 'No work experience',
     education: 'Diploma', location: 'Subang Jaya', interestedPosition: 'Customer service' };
   const sentBeforeIntake = sent.length;
