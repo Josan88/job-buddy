@@ -1,16 +1,13 @@
 // Email delivery with a safety rule: real email only ever goes to an inbox the demo owner controls.
 //
 // DEMO_INBOX=you@gmail.com  -> every demo address (aina.rahman@example.com ...) is delivered to
-//                              you+aina@gmail.com, so each candidate's invite lands in your inbox.
+//                              you+aina@gmail.com, so each candidate's interview email lands in your inbox.
 // Real addresses are delivered only if they are DEMO_INBOX itself, a +tag of it, or listed in
 // MAIL_ALLOW (comma separated). Everything else stays in the public outbox page.
 //
 // Providers (first one configured wins):
 //   BREVO_API_KEY  - brevo.com free plan, sends to any address after you verify your sender email.
 //   RESEND_API_KEY - resend.com; without your own domain it only delivers to your signup email.
-const store = require('./store');
-const L = require('./lib');
-
 const FROM = () => process.env.MAIL_FROM || process.env.DEMO_INBOX || '';
 const FROM_NAME = () => process.env.MAIL_FROM_NAME || 'HireBuddy';
 
@@ -39,12 +36,11 @@ function mask(addr) {
   return `${local.slice(0, 1)}***${local.includes('+') ? '+' + local.split('+')[1] : ''}@${domain}`;
 }
 
-async function sendBrevo({ to, subject, text, ics }) {
+async function sendBrevo({ to, subject, text }) {
   const body = {
     sender: { email: FROM(), name: FROM_NAME() },
     to: [{ email: to }], subject, textContent: text,
   };
-  if (ics) body.attachment = [{ name: 'invite.ics', content: Buffer.from(ics).toString('base64') }];
   const r = await fetch(process.env.BREVO_API_URL || 'https://api.brevo.com/v3/smtp/email', {
     method: 'POST', headers: { 'api-key': process.env.BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
@@ -54,9 +50,8 @@ async function sendBrevo({ to, subject, text, ics }) {
   return { provider: 'Brevo', providerId: data.messageId };
 }
 
-async function sendResend({ to, subject, text, ics }) {
+async function sendResend({ to, subject, text }) {
   const body = { from: `${FROM_NAME()} <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`, to: [to], subject, text };
-  if (ics) body.attachments = [{ filename: 'invite.ics', content: Buffer.from(ics).toString('base64'), content_type: 'text/calendar; method=REQUEST' }];
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST', headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'content-type': 'application/json' },
     body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
@@ -66,19 +61,13 @@ async function sendResend({ to, subject, text, ics }) {
   return { provider: 'Resend', providerId: data.id };
 }
 
-async function deliver(email, interview) {
+async function deliver(email) {
   const provider = process.env.BREVO_API_KEY ? sendBrevo : process.env.RESEND_API_KEY ? sendResend : null;
   const target = route(email.to);
   if (!provider) return { channel: 'demo outbox', delivered: true, reason: 'email not configured' };
   if (!target) return { channel: 'demo outbox', delivered: true, reason: 'not an inbox the demo owner controls' };
-  let ics = null;
-  if (interview) {
-    const job = store.db.jobs.find(x => x.id === interview.jobId);
-    // Organizer stays the business (not your own inbox) so Gmail shows Accept / Decline to you.
-    ics = L.interviewIcs(interview, job, process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '', { attendee: target });
-  }
   try {
-    const res = await provider({ to: target, subject: email.subject, text: email.body, ics });
+    const res = await provider({ to: target, subject: email.subject, text: email.body });
     return { channel: `real email (${res.provider})`, delivered: true, to: mask(target), providerId: res.providerId };
   } catch (e) {
     return { channel: 'demo outbox', delivered: true, reason: `real send failed: ${e.message}` };

@@ -31,7 +31,7 @@ function widenFor(ctx, s) {
 const h = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // A small page for the user's own computer: headings and lists a screen reader can jump through,
-// no scripts, large text, works offline. Calendar files sit next to it in the same folder.
+// no scripts, large text, and works offline.
 function resultsPage(s, ivs, run, check, baseUrl) {
   const job = iv => store.db.jobs.find(x => x.id === iv.jobId);
   const ok = (run.outside || []).filter(r => r.verdict !== 'not suitable');
@@ -43,7 +43,7 @@ function resultsPage(s, ivs, run, check, baseUrl) {
 <h1>Your interviews, ${h(s.name)}</h1>
 <p>${ivs.length} interview${ivs.length === 1 ? '' : 's'} booked. ${check.passed} of ${check.total} checks passed.</p>
 <h2>Interviews</h2>
-${ivs.length ? `<ol>${ivs.map(iv => { const j = job(iv); return `<li><h3>${h(j.title)} at ${h(j.business)}</h3><p><b>When:</b> ${h(iv.whenLong)} (Malaysia time)</p><p><b>How:</b> ${h(iv.howToJoin)}</p><p><a href="Interview - ${h(fileSafe(j.business))}.ics">Add the ${h(j.business)} interview to your calendar</a></p></li>`; }).join('')}</ol>` : '<p>None booked yet.</p>'}
+${ivs.length ? `<ol>${ivs.map(iv => { const j = job(iv); return `<li><h3>${h(j.title)} at ${h(j.business)}</h3><p><b>When:</b> ${h(iv.whenLong)} (Malaysia time)</p><p><b>How:</b> ${h(iv.howToJoin)}</p></li>`; }).join('')}</ol>` : '<p>None booked yet.</p>'}
 ${ok.length || no.length ? `<h2>Jobs found on other sites</h2><p>HireBuddy cannot apply on other sites, so nothing was sent. The applications below are ready for you to send.</p>
 ${ok.map(r => `<h3>${h(r.title)}${r.employer ? ` at ${h(r.employer)}` : ''}${r.site ? `, on ${h(r.site)}` : ''}</h3>${r.url ? `<p><a href="${h(r.url)}">Open the listing</a></p>` : ''}<p>Worth asking: ${h(r.reasons.join('; ') || 'nothing rules it out')}.</p><pre>${h(r.draft)}</pre>`).join('')}
 ${no.length ? `<h3>Not suitable</h3><ul>${no.map(r => `<li>${h(r.title)}${r.employer ? ` at ${h(r.employer)}` : ''}: ${h(r.blockers[0])}.</li>`).join('')}</ul>` : ''}` : ''}
@@ -169,7 +169,7 @@ steps.hirebuddy_2_check_jobs = {
 };
 
 steps.hirebuddy_3_apply_and_book = {
-  description: 'Step 3 of 4. Applies to the given suitable jobs (the employer gets the user\'s interview needs in plain text), books an interview in each inside both calendars and in the preferred format, and emails the user each interview with the time first. Then follow `next`.',
+  description: 'Step 3 of 4. Applies to the given suitable jobs (the employer gets the user\'s interview needs in plain text), books an interview in each inside both schedules and in the preferred format, and emails the user each interview with the time first. Then follow `next`.',
   inputSchema: {
     type: 'object',
     properties: { runId: { type: 'string' }, jobIds: { type: 'array', items: { type: 'string' }, maxItems: 3 } },
@@ -185,7 +185,7 @@ steps.hirebuddy_3_apply_and_book = {
       const r = results.find(x => x.jobId === id);
       if (!r || !r.suitable || r.applied) { refused.push(`${id}: ${!r ? 'unknown job' : r.applied ? 'already applied' : `not suitable (${r.whyNot})`}`); continue; }
       const iv = await agent.applyAndBook(ctx, s, r);
-      if (iv) booked.push({ job: `${r.title} at ${r.business}`, when: iv.whenLong, format: iv.format, howToJoin: iv.howToJoin, calendarFile: iv.icsUrl });
+      if (iv) booked.push({ job: `${r.title} at ${r.business}`, when: iv.whenLong, format: iv.format, howToJoin: iv.howToJoin });
       else refused.push(`${r.title}: could not book a time`);
     }
     const have = active(ctx).length;
@@ -202,7 +202,7 @@ steps.hirebuddy_3_apply_and_book = {
 };
 
 steps.hirebuddy_4_verify = {
-  description: 'Step 4 of 4. Re-checks everything (pay, access, both calendars, no clashes, formats, transit, calendar files, time-first emails, and the job-site listings), writes the summary for the user, and returns the files to save on their computer. Then save the files and give the user the summary.',
+  description: 'Step 4 of 4. Re-checks everything (pay, access, both schedules, no clashes, formats, transit, time-first emails, and the job-site listings), writes the summary for the user, and returns the files to save on their computer. Then save the files and give the user the summary.',
   inputSchema: { type: 'object', properties: { runId: { type: 'string' } }, required: ['runId'] },
   async run(args, baseUrl) {
     const ctx = ctxFor(args.runId, baseUrl);
@@ -221,7 +221,7 @@ steps.hirebuddy_4_verify = {
     }
     const check = await agent.callTool(ctx, 'verify_applications', { studentId: s.id });
     const lines = ivs.map((iv, i) => { const j = store.db.jobs.find(x => x.id === iv.jobId); return `${i + 1}. ${j.title} at ${j.business}, ${iv.whenLong}, ${iv.format}${s.needs?.interviewFormat && iv.format !== s.needs.interviewFormat ? ` (they only offer ${(j.access?.interviewFormats || []).join(' or ')})` : ''}. ${iv.howToJoin}`; });
-    const summary = (ivs.length ? `${run.daily ? 'Daily check: new interviews booked. ' : ''}You have ${ivs.length} ${run.daily ? 'new ' : ''}interview${ivs.length === 1 ? '' : 's'}.\n${lines.join('\n')}\nEach one is in your email with the time first and a calendar invite.`
+    const summary = (ivs.length ? `${run.daily ? 'Daily check: new interviews booked. ' : ''}You have ${ivs.length} ${run.daily ? 'new ' : ''}interview${ivs.length === 1 ? '' : 's'}.\n${lines.join('\n')}\nEach one is in your email with the time first and instructions for joining.`
       : run.daily ? 'Daily check: no new job suits you today, so I booked nothing new.' : 'No job on HireBuddy suits you right now, so I booked nothing.')
       + (run.daily && (run.alreadyBooked || []).length ? ` You still have ${run.alreadyBooked.length} interview${run.alreadyBooked.length === 1 ? '' : 's'} booked from before.` : '')
       + (run.daily ? '' : agent.decisionSummary(ctx)) + outside.summarise(run.outside || []) + ` ${check.passed} of ${check.total} checks passed.`;
@@ -233,11 +233,6 @@ steps.hirebuddy_4_verify = {
     const files = [
       { path: `${folder}/Results.html`, content: resultsPage(s, ivs, run, check, baseUrl), open: true },
       { path: `${folder}/Summary.txt`, content: `${summary}\n\nRun log: ${baseUrl}/runs/${run.id}\n` },
-      ...await Promise.all(ivs.map(async iv => {
-        const j = store.db.jobs.find(x => x.id === iv.jobId);
-        const content = await fetch(`${baseUrl}/ics/${iv.id}.ics`).then(r => r.text()).catch(() => null);
-        return { path: `${folder}/Interview - ${fileSafe(j.business)}.ics`, ...(content ? { content } : { downloadFrom: `${baseUrl}/ics/${iv.id}.ics` }) };
-      })),
       ...(run.outside || []).filter(r => r.draft).map(r => ({ path: `${folder}/Application - ${fileSafe(r.employer || r.title)}.txt`, content: r.draft })),
     ];
     return {

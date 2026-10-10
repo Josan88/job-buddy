@@ -13,7 +13,7 @@ From that one sentence, with no further questions, HireBuddy:
 3. **Checks every open job** against the law (Minimum Wages Order 2024, RM8.72 an hour) and against her needs: remote or a short walk from a train or bus stop, screen reader support stated, no tasks that need sight (for example riding a motorcycle), an interview format she can use. It says why each unsuitable job is left out.
 4. **Applies** with a short note naming the job and her real skills. The employer also receives her interview needs ("send documents as Word or plain text, not scanned images").
 5. **Books interviews** inside the employer's interview hours and her free time, never overlapping, by phone where offered. In-person interviews must be reachable by public transport.
-6. **Emails her each interview** in plain text with the time on line one and how to join on line two, plus a calendar invitation.
+6. **Emails her each interview** in plain text with the time on line one and how to join on line two.
 7. **Verifies everything** (28 checks in the demo run) and is **not allowed to finish** until they pass. Then it gives a summary written to be heard on a screen reader.
 
 ## What makes it an agent, not a button
@@ -52,8 +52,7 @@ WorkBuddy ──(Skill / MCP)──┐
 Web console ──REST/SSE──▶ Agent ──▶ Tools ──▶ store (jobs, students, applications, interviews, emails, runs)
                            │          │
                     LLM planner or    ├─ public job pages + apply form
-                    rule autopilot    ├─ .ics calendar files
-                                      ├─ email (Resend) / outbox
+                    rule autopilot    ├─ email (Resend) / outbox
                                       └─ HTTP self-checks against its own public URLs
 ```
 
@@ -109,7 +108,7 @@ WorkBuddy is Tencent's desktop AI agent. HireBuddy plugs into it in two ways:
 
 `hirebuddy-mcp.js` is a zero-dependency stdio-to-HTTP bridge. Clients that support remote MCP can point straight at `https://hirebuddy-k543.onrender.com/mcp`. Restart WorkBuddy, then type the one prompt. WorkBuddy calls `hirebuddy_run` and shows the verified result, the self-checks and the links.
 
-**WorkBuddy runs the steps.** For a job seeker the Skill has WorkBuddy run the job itself: it searches job sites, then calls `hirebuddy_1_understand`, `hirebuddy_2_check_jobs`, `hirebuddy_3_apply_and_book` and `hirebuddy_4_verify` in turn. When there are fewer than 3 interviews, WorkBuddy chooses how to widen the search (HireBuddy refuses any option that gives up something the user asked for). At the end it saves the summary, calendar files and drafted applications on the user's computer. Every step result has a `next` field so the client never stops to ask. `hirebuddy_run` remains the one-call backup and the employer flow.
+**WorkBuddy runs the steps.** For a job seeker the Skill has WorkBuddy run the job itself: it searches job sites, then calls `hirebuddy_1_understand`, `hirebuddy_2_check_jobs`, `hirebuddy_3_apply_and_book` and `hirebuddy_4_verify` in turn. When there are fewer than 3 interviews, WorkBuddy chooses how to widen the search (HireBuddy refuses any option that gives up something the user asked for). At the end it saves the summary and drafted applications on the user's computer. Every step result has a `next` field so the client never stops to ask. `hirebuddy_run` remains the one-call backup and the employer flow.
 
 **Jobs on real sites.** For a job seeker, the Skill tells WorkBuddy to search JobStreet, Indeed, Hiredly or Maukerja on the user's own machine first and pass what it found as `listings` in the same single call. HireBuddy never fetches those sites itself. It checks each listing the same way as its own jobs (legal pay, the seeker's pay floor, tasks that need sight, screen reader support, hours, travel) and drafts an application with the questions the listing leaves open. It can't apply or book on those sites, so nothing is sent there; the self-check confirms that. With no listings, the flow is unchanged.
 

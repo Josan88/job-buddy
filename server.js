@@ -1,4 +1,4 @@
-// HireBuddy web server: live agent console, public job pages, outbox, calendar files, REST + MCP endpoints.
+// HireBuddy web server: live agent console, public job pages, outbox, REST + MCP endpoints.
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -224,7 +224,7 @@ async function route(req, res) {
       const s = store.db.students.find(x => x.id === a.studentId);
       return { applicationId: a.id, name: s?.name, area: s?.area, score: a.score, at: a.at };
     });
-    const interviews = store.db.interviews.filter(i => i.jobId === j.id).map(i => ({ name: i.name, when: i.when, start: i.start, status: i.status || 'booked', ics: `${base}/ics/${i.id}.ics` }));
+    const interviews = store.db.interviews.filter(i => i.jobId === j.id).map(i => ({ name: i.name, when: i.when, start: i.start, status: i.status || 'booked' }));
     return json(res, 200, { ...j, url: `${base}/jobs/${j.id}`, applicants, interviews });
   }
   if (p === '/api/students') return json(res, 200, store.db.students.map(({ email, ...s }) => s));
@@ -256,7 +256,7 @@ async function route(req, res) {
         jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`, url: `${base}/jobs/${j.id}`,
         status, applied: !!app, appliedAt: app?.at || null, score: app?.score ?? L.scoreMatch(j, s).total,
         interview: iv ? { id: iv.id, when: iv.when, whenLong: iv.whenLong || L.fmtLong(new Date(iv.start)), start: iv.start, mode: iv.mode, format: iv.format || null, howToJoin: iv.howToJoin || null,
-          status: iv.status || 'booked', meetUrl: iv.meetUrl || null, ics: `${base}/ics/${iv.id}.ics`, replanRunId: iv.replanRunId || null } : null,
+          status: iv.status || 'booked', meetUrl: iv.meetUrl || null, replanRunId: iv.replanRunId || null } : null,
         access: s.needs ? L.accessFit(j, s) : null,
         updatedAt: iv ? (store.db.emails.find(e => e.interviewId === iv.id)?.at || iv.start) : app?.at,
       };
@@ -279,13 +279,13 @@ async function route(req, res) {
         url: `${base}/jobs/${j.id}`, runId: j.runId || null, createdAt: j.createdAt || null,
         applicants: apps.map(a => ({ name: store.db.students.find(x => x.id === a.studentId)?.name, score: a.score, at: a.at }))
           .sort((a, b) => b.score - a.score),
-        interviews: ivs.map(i => ({ name: i.name, when: i.when, ics: `${base}/ics/${i.id}.ics`, status: i.status || 'booked', replanRunId: i.replanRunId || null,
+        interviews: ivs.map(i => ({ name: i.name, when: i.when, status: i.status || 'booked', replanRunId: i.replanRunId || null,
           score: L.scoreMatch(j, store.db.students.find(x => x.id === i.studentId) || {}).total })),
       };
     });
     return json(res, 200, { business: name, jobs });
   }
-  // A student answers their invite. Declining hands the slot back to the agent, which books the next best candidate.
+  // A student answers an interview request. Declining hands the slot back to the agent, which books the next best candidate.
   if ((m = p.match(/^\/api\/interviews\/([\w-]+)\/(accept|decline)$/)) && req.method === 'POST') {
     const iv = store.db.interviews.find(i => i.id === m[1]);
     if (!iv) return json(res, 404, { error: 'not found' });
@@ -317,16 +317,6 @@ async function route(req, res) {
     if (token && url.searchParams.get('token') !== token) return json(res, 403, { error: 'bad token' });
     store.reset();
     return json(res, 200, { ok: true });
-  }
-
-  // ---- Calendar files ----
-  if ((m = p.match(/^\/ics\/([\w-]+)\.ics$/))) {
-    const iv = store.db.interviews.find(i => i.id === m[1]);
-    if (!iv) return json(res, 404, { error: 'not found' });
-    const j = store.db.jobs.find(x => x.id === iv.jobId);
-    const body = L.interviewIcs(iv, j, base);
-    res.writeHead(200, { 'content-type': 'text/calendar; charset=utf-8', 'content-disposition': `attachment; filename="interview-${iv.id}.ics"` });
-    return res.end(body);
   }
 
   // ---- Pages ----
@@ -366,7 +356,7 @@ async function route(req, res) {
     const mails = store.db.emails.filter(e => !runFilter || e.runId === runFilter).slice(-60).reverse();
     const list = mails.map(e => `<article class="mail" id="${esc(e.id)}" aria-labelledby="${esc(e.id)}-s"><h2 id="${esc(e.id)}-s">${esc(e.subject)}</h2>
 <dl class="facts"><dt>To</dt><dd>${esc(e.to)}</dd><dt>Sent</dt><dd>${esc(new Date(e.at).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'full', timeStyle: 'short' }))}</dd><dt>Delivered by</dt><dd>${esc(e.delivery?.channel || 'demo outbox')}</dd></dl>
-<pre>${esc(e.body)}</pre>${e.attachment ? `<p><a href="${esc(e.attachment)}">Calendar invitation for “${esc(e.subject)}”</a></p>` : ''}</article>`).join('') || '<p>No emails yet.</p>';
+<pre>${esc(e.body)}</pre></article>`).join('') || '<p>No emails yet.</p>';
     return html(res, 200, page('Emails', `<h1>Emails (${mails.length})</h1><p>Every email the agent sends, in plain text with the time and how to join first. Demo addresses (example.com) stay here instead of being delivered.</p>${list}`, { current: '/outbox' }));
   }
   if (p === '/' || p === '/about' || p === '/me' || /^\/runs\/[\w-]+$/.test(p)) {

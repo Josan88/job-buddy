@@ -1,4 +1,4 @@
-// Deterministic helpers: places, availability maths, wage rules, scoring and calendar files.
+// Deterministic helpers: places, availability maths, wage rules and scoring.
 // Everything here is pure so the self-check step can recompute any result independently.
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -288,52 +288,10 @@ function pickFormat(job, person) {
   return ['phone', 'video', 'in person'].find(f => formats.includes(f)) || formats[0];
 }
 
-// ---- Calendar ---------------------------------------------------------------
-
-function icsStamp(d) {
-  return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-}
-function icsEscape(s) {
-  return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-}
-function makeIcs({ uid, start, end, summary, description, location, url, organizer, organizerName, attendee, attendeeName }) {
-  return [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//HireBuddy//Interview//EN', 'CALSCALE:GREGORIAN', 'METHOD:REQUEST',
-    'BEGIN:VEVENT',
-    `UID:${uid}@hirebuddy`, `DTSTAMP:${icsStamp(new Date())}`,
-    `DTSTART:${icsStamp(start)}`, `DTEND:${icsStamp(end)}`, 'SEQUENCE:0', 'STATUS:CONFIRMED',
-    `SUMMARY:${icsEscape(summary)}`, `DESCRIPTION:${icsEscape(description)}`, `LOCATION:${icsEscape(location)}`,
-    url ? `URL:${url}` : null,
-    organizer ? `ORGANIZER;CN=${icsEscape(organizerName || organizer)}:mailto:${organizer}` : null,
-    attendee ? `ATTENDEE;CN=${icsEscape(attendeeName || attendee)};ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${attendee}` : null,
-    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Interview in 30 minutes', 'TRIGGER:-PT30M', 'END:VALARM',
-    'END:VEVENT', 'END:VCALENDAR', '',
-  ].filter(Boolean).join('\r\n');
-}
-
-// One calendar invite per interview. `attendee` overrides who it is addressed to (the real inbox
-// it is delivered to), so Gmail and Outlook show Accept / Decline for that recipient.
-function interviewIcs(iv, job, base, { attendee, organizer } = {}) {
-  return makeIcs({
-    uid: iv.id, start: new Date(iv.start), end: new Date(iv.end),
-    summary: `Interview: ${job.title} (${job.business})`,
-    description: `Interview with ${iv.name} for ${job.title} at ${job.business}.\n${iv.howToJoin || `Join the video call: ${iv.meetUrl || 'see location'}`}\nJob: ${base}/jobs/${job.id}`,
-    location: iv.meetUrl || (iv.format === 'phone' ? 'Phone call' : iv.format === 'in person' ? `${job.business}, ${job.area}` : iv.mode), url: iv.meetUrl,
-    organizer: organizer || job.ownerEmail || 'interviews@hirebuddy.example.com', organizerName: job.business,
-    attendee: attendee || iv.email, attendeeName: iv.name,
-  });
-}
-
-function parseIcs(text) {
-  const get = k => (text.match(new RegExp(`^${k}[^:]*:(.+)$`, 'm')) || [])[1]?.trim();
-  const toDate = s => s && new Date(s.replace(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/, '$1-$2-$3T$4:$5:$6Z'));
-  return { method: get('METHOD'), start: toDate(get('DTSTART')), end: toDate(get('DTEND')), summary: get('SUMMARY'), url: get('URL'), attendee: (get('ATTENDEE') || '').replace('mailto:', '') };
-}
-
 module.exports = {
   DAYS, DAY_NAMES, AREAS, findArea, distanceKm, coords,
   toMin, toHHMM, ranges, overlapMinutes, totalMinutes, describeSchedule,
   mytParts, mytDate, fmtMyt, fmtLong, MIN_WAGE, checkWage,
   termsFor, evidenceFor, sentences, scoreMatch, explain, hourlyRate,
-  makeIcs, interviewIcs, parseIcs, accessFit, pickFormat, DEFAULT_WALK,
+  accessFit, pickFormat, DEFAULT_WALK,
 };

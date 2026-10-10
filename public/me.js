@@ -52,7 +52,6 @@ function interviewCard(a) {
     <dt>Status</dt><dd>${iv.status === 'accepted' ? 'You accepted' : 'Waiting for your answer'}</dd></dl>
     <div class="actions">
       ${iv.meetUrl ? `<a class="btn" href="${esc(iv.meetUrl)}">Join the ${esc(a.business)} video call</a>` : ''}
-      <a class="btn secondary" href="${esc(iv.ics)}">Add to calendar</a>
       ${iv.status !== 'accepted' ? `<button type="button" data-iv="${esc(iv.id)}" data-act="accept" data-label="${esc(a.business)}">Accept</button>` : ''}
       <button type="button" class="danger" data-iv="${esc(iv.id)}" data-act="decline" data-label="${esc(a.business)}">I can't make it</button>
     </div></li>`;
@@ -131,7 +130,7 @@ async function showOwner(me, focus) {
       <p>${esc(j.area)}. ${esc(j.pay)}. ${esc(j.schedule)}.</p>
       ${j.runId ? `<p><a href="/runs/${esc(j.runId)}">How the agent did it</a></p>` : ''}
       <h3>Interviews</h3>
-      ${j.interviews.length ? `<ul>${j.interviews.map(i => `<li>${esc(i.name)}: ${esc(i.when)}. ${i.status === 'declined' ? 'Declined.' : i.status === 'accepted' ? 'Accepted.' : 'Waiting for an answer.'} ${i.status !== 'declined' ? `<a href="${esc(i.ics)}">Calendar file for ${esc(i.name)}</a>` : ''}</li>`).join('')}</ul>` : '<p>None booked yet.</p>'}
+      ${j.interviews.length ? `<ul>${j.interviews.map(i => `<li>${esc(i.name)}: ${esc(i.when)}. ${i.status === 'declined' ? 'Declined.' : i.status === 'accepted' ? 'Accepted.' : 'Waiting for an answer.'}</li>`).join('')}</ul>` : '<p>None booked yet.</p>'}
       ${j.applicants.length ? `<h3>Applicants</h3><ul>${j.applicants.map(a => `<li>${esc(a.name)}, match ${a.score} out of 100</li>`).join('')}</ul>` : ''}
     </section>`).join('') || '<p>You have not published any jobs yet.</p>'}`;
   bind(me);

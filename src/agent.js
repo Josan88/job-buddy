@@ -191,7 +191,7 @@ async function emailInterviews(ctx, job, booked, screened) {
       + `You scored ${score}/100 on our screening (${why}).\n\n`
       + `Your interview: ${iv.when} (Malaysia time), 20 minutes, by video call.\n`
       + `Join the video call: ${iv.meetUrl}\n\n`
-      + `The calendar invitation is attached. Press Accept to add it to your calendar.\nJob details: ${jobUrl(ctx, job.id)}\n\nCan't make it? Decline on your HireBuddy page (${ctx.baseUrl}/me) and we'll offer the slot to someone else.\n\n${job.business}`;
+      + `Job details: ${jobUrl(ctx, job.id)}\n\nCan't make it? Decline on your HireBuddy page (${ctx.baseUrl}/me) and we'll offer the slot to someone else.\n\n${job.business}`;
     await callTool(ctx, 'send_email', { to: iv.email || s.email, subject: `Interview for ${job.title}: ${iv.when}`, body, interviewId: iv.interviewId, kind: 'interview_invite' });
   }
 }
@@ -220,7 +220,7 @@ async function autopilotHirer(ctx) {
     { title: 'Self-check the ranking', tool: 'verify_screening' },
     { title: `Book interviews until ${goal} are set`, tool: 'schedule_interviews' },
     { title: 'If short: decide to widen, relax or stop', tool: 'log_decision' },
-    { title: 'Email invites with calendar files', tool: 'send_email' },
+    { title: 'Email the interview details', tool: 'send_email' },
     { title: 'Verify the whole outcome', tool: 'verify_hiring_outcome' },
     { title: 'Deliver the report', tool: 'finish' },
   ] });
@@ -263,7 +263,7 @@ async function autopilotHirer(ctx) {
   }
   const final = screened.details;
   const lines = booked.map(iv => `${iv.name} (${final.find(r => r.id === iv.candidateId)?.score ?? '?'}/100) on ${iv.when}`);
-  await callTool(ctx, 'finish', { summary: `Published "${spec.title}" at ${jobUrl(ctx, jobId)}. Booked ${lines.length} of ${goal} interviews: ${lines.join('; ')}. Invites with calendar files were emailed.`
+  await callTool(ctx, 'finish', { summary: `Published "${spec.title}" at ${jobUrl(ctx, jobId)}. Booked ${lines.length} of ${goal} interviews: ${lines.join('; ')}. Interview details were emailed.`
     + `${radius > RADII[0] ? ` Searched up to ${radius} km.` : ''}${relaxed.length ? ` Relaxed to nice-to-have: ${relaxed.join(', ')}.` : ''}${decisionSummary(ctx)}`
     + `${misses.length ? ` Closest near misses: ${misses.map(m => `${m.name} (missing ${m.missing.join(', ')})`).join('; ')}.` : ''} ${check.passed}/${check.total} self-checks passed.` });
 }
@@ -280,7 +280,7 @@ async function autopilotReplace(ctx) {
     { title: 'Re-screen without anyone who declined or is booked', tool: 'screen_candidates' },
     { title: 'Self-check the ranking', tool: 'verify_screening' },
     { title: 'Book the next best candidate', tool: 'schedule_interviews' },
-    { title: 'Email the invite', tool: 'send_email' },
+    { title: 'Email the interview details', tool: 'send_email' },
     { title: 'Verify the new booking', tool: 'verify_hiring_outcome' },
     { title: 'Deliver the report', tool: 'finish' },
   ] });
@@ -300,7 +300,7 @@ async function autopilotReplace(ctx) {
   }
   const check = await callTool(ctx, 'verify_hiring_outcome', { jobId: job.id });
   await callTool(ctx, 'finish', { summary: booked[0]
-    ? `${declined.name} declined, so I booked the next best candidate: ${booked[0].name} (${screened.details.find(d => d.id === booked[0].candidateId)?.score}/100) on ${booked[0].when}, invite emailed. ${check.passed}/${check.total} self-checks passed.`
+    ? `${declined.name} declined, so I booked the next best candidate: ${booked[0].name} (${screened.details.find(d => d.id === booked[0].candidateId)?.score}/100) on ${booked[0].when}, interview details emailed. ${check.passed}/${check.total} self-checks passed.`
     : `${declined.name} declined and nobody else qualifies for ${job.title} right now, so the slot stays open.${decisionSummary(ctx)} ${check.passed}/${check.total} self-checks passed.` });
 }
 
@@ -313,7 +313,7 @@ function seekerEmail(iv, job, s, ctx) {
   return `Interview: ${iv.when} (Malaysia time), 30 minutes.\n${iv.howToJoin}\n\n`
     + `Hi ${s.name.split(' ')[0]}, this is HireBuddy. You have an interview for ${job.title} at ${job.business}.\n`
     + `Pay: RM${job.pay} per ${job.payUnit}. Work: ${job.access?.workMode || 'on-site'}.\n`
-    + `A calendar invitation is attached.\nJob details: ${jobUrl(ctx, job.id)}\n`
+    + `Job details: ${jobUrl(ctx, job.id)}\n`
     + `Can't make it? Say so on your HireBuddy page (${ctx.baseUrl}/me) and I will find another time.`;
 }
 
@@ -421,7 +421,7 @@ async function autopilotStudent(ctx) {
   const closest = ivs.length < goal ? found.results.filter(r => r.legalPay && !r.suitable && !r.applied).slice(0, 2) : [];
   if (closest.length) ctx.run.suggestions = (ctx.run.suggestions || []).concat(`Closest other jobs: ${closest.map(r => `${r.title} at ${r.business}, not booked because ${why(r)}`).join('; ')}.`);
   await callTool(ctx, 'finish', { summary: ivs.length
-    ? `You have ${ivs.length} interview${ivs.length === 1 ? '' : 's'}.\n${lines.join('\n')}\nEach one is in your email with the time first and a calendar invite.`
+    ? `You have ${ivs.length} interview${ivs.length === 1 ? '' : 's'}.\n${lines.join('\n')}\nEach one is in your email with the time first and instructions for joining.`
       + `${skipped ? ` I left out ${skipped} job${skipped === 1 ? '' : 's'} that did not suit your needs.` : ''}${decisionSummary(ctx)}${(ctx.run.suggestions || []).map(x => ` ${x}`).join('')}${outside.summarise(ctx.run.outside || [])} ${check.passed} of ${check.total} checks passed.`
     : `No job on HireBuddy suits you right now, so I booked nothing. Your profile is saved and employers can find you.${decisionSummary(ctx)}${outside.summarise(ctx.run.outside || [])} ${check.passed} of ${check.total} checks passed.` });
 }
@@ -464,7 +464,7 @@ async function autopilotReschedule(ctx) {
   }
   const check = await callTool(ctx, 'verify_applications', { studentId: s.id });
   await callTool(ctx, 'finish', { summary: iv?.ok
-    ? `Done. Your ${j.title} interview with ${j.business} is now ${iv.whenLong}, ${iv.format}. ${iv.howToJoin} The new invite is in your email. ${check.passed} of ${check.total} checks passed.`
+    ? `Done. Your ${j.title} interview with ${j.business} is now ${iv.whenLong}, ${iv.format}. ${iv.howToJoin} The new details are in your email. ${check.passed} of ${check.total} checks passed.`
     : `${job.business} has no other time and no other job suits you right now, so nothing is booked. ${check.passed} of ${check.total} checks passed.` });
 }
 
@@ -494,7 +494,7 @@ Steps: check_minimum_wage (if illegal, explain and finish without publishing), p
 - Judge fit from what people wrote, not keywords: screen_candidates returns "profiles" with each near miss's bio and missing skills. If a bio shows a missing skill in other words (e.g. "worked at a bubble tea shop" shows drinks preparation), call record_fit_judgement with an exact quote from the bio, then screen again. Never judge a skill the bio does not support.
 - verify_screening, then schedule_interviews for qualified candidates (qualified:true) up to the goal.
 - If you are short of the goal, call log_decision listing the real options (widen the radius to 20 or 30 km, relax_requirement on one non-core must-have, look further ahead with withinDays 14, or stop and report who came closest), choose the one that actually adds qualified candidates, give the reason, then act and loop. Relax at most one requirement the owner stated.
-Then send_email an invite to each booked candidate (pass interviewId; body must contain the exact "when" text, the meetUrl video link and the job link), email the owner a summary if they gave an email, verify_hiring_outcome, finish (mention every decision you made and who came closest if short).
+Then send_email the interview details to each booked candidate (pass interviewId; body must contain the exact "when" text, the meetUrl video link and the job link), email the owner a summary if they gave an email, verify_hiring_outcome, finish (mention every decision you made and who came closest if short).
 If the user message says a candidate declined (replaceInterviewId), do not publish anything: log_decision on how to fill the slot, then find, screen, verify and book ONE next best qualified candidate for that jobId, email them, verify_hiring_outcome and finish.`;
 }
 
@@ -592,10 +592,6 @@ async function execute(run, baseUrl) {
 function links(run, baseUrl) {
   const out = [{ label: 'Agent run log', url: `${baseUrl}/runs/${run.id}` }];
   if (run.jobId) out.push({ label: 'Published job page', url: `${baseUrl}/jobs/${run.jobId}` });
-  for (const id of run.interviews || []) {
-    const iv = store.db.interviews.find(i => i.id === id);
-    if (iv) out.push({ label: `Calendar invite: ${iv.name}`, url: `${baseUrl}/ics/${iv.id}.ics` });
-  }
   if (store.db.emails.some(e => e.runId === run.id)) out.push({ label: 'Emails sent', url: `${baseUrl}/outbox?run=${run.id}` });
   return out;
 }
