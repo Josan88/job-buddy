@@ -10,7 +10,7 @@
 //   RESEND_API_KEY - resend.com; without your own domain it only delivers to your signup email.
 const FROM = () => process.env.MAIL_FROM || process.env.DEMO_INBOX || '';
 const FROM_NAME = () => process.env.MAIL_FROM_NAME || 'HireBuddy';
-const APPLICATION_INBOX = 'stephanieshinhui@gmail.com';
+const APPLICATION_INBOX = 'stephanieshinhuiyeo@gmail.com';
 
 function split(addr) {
   const [local, domain] = String(addr || '').toLowerCase().split('@');

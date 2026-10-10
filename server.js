@@ -69,9 +69,10 @@ function page(title, inner, { current = '', scripts = '', description = 'HireBud
 <button type="button" class="secondary" data-size="normal" aria-label="Normal text">A</button><button type="button" class="secondary" data-size="large" aria-label="Large text">A+</button><button type="button" class="secondary" data-size="larger" aria-label="Largest text">A++</button></div>
 <button type="button" class="secondary" id="voice-command" aria-keyshortcuts="Alt+V" title="Alt+V, say a button, then Enter">Voice command</button>
 </div></header>
+<div id="announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 <main id="main" tabindex="-1">${inner}</main>
 <footer><p>Built to work with screen readers (NVDA, JAWS, VoiceOver, TalkBack), with a keyboard alone, and at large text sizes. People and employers in this demo are fictional.</p></footer>
-<script src="/common.js?v=20261011-4"></script>${scripts}
+<script src="/common.js?v=20261011-5"></script>${scripts}
 </body></html>`;
 }
 
@@ -350,6 +351,7 @@ async function route(req, res) {
   if (p === '/api/emails') return json(res, 200, store.db.emails.slice(-100).reverse());
   if ((m = p.match(/^\/api\/jobs\/([\w-]+)\/apply\/([\w-]+)$/)) && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
+    console.log('[HireBuddy application] Telegram handoff request', { jobId: m[1], studentId: m[2], paired: telegram.keyOk(body.key) });
     if (!telegram.configured()) return json(res, 503, { ok: false, error: 'Telegram is not set up. Configure Telegram before sending an application.' });
     if (!telegram.keyOk(body.key)) return json(res, 403, { ok: false, error: 'Pair this browser with Telegram on Find work before sending an application.' });
     const j = store.db.jobs.find(x => x.id === m[1]);
@@ -372,8 +374,10 @@ async function route(req, res) {
         coverNote: data.body, applicationData: data, at: new Date().toISOString(),
         score: L.scoreMatch(j, s).total, source: 'job card', handoffStatus: 'sent to Telegram' });
       store.save();
+      console.log('[HireBuddy application] handed to Telegram', { jobId: j.id, to: data.to, subject: data.subject });
       return json(res, 200, { ok: true, sent: 'telegram', message: `Application request for ${j.title} at ${j.business} sent to Telegram. WorkBuddy will send the email to ${mail.APPLICATION_INBOX}. Email delivery is not yet confirmed.` });
     } catch (e) {
+      console.error('[HireBuddy application] Telegram handoff failed', { jobId: j.id, error: e.message });
       return json(res, 502, { ok: false, error: `Could not send the application request to Telegram: ${e.message}` });
     } finally {
       pendingApplications.delete(requestId);

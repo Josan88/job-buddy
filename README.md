@@ -142,8 +142,8 @@ MIT
 
 ## Keyboard applications through Telegram
 
-On Jobs and My details, use Tab to focus a job card and Enter to request an application through WorkBuddy's Telegram connection. Select your job seeker profile on My details and pair the browser using the Telegram hand-off key on Find work first.
+On Jobs and My details, use Tab to focus a job card and Enter to request an application through WorkBuddy's Telegram connection. Select your job seeker profile on My details and pair the browser using the Telegram hand-off key on Find work first. The public Jobs page falls back to the fictional Nadia demo profile when no profile has been selected.
 
-Application requests instruct WorkBuddy to send only to `stephanieshinhui@gmail.com`. The original company email is retained in the email body and stored application data, together with the job details, applicant profile, availability, accessibility/interview needs, and resume link when available. A successful Telegram hand-off does not confirm email delivery; WorkBuddy reports the actual send result through Telegram. Failed hand-offs can be retried.
+Application requests instruct WorkBuddy to send only to `stephanieshinhuiyeo@gmail.com`. The original company email is placed first in the subject and retained in the email body and stored application data, together with the job details, applicant profile, availability, accessibility/interview needs, and resume link when available. A successful Telegram hand-off does not confirm email delivery; WorkBuddy reports the actual send result through Telegram.
 
-Run `npm run test:application` to check keyboard activation and the hand-off using a mocked Telegram connection.
+Run `npm run test:application` to check keyboard activation, Telegram hand-off, recipient handling and duplicate protection using a mocked Telegram connection.

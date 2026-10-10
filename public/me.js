@@ -173,6 +173,7 @@ function bind(me) {
     card.addEventListener('focus', () => window.HB.readControl(`${card.innerText} Press Enter to send this application.`));
     card.addEventListener('keydown', e => {
       if (e.key !== 'Enter' || e.target !== card || e.repeat) return;
+      console.info('[HireBuddy application] Enter pressed on My details job card', { jobId: card.querySelector('[data-apply-job]').dataset.applyJob, studentId: me.id });
       e.preventDefault();
       card.querySelector('[data-apply-job]').click();
     });
@@ -180,8 +181,10 @@ function bind(me) {
   document.querySelectorAll('[data-apply-job]').forEach(b => b.onclick = async () => {
     if (b.disabled) return;
     b.disabled = true;
-    announce('Sending application request to Telegram.');
+    console.info('[HireBuddy application] My details button activated', { jobId: b.dataset.applyJob, studentId: me.id });
+    announce('Sending application request to WorkBuddy through Telegram.');
     const r = await window.HB.sendApplication(b.dataset.applyJob, me.id);
+    console.info('[HireBuddy application] My details response', r);
     const msg = $('#apply-msg');
     msg.hidden = false;
     msg.className = `panel ${r.ok ? 'good' : 'bad'}`;

@@ -15,7 +15,7 @@ const message = { focus() {} };
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/jobs.js'), 'utf8'), {
   document: { querySelectorAll: () => [card], getElementById: () => message },
   localStorage: { getItem: () => JSON.stringify({ role: 'student', id: 'stu-test' }) },
-  window: { addEventListener() {}, HB: { announce() {}, readFocus() {},
+  window: { addEventListener() {}, HB: { announce() {}, readControl() {},
     sendApplication: async () => { keyboardCalls++; return { ok: true, message: 'Sent to Telegram' }; } } },
 });
 handlers.keydown({ key: 'Enter', target: card, repeat: true });
@@ -51,14 +51,15 @@ const apply = (job, key) => fetch(`${base}/api/jobs/${job}/apply/stu-nadia`, {
   const results = await Promise.all([apply(jobs[0].id, 'paired-test'), apply(jobs[0].id, 'paired-test')]);
   assert.deepEqual(results.map(r => r.status).sort(), [200, 409]);
   assert.equal(sent.length, 1);
-  assert(sent[0].includes('The ONLY recipient (To) must be stephanieshinhui@gmail.com'));
+  assert(sent[0].includes('The ONLY recipient (To) must be stephanieshinhuiyeo@gmail.com'));
+  assert(sent[0].includes(`Subject: ${jobs[0].ownerEmail} —`));
   assert(sent[0].includes(jobs[0].ownerEmail));
   assert(sent[0].includes(student.bio));
   assert(sent[0].includes('NVDA'));
-  assert.equal(store.db.applications[0].applicationData.to, 'stephanieshinhui@gmail.com');
+  assert.equal(store.db.applications[0].applicationData.to, 'stephanieshinhuiyeo@gmail.com');
   assert.equal(store.db.applications[0].applicationData.companyEmail, jobs[0].ownerEmail);
   assert.equal(store.db.emails.length, 0, 'The server must not also send a direct email');
   assert.equal((await apply(jobs[0].id, 'paired-test')).status, 409);
-  console.log('PASS application Telegram handoff, recipient, preserved data, pairing, retry and duplicate protection');
+  console.log('PASS application Telegram handoff, recipient, subject, preserved data, pairing, retry and duplicate protection');
 })().then(() => { fs.rmSync(dir, { recursive: true, force: true }); process.exit(0); })
   .catch(e => { console.error(e); fs.rmSync(dir, { recursive: true, force: true }); process.exit(1); });

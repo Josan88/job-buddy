@@ -25,8 +25,11 @@ window.HB = {
       const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/apply/${encodeURIComponent(studentId)}`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key }),
       });
-      return await response.json();
-    } catch {
+      const result = await response.json();
+      console.info('[HireBuddy application] HTTP response', { status: response.status, result });
+      return result;
+    } catch (error) {
+      console.error('[HireBuddy application] request failed', error);
       return { ok: false, error: 'The application request could not be sent. Check your connection and try again.' };
     }
   },
@@ -48,31 +51,54 @@ window.HB = {
   },
   // Read newly focused controls for people using the site's built-in speech rather than a screen reader.
   readFocus(text) {
-    if (!('speechSynthesis' in window)) return;
+    if (!('speechSynthesis' in window)) { console.error('[HireBuddy speech] speechSynthesis is unavailable'); return; }
     const clean = String(text || '').replace(/\s+/g, ' ').trim();
     const chunks = clean.match(/.{1,180}(?:[.!?](?=\s|$)|\s|$)/g) || [clean];
+    console.info('[HireBuddy speech] queue', { characters: clean.length, chunks: chunks.length, text: clean });
     speechSynthesis.resume();
     chunks.filter(Boolean).forEach(chunk => {
       const u = new SpeechSynthesisUtterance(chunk.trim());
       u.lang = 'en-GB'; u.rate = 1;
+      u.onstart = () => { window.HB._speechStarted = true; console.info('[HireBuddy speech] started', chunk.trim()); };
+      u.onend = () => console.info('[HireBuddy speech] ended', chunk.trim());
+      u.onerror = event => console.error('[HireBuddy speech] error', event.error, chunk.trim());
       speechSynthesis.speak(u);
     });
   },
   readControl(text) {
-    if (!('speechSynthesis' in window)) return;
+    if (!('speechSynthesis' in window)) { console.error('[HireBuddy speech] speechSynthesis is unavailable'); return; }
     speechSynthesis.cancel();
-    const speak = () => {
+    let spoken = false;
+    const speak = source => {
+      if (spoken) return;
+      spoken = true;
       const u = new SpeechSynthesisUtterance(String(text || '').replace(/\s+/g, ' ').trim());
       u.lang = 'en-GB'; u.rate = 1;
+      const voices = speechSynthesis.getVoices();
+      u.voice = voices.find(v => /^en(-|_)/i.test(v.lang)) || voices[0] || null;
+      u.onstart = () => { window.HB._speechStarted = true; console.info('[HireBuddy speech] control started', { source, text: u.text, voice: u.voice?.name }); };
+      u.onend = () => console.info('[HireBuddy speech] control ended', u.text);
+      u.onerror = event => console.error('[HireBuddy speech] control error', event.error, u.text);
       speechSynthesis.resume();
       speechSynthesis.speak(u);
     };
-    if (speechSynthesis.getVoices().length) speak();
-    else speechSynthesis.addEventListener('voiceschanged', speak, { once: true });
+    const voices = speechSynthesis.getVoices();
+    console.info('[HireBuddy speech] control request', { text, voices: voices.length });
+    if (voices.length) speak('voices-ready');
+    else {
+      speechSynthesis.addEventListener('voiceschanged', () => speak('voiceschanged'), { once: true });
+      setTimeout(() => speak('voice-timeout'), 300);
+    }
   },
-  readPage() {
+  readPage(interrupt = false) {
     const main = document.querySelector('main');
-    if (main) window.HB.readFocus(main.innerText);
+    if (!main) return;
+    const title = main.querySelector('h1')?.textContent?.trim() || document.title;
+    const intro = main.querySelector('.lede, h1 + p, #job-help')?.textContent?.trim() || '';
+    const sections = [...main.querySelectorAll('h2')].filter(h => h.getClientRects().length).map(h => h.textContent.trim());
+    const text = `${title}. ${intro}${sections.length ? ` This page has these sections: ${sections.join(', ')}.` : ''}`;
+    console.info('[HireBuddy speech] page introduction', { title, intro, sections, interrupt });
+    (interrupt ? window.HB.readControl : window.HB.readFocus)(text);
   },
   // Listen until the person presses Enter (or the button again). Escape cancels. Calls done(text), with ''
   // when nothing was heard or it was cancelled. Returns a stop function, or null without speech recognition.
@@ -82,8 +108,9 @@ window.HB = {
     const rec = new Rec();
     rec.lang = lang; rec.continuous = true; rec.interimResults = false;
     let text = '', cancelled = false, error = '';
-    rec.onresult = e => { text = [...e.results].map(r => r[0].transcript).join(' ').trim(); };
-    rec.onerror = e => { error = e.error; };
+    rec.onstart = () => console.info('[HireBuddy voice] recognition started', { lang });
+    rec.onresult = e => { text = [...e.results].map(r => r[0].transcript).join(' ').trim(); console.info('[HireBuddy voice] recognition result', text); };
+    rec.onerror = e => { error = e.error; console.error('[HireBuddy voice] recognition error', e.error); };
     const key = e => {
       if (e.key !== 'Enter' && e.key !== 'Escape') return;
       e.preventDefault(); e.stopPropagation();
@@ -92,11 +119,12 @@ window.HB = {
     };
     document.addEventListener('keydown', key, true);
     rec.onend = () => {
+      console.info('[HireBuddy voice] recognition ended', { text, cancelled, error });
       document.removeEventListener('keydown', key, true);
       if (error === 'not-allowed' || error === 'service-not-allowed') window.HB.announce('The browser blocked the microphone. Allow it in the address bar, then try again.');
       done(cancelled ? '' : text);
     };
-    try { rec.start(); } catch (e) { rec.onend(); }
+    try { rec.start(); } catch (e) { console.error('[HireBuddy voice] could not start recognition', e); rec.onend(); }
     return () => rec.stop();
   },
 };
@@ -105,6 +133,14 @@ window.HB = {
 window.addEventListener('load', () => {
   window.HB.readPage();
 });
+
+// If autoplay was blocked, retry once inside the first trusted keyboard or pointer event.
+const retryStartupSpeech = () => {
+  console.info('[HireBuddy speech] first user interaction', { alreadyStarted: !!window.HB._speechStarted });
+  if (!window.HB._speechStarted) window.HB.readPage(true);
+};
+document.addEventListener('keydown', retryStartupSpeech, { once: true, capture: true });
+document.addEventListener('pointerdown', retryStartupSpeech, { once: true, capture: true });
 
 // Every button announces itself when reached with Tab, including dynamically added buttons.
 document.addEventListener('focusin', event => {
@@ -129,7 +165,7 @@ document.addEventListener('focusin', event => {
     .filter(el => el !== btn && visible(el))
     .map(el => ({ el, name: el.matches('input') ? norm(el.closest('label')?.textContent) : nameOf(el) }))
     .filter(t => t.name);
-  const say = text => window.HB.announce(text);
+  const say = text => { console.info('[HireBuddy voice] feedback', text); window.HB.announce(text); window.HB.readControl(text); };
   const short = n => n.split(' ').slice(0, 6).join(' ');
   const listing = () => {
     const names = targets().map(t => t.name.startsWith('example ') ? null : short(t.name)).filter(Boolean);
@@ -139,10 +175,12 @@ document.addEventListener('focusin', event => {
 
   function act(heard) {
     const h = norm(heard).replace(/^(press|click|choose|select|open|go to|the)\s+/, '').replace(/\s+button$/, '');
+    console.info('[HireBuddy voice] command', { heard, normalized: h });
     if (!h) return say("I didn't hear a button. Press Alt V to try again.");
     if (/what can i say|^help$|^options$/.test(h)) return say(listing());
     if (/^(stop|quiet|be quiet|cancel)$/.test(h)) { if ('speechSynthesis' in window) speechSynthesis.cancel(); return; }
     const all = targets();
+    console.info('[HireBuddy voice] available targets', all.map(t => t.name));
     // "first example", "example two"
     const ord = h.match(/\b(first|second|third|fourth|one|two|three|four|[1-4])\b/);
     if (/example/.test(h) && ord) {
@@ -157,13 +195,15 @@ document.addEventListener('focusin', event => {
       if (!sc) { const tw = t.name.split(' '); const hit = words.filter(w => tw.includes(w)).length; sc = words.length ? hit / words.length * (hit >= Math.min(2, words.length) ? 40 : 0) : 0; }
       if (sc > score) { score = sc; best = t; }
     }
-    if (!best) return say(`I couldn't find a button called ${heard}. ${listing()}`);
+    if (!best) { console.warn('[HireBuddy voice] no target matched', { heard, normalized: h }); return say(`I couldn't find a button called ${heard}. ${listing()}`); }
+    console.info('[HireBuddy voice] activating target', { heard, target: best.name, score });
     best.el.focus();
     best.el.click();
   }
 
   let stop = null;
   function start() {
+    console.info('[HireBuddy voice] start requested');
     if (stop) return stop();
     const reset = () => { stop = null; if (btn) { btn.disabled = false; btn.textContent = 'Voice command'; } };
     stop = window.HB.listen('en-GB', heard => { reset(); if (heard) act(heard); else say("I didn't hear a button. Press Alt V to try again."); });
