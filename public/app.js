@@ -486,6 +486,7 @@ function render(e, live) {
       const li = pending.get(e.tool) || logItem(`<h3>${esc(TOOL_LABEL[e.tool] || e.tool)}</h3><div class="out"></div>`, 'tool');
       pending.delete(e.tool);
       li.classList.add(e.ok ? 'ok' : 'fail');
+      if (e.ok && e.tool === 'register_student') outcome.studentId = e.result.studentId;
       if (e.ok && e.tool === 'screen_candidates') outcome.screen = e.result.details;
       if (e.ok && e.tool === 'search_jobs') outcome.jobs = e.result.results;
       if (e.ok && e.tool === 'check_outside_listings') outcome.outside = e.result.results;
@@ -575,13 +576,15 @@ function showResult(e, live) {
   const lines = (e.summary || 'The agent stopped before finishing. Open the step-by-step list below.').split('\n');
   const head = lines[0];
   const jobs = (outcome.jobs || []).filter(j => j.suitable && !j.applied);
-  const scoredJobs = jobs.length ? `<h3>Suitable jobs and match scores</h3><ol class="joblist">${jobs.map(j => `<li class="job-card">
+  const scoredJobs = jobs.length ? `<h3>Suitable jobs and match scores</h3><ol class="joblist">${jobs.map(j => `<li class="job-card" tabindex="0" data-result-card>
     <div class="person-top"><h4><a href="${esc(j.url)}">${esc(j.title)}</a> at ${esc(j.business)}</h4>${scoreCard(j.score)}</div>
-    <p>${esc(j.pay)}. ${accessText(j.access)}</p><p>${esc(j.why || '')}</p></li>`).join('')}</ol>` : '';
+    <p>${esc(j.pay)}. ${accessText(j.access)}</p><p>${esc(j.why || '')}</p>
+    <p><button type="button" data-job-apply="${esc(j.jobId)}" data-student-id="${esc(outcome.studentId || '')}">Apply for ${esc(j.title)} at ${esc(j.business)} through Telegram</button></p>
+    <p data-application-status role="status" tabindex="-1"></p></li>`).join('')}</ol>` : '';
   const out = outcome.outside || [];
   const others = out.length ? `<h3>Jobs WorkBuddy found on other sites</h3>
     <p>Press Tab to focus a job card, then Enter to ask WorkBuddy on Telegram to email your application to the demo inbox.</p>
-    <ol class="joblist">${out.map((r, i) => `<li class="job-card" ${r.draft ? `tabindex="0" data-result-card aria-labelledby="outside-title-${i}" aria-describedby="outside-detail-${i}"` : ''}><h4 id="outside-title-${i}">${r.url ? `<a href="${esc(r.url)}">${esc(r.title)}</a>` : esc(r.title)}${r.employer ? ` at ${esc(r.employer)}` : ''}${r.site ? `, on ${esc(r.site)}` : ''}</h4>
+    <ol class="joblist">${out.map((r, i) => `<li class="job-card" ${r.draft ? `tabindex="0" data-result-card aria-labelledby="outside-title-${i}" aria-describedby="outside-detail-${i}"` : ''}><div class="person-top"><h4 id="outside-title-${i}">${r.url ? `<a href="${esc(r.url)}">${esc(r.title)}</a>` : esc(r.title)}${r.employer ? ` at ${esc(r.employer)}` : ''}${r.site ? `, on ${esc(r.site)}` : ''}</h4>${scoreCard(r.score)}</div>
       <p id="outside-detail-${i}">${esc(r.location || '')} ${esc(r.pay || '')} ${esc(r.hours || '')}</p>
       <p><span class="status-word ${r.verdict === 'not suitable' ? 'bad' : 'good'}">${r.verdict === 'not suitable' ? 'Not suitable' : 'Worth asking'}</span>
       ${esc(r.verdict === 'not suitable' ? r.blockers.join('; ') : r.reasons.join('; '))}.</p>

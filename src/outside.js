@@ -37,6 +37,9 @@ const SIGHT = [
   [/\bwait(er|ress|ing staff)\b|serv(e|ing) tables/i, 'serving tables'],
 ];
 const ACCESS_WORDS = /screen ?reader|\bnvda\b|\bjaws\b|voiceover|talkback|accessib|disabilit|\boku\b|\bpwd\b|inclusive (employer|workplace)/i;
+const SCORE_SKILLS = ['customer service', 'cashier', 'food handling', 'tutoring', 'mathematics', 'social media',
+  'data entry', 'event crew', 'english', 'bahasa melayu', 'phone', 'typing', 'screen reader', 'massage',
+  'copywriting', 'mandarin', 'driving license', 'espresso', 'barista', 'latte art'];
 
 // "Mon to Fri 9am-6pm", "weekdays 9-5", "full time". Without any day words the hours are unknown.
 function hoursOf(text) {
@@ -100,8 +103,24 @@ function assess(l, s) {
   else if (s.availability && L.overlapMinutes(sched, s.availability) <= 0) out.blockers.push(`its hours (${L.describeSchedule(sched)}) are outside your free time`);
   else out.reasons.push(`hours ${L.describeSchedule(sched)} overlap your free time`);
 
+  // Score external listings with the same 100-point matcher as HireBuddy jobs. Unknown fields receive
+  // neutral partial credit instead of pretending they are a perfect match; the draft asks for them.
+  const mentioned = SCORE_SKILLS.filter(skill => L.termsFor(skill).some(term => all.toLowerCase().includes(term)));
+  const area = L.findArea(`${l.location} ${l.title}`) || L.findArea(all);
+  const scoreJob = {
+    title: l.title, requirements: mentioned, niceToHave: [], schedule: sched || {}, area,
+    pay: p?.pay ?? Number(s.expectedRate || 0), payUnit: p?.payUnit || 'hour',
+    access: { workMode: remote && !hybrid ? 'remote' : hybrid ? 'hybrid' : 'on-site' },
+  };
+  const match = L.scoreMatch(scoreJob, s);
+  if (!mentioned.length) match.breakdown.skills = 18;
+  if (!sched) match.breakdown.availability = 12;
+  if (!area && !remote) match.breakdown.distance = 7;
+  if (!p) match.breakdown.payFit = 2;
+  const score = Object.values(match.breakdown).reduce((sum, points) => sum + points, 0);
+
   const verdict = out.blockers.length ? 'not suitable' : 'worth asking';
-  return { ...l, payText, verdict, ...out, draft: verdict === 'not suitable' ? null : draft(l, s, out.asks) };
+  return { ...l, payText, score, verdict, ...out, draft: verdict === 'not suitable' ? null : draft(l, s, out.asks) };
 }
 
 function draft(l, s, asks) {

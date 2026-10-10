@@ -73,24 +73,26 @@ window.HB = {
     }
   },
   bindResultApplications(root, runId) {
-    root.querySelectorAll('[data-result-apply]').forEach(button => {
+    root.querySelectorAll('[data-result-apply], [data-job-apply]').forEach(button => {
       const card = button.closest('[data-result-card]');
       card.addEventListener('focus', () => {
-        window.HB.debug('result card focused', { runId, listing: button.dataset.resultApply });
+        window.HB.debug('result card focused', { runId, listing: button.dataset.resultApply, jobId: button.dataset.jobApply });
         window.HB.readControl(`${card.innerText}. Press Enter to request an application.`);
       });
       card.addEventListener('keydown', event => {
         if (event.key !== 'Enter' || event.target !== card || event.repeat) return;
         event.preventDefault();
-        window.HB.debug('result card Enter', { runId, listing: button.dataset.resultApply });
+        window.HB.debug('result card Enter', { runId, listing: button.dataset.resultApply, jobId: button.dataset.jobApply });
         button.click();
       });
       button.onclick = async () => {
         if (button.disabled) return;
         button.disabled = true;
         window.HB.announce('Sending application request to Telegram.');
-        const result = await window.HB.sendApplication(null, null,
-          `/api/runs/${encodeURIComponent(runId)}/listings/${button.dataset.resultApply}/apply`);
+        const endpoint = button.dataset.jobApply
+          ? `/api/jobs/${encodeURIComponent(button.dataset.jobApply)}/apply/${encodeURIComponent(button.dataset.studentId)}`
+          : `/api/runs/${encodeURIComponent(runId)}/listings/${button.dataset.resultApply}/apply`;
+        const result = await window.HB.sendApplication(null, null, endpoint);
         const status = card.querySelector('[data-application-status]');
         status.textContent = result.message || result.error || 'Application request failed.';
         status.focus();
