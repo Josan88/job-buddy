@@ -16,6 +16,27 @@ const EXAMPLES = {
   ],
 };
 
+// Ideas for what to write. Choosing one starts that line in the box for the person to finish.
+const IDEAS = {
+  student: [
+    ['Your name', "I'm "],
+    ['Your sight', 'I am blind / have low vision and use '],
+    ['Where you live', 'I live in '],
+    ['How you travel', 'I get around by '],
+    ['Skills and experience', 'I am good at '],
+    ['When you are free', 'I am free '],
+    ['Pay', 'I need at least RM an hour.'],
+    ['Interviews', 'I prefer interviews by phone.'],
+  ],
+  hirer: [
+    ['The job', 'Need a '],
+    ['Where', 'in '],
+    ['Pay', 'RM an hour, '],
+    ['Hours', 'weekends, 8-hour shifts, '],
+    ['Start date', 'start next week.'],
+  ],
+};
+
 const TOOL_LABEL = {
   check_minimum_wage: 'Checked the pay is legal', publish_job: 'Published the job page', find_candidates: 'Found candidates',
   screen_candidates: 'Screened candidates', verify_screening: 'Self-check: screening', schedule_interviews: 'Booked interviews',
@@ -36,39 +57,54 @@ function setPersona(p) {
   $('#go').textContent = p === 'student' ? 'Find me work' : 'Hire for me';
   $('#handoff').hidden = p !== 'student';
   $('#tg').hidden = p !== 'student' || !telegramOn;
+  $('#prompt-label').textContent = p === 'student' ? 'Introduce yourself' : 'Describe the job';
+  $('#ideas').innerHTML = IDEAS[p].map(([label], i) => `<li><button type="button" class="secondary" data-i="${i}">${esc(label)}</button></li>`).join('');
+  $('#ideas').querySelectorAll('button').forEach(b => b.onclick = () => addIdea(IDEAS[p][b.dataset.i]));
   $('#examples').innerHTML = EXAMPLES[p].map((e, i) => `<li><button type="button" data-i="${i}"><span><b>Use this example:</b> ${esc(e)}</span></button></li>`).join('');
   $('#examples').querySelectorAll('button').forEach(b => b.onclick = () => {
     $('#prompt').value = EXAMPLES[p][b.dataset.i];
     $('#prompt').focus();
-    announce('Example added. Press Enter to start, or press Alt V and say Find me work.');
+    announce('Example added. Press Enter to start.');
   });
+}
+
+// Add the idea's opening words on a new line and put the cursor where the person carries on typing.
+// A blank in the phrase ("RM an hour") puts the cursor right after "RM".
+function addIdea([label, phrase]) {
+  const box = $('#prompt');
+  const before = box.value.replace(/\s+$/, '');
+  box.value = (before ? `${before}${persona === 'student' ? '\n' : ' '}` : '') + phrase;
+  const gap = phrase.indexOf('RM ');
+  const at = gap >= 0 ? box.value.length - phrase.length + gap + 2 : box.value.length;
+  box.focus();
+  box.setSelectionRange(at, at);
+  announce(`${label}: ${phrase} Carry on typing.`);
 }
 
 document.querySelectorAll('input[name="persona"]').forEach(r => r.addEventListener('change', () => setPersona(r.value)));
 
 fetch('/api/config').then(r => r.json()).then(c => {
-  $('#mode').textContent = c.llm
-    ? `Thinking with ${c.model}. Every step is checked by the same tools and self-checks.`
-    : 'Running the built-in planner (no AI key set). Same tools, same self-checks.';
+  $('#mode').textContent = c.llm ? `Thinking with ${c.model}.` : 'Using the built-in planner.';
   telegramOn = !!c.telegram;
   $('#tg').hidden = persona !== 'student' || !telegramOn;
 });
 
 // Speak instead of typing, where the browser supports it (useful on phones and for low vision).
-const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (Rec) {
+// Press Enter (or the button again) to stop; Escape cancels.
+if (window.SpeechRecognition || window.webkitSpeechRecognition) {
   const btn = $('#speak');
+  let stop = null;
   btn.hidden = false;
   btn.onclick = () => {
-    const rec = new Rec();
-    rec.lang = 'en-MY';
-    rec.interimResults = false;
-    btn.disabled = true;
-    btn.textContent = 'Listening…';
-    announce('Listening. Say your sentence.');
-    rec.onresult = e => { $('#prompt').value = [...e.results].map(r => r[0].transcript).join(' '); announce(`Heard: ${$('#prompt').value}`); };
-    rec.onend = () => { btn.disabled = false; btn.textContent = 'Speak instead'; $('#prompt').focus(); };
-    rec.start();
+    if (stop) return stop();
+    stop = window.HB.listen('en-MY', text => {
+      stop = null;
+      btn.textContent = 'Speak instead';
+      if (text) { const box = $('#prompt'); box.value = [box.value.trim(), text].filter(Boolean).join(' '); announce(`Heard: ${text}`); }
+      $('#prompt').focus();
+    });
+    btn.textContent = 'Listening. Press Enter to stop';
+    announce('Listening. Speak, then press Enter.');
   };
 }
 
@@ -78,7 +114,7 @@ $('#ask').onsubmit = async e => {
   const err = $('#prompt-error');
   if (!prompt) {
     err.hidden = false;
-    err.textContent = 'Error: write one sentence about the work you want, or pick an example below.';
+    err.textContent = 'Error: write a few words about the work you want, or use the ideas below.';
     $('#prompt').setAttribute('aria-invalid', 'true');
     $('#prompt').focus();
     return;
@@ -196,7 +232,7 @@ $('#handoff').onclick = async () => {
   const err = $('#prompt-error');
   if (!prompt) {
     err.hidden = false;
-    err.textContent = 'Error: write one sentence about the work you want, or pick an example below.';
+    err.textContent = 'Error: write a few words about the work you want, or use the ideas below.';
     $('#prompt').setAttribute('aria-invalid', 'true');
     return $('#prompt').focus();
   }
@@ -462,8 +498,7 @@ function showResult(e, live) {
   });
   if (live) {
     $('#result-title').focus();
-    // With Speak out loud on, say the whole result, not just the headline.
-    announce(`${ok ? 'Done' : 'Stopped'}. ${window.HB_SPEAK && e.summary ? e.summary.replace(/https?:\/\/\S+/g, 'the link') : head}`);
+    announce(`${ok ? 'Done' : 'Stopped'}. ${head}`);
   }
 }
 

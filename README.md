@@ -30,7 +30,7 @@ From that one sentence, with no further questions, HireBuddy:
 - Keyboard only throughout, with a thick yellow focus ring. Buttons are at least 48 pixels high.
 - AAA-contrast colours, Atkinson Hyperlegible (the Braille Institute's typeface for low vision), a remembered text-size control (up to 150%), dark mode, reduced motion respected.
 - Status always in words ("Suits you", "Not suitable", "Passed"), never colour alone. Tables have captions and header cells.
-- "Read aloud" speaks the result for people who don't use a screen reader; "Speak instead" takes the sentence by voice where the browser supports it.
+- "Read aloud" speaks the result for people who don't use a screen reader; "Speak instead" takes the sentence by voice where the browser supports it (press Enter to stop).
 - Automated check: axe-core reports 0 WCAG 2.2 AA violations on every page, in light and dark mode, on desktop and phone widths.
 
 ## Try it
