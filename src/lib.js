@@ -90,6 +90,14 @@ function fmtMyt(date) {
   return `${p.dow} ${p.d} ${month}, ${h12}:${String(p.mi).padStart(2, '0')} ${p.h < 12 ? 'AM' : 'PM'}`;
 }
 
+// Spoken-friendly form for screen readers: "Monday 12 October, 10:00 AM".
+function fmtLong(date) {
+  const p = mytParts(date);
+  const month = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][p.mo];
+  const h12 = ((p.h + 11) % 12) + 1;
+  return `${DAY_NAMES[p.dow]} ${p.d} ${month}, ${h12}:${String(p.mi).padStart(2, '0')} ${p.h < 12 ? 'AM' : 'PM'}`;
+}
+
 // ---- Wages ------------------------------------------------------------------
 
 // Minimum Wages Order 2024, P.U.(A) 376: RM1,700 a month, RM8.72 an hour (1700 x 12 / 52 / 45),
@@ -124,6 +132,11 @@ const SYNONYMS = {
   'data entry': ['data entry', 'key in'],
   'event crew': ['event crew', 'events', 'concert'],
   'english': ['english'], 'bahasa melayu': ['bahasa melayu', 'malay', 'bm'],
+  'phone': ['phone', 'calls', 'call centre', 'call center', 'hotline', 'telesales', 'telemarketing'],
+  'typing': ['typing', 'touch type', 'words a minute', 'transcrib', 'type up', 'type fast', 'typist'],
+  'screen reader': ['screen reader', 'nvda', 'jaws', 'voiceover', 'talkback'],
+  'massage': ['massage', 'reflexology'],
+  'copywriting': ['copywriting', 'captions', 'articles', 'content writ'],
   'mandarin': ['mandarin', 'chinese'], 'driving license': ['driving license', 'driving licence', 'license'],
 };
 
@@ -179,8 +192,9 @@ function scoreMatch(job, person) {
   const ov = overlapMinutes(job.schedule, person.availability);
   const availability = jobMin ? Math.round(25 * Math.min(1, ov / jobMin)) : 25;
 
-  const km = distanceKm(job.area, person.area);
-  const distance = km == null ? 5 : km <= 5 ? 15 : km <= 10 ? 11 : km <= 20 ? 6 : 2;
+  const remote = job.access?.workMode === 'remote';
+  const km = remote ? null : distanceKm(job.area, person.area);
+  const distance = remote ? 15 : km == null ? 5 : km <= 5 ? 15 : km <= 10 ? 11 : km <= 20 ? 6 : 2;
 
   // Experience: a bio sentence naming the role or a core requirement plus a duration.
   const roleWords = [...new Set([...(job.title || '').toLowerCase().split(/\W+/).filter(w => w.length > 3 && !['weekend', 'part', 'time', 'weekends', 'assistant'].includes(w)), ...req.flatMap(termsFor)])];
@@ -218,10 +232,52 @@ function explain(job, person, s) {
   const bits = [];
   bits.push(`${s.evidence.filter(e => e.required).length}/${(job.requirements || []).length} required skills`);
   bits.push(`free ${Math.round(s.overlapMinutes / 60)}h of the ${Math.round(s.scheduleMinutes / 60)}h shift`);
-  if (s.distanceKm != null) bits.push(`${s.distanceKm} km away`);
+  if (job.access?.workMode === 'remote') bits.push('remote'); else if (s.distanceKm != null) bits.push(`${s.distanceKm} km away`);
   if (s.missing.length) bits.push(`missing ${s.missing.join(', ')}`);
   if (person.expectedRate > hourlyRate(job)) bits.push(`asks RM${person.expectedRate}/h vs about RM${Math.round(hourlyRate(job) * 100) / 100}/h`);
   return bits.join(', ');
+}
+
+// ---- Access fit for blind and low-vision job seekers ---------------------------
+// A job is checked against what the seeker told us they need. Blockers rule a job out,
+// "asks" are open questions the application raises with the employer.
+
+const DEFAULT_WALK = 10;
+
+function accessFit(job, person, relax = {}) {
+  const n = person.needs;
+  const a = job.access || {};
+  const out = { fit: 'good', blockers: [], asks: [], reasons: [], workMode: a.workMode || 'on-site' };
+  if (!n) return out;
+  const mode = out.workMode;
+  const maxWalk = relax.maxWalkMin || n.maxWalkMin || DEFAULT_WALK;
+  if (n.remoteOnly && mode !== 'remote') out.blockers.push(`it is ${mode} and you asked for remote work only`);
+  else if (mode === 'remote') out.reasons.push('remote, no travel');
+  else if (!a.transit) out.blockers.push('no train or bus stop is listed near the workplace');
+  else if (a.transit.walkMin > maxWalk) out.blockers.push(`it is a ${a.transit.walkMin}-minute walk from ${a.transit.station}, more than your ${maxWalk} minutes`);
+  else out.reasons.push(`${mode === 'hybrid' ? 'hybrid, ' : ''}${a.transit.walkMin}-minute walk from ${a.transit.station}`);
+  for (const t of a.sightTasks || []) out.blockers.push(`the listing requires: ${t}`);
+  if (a.computerWork === false) out.reasons.push('no computer work, so no screen reader needed');
+  else if (n.screenReader) {
+    const at = (a.assistiveTech || []).filter(x => !/magnif|zoom/i.test(x));
+    if (at.length) out.reasons.push(`supports ${at.join(' and ')}`);
+    else if (!relax.askAboutTech) out.blockers.push('the listing does not say screen readers are supported');
+    else out.asks.push('the listing does not say screen readers are supported, so the application asks');
+  } else if (n.magnification) {
+    if ((a.assistiveTech || []).length) out.reasons.push(`supports ${a.assistiveTech.join(' and ')}`);
+  }
+  const formats = a.interviewFormats || ['in person'];
+  if (n.interviewFormat && !formats.includes(n.interviewFormat)) out.asks.push(`no ${n.interviewFormat} interview offered, so it will be ${formats[0]}`);
+  out.fit = out.blockers.length ? 'not suitable' : out.asks.length ? 'ask first' : 'good';
+  return out;
+}
+
+// Which interview format to book: the seeker's preference if offered, else the first accessible one.
+function pickFormat(job, person) {
+  const formats = job.access?.interviewFormats || ['in person'];
+  const want = person.needs?.interviewFormat;
+  if (want && formats.includes(want)) return want;
+  return ['phone', 'video', 'in person'].find(f => formats.includes(f)) || formats[0];
 }
 
 // ---- Calendar ---------------------------------------------------------------
@@ -253,8 +309,8 @@ function interviewIcs(iv, job, base, { attendee, organizer } = {}) {
   return makeIcs({
     uid: iv.id, start: new Date(iv.start), end: new Date(iv.end),
     summary: `Interview: ${job.title} (${job.business})`,
-    description: `Interview with ${iv.name} for ${job.title} at ${job.business}.\nJoin the video call: ${iv.meetUrl || 'see location'}\nJob: ${base}/jobs/${job.id}`,
-    location: iv.meetUrl || iv.mode, url: iv.meetUrl,
+    description: `Interview with ${iv.name} for ${job.title} at ${job.business}.\n${iv.howToJoin || `Join the video call: ${iv.meetUrl || 'see location'}`}\nJob: ${base}/jobs/${job.id}`,
+    location: iv.meetUrl || (iv.format === 'phone' ? 'Phone call' : iv.format === 'in person' ? `${job.business}, ${job.area}` : iv.mode), url: iv.meetUrl,
     organizer: organizer || job.ownerEmail || 'interviews@hirebuddy.example.com', organizerName: job.business,
     attendee: attendee || iv.email, attendeeName: iv.name,
   });
@@ -269,7 +325,7 @@ function parseIcs(text) {
 module.exports = {
   DAYS, DAY_NAMES, AREAS, findArea, distanceKm, coords,
   toMin, toHHMM, ranges, overlapMinutes, totalMinutes, describeSchedule,
-  mytParts, mytDate, fmtMyt, MIN_WAGE, checkWage,
+  mytParts, mytDate, fmtMyt, fmtLong, MIN_WAGE, checkWage,
   termsFor, evidenceFor, sentences, scoreMatch, explain, hourlyRate,
-  makeIcs, interviewIcs, parseIcs,
+  makeIcs, interviewIcs, parseIcs, accessFit, pickFormat, DEFAULT_WALK,
 };

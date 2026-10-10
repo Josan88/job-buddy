@@ -29,3 +29,7 @@ HireBuddy ships with demo jobs and a demo talent pool so the full flow runs on s
 - Indeed Malaysia, weekend part-time jobs in Kuala Lumpur: https://malaysia.indeed.com/q-weekend-part-time-l-kuala-lumpur-jobs.html
 - Glassdoor, part-time jobs in Petaling Jaya: https://www.glassdoor.com/Job/petaling-jaya-part-time-jobs-SRCH_IL.0,13_IC3002296_KO14,23.htm
 - Indeed Malaysia, barista salaries in Subang Jaya (average RM2,087/month from 139 reports, updated 4 Oct 2026): https://malaysia.indeed.com/career/barista/salaries/Subang-Jaya
+
+## Jobs for blind and low-vision seekers (added 10 Oct 2026)
+
+The eight jobs with an `access` block at the top of `src/seed.js` (TalkLine Support, Kodlab Studio, Suara Notes, Prima Insure Agency, Klinik Mesra Sunway, Tenang Wellness, Cerita Digital, KedaiKita Grocer) are illustrative: employers are fictional, roles and pay are typical Klang Valley rates at or above the legal minimum, and station names are real stops chosen to make the walking-distance check meaningful. They are not copied from any listing. The seekers Nadia Rahim, Nur Aqilah and Ravi Chandran are fictional.

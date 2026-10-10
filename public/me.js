@@ -1,102 +1,152 @@
-// "My page": a student sees open jobs and their own applications with live status;
-// a business owner sees only the jobs they published, with the shortlist the agent booked.
+// "My page". A job seeker hears their interviews first (time, how to join), can accept or say
+// they can't make it, then their applications and the jobs that suit them.
+// An employer sees only the jobs they published, with the interviews booked.
 const $ = s => document.querySelector(s);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const { esc, announce } = window.HB;
 const KEY = 'hirebuddy.me';
 
 function getMe() { try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } }
 function setMe(v) { try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch {} }
 
-const STATUS = {
-  interview: ['Interview booked', 'good'],
-  applied: ['Applied', ''],
-  not_selected: ['Not selected this round', 'bad'],
-  declined: ['You declined', ''],
-};
-
 let role = 'student';
+let people = null;
 
 async function showPicker() {
   $('#view').hidden = true;
   $('#pick').hidden = false;
-  const people = await fetch('/api/people').then(r => r.json());
+  document.title = 'Who are you? · HireBuddy';
+  people = people || await fetch('/api/people').then(r => r.json());
   const render = () => {
-    document.querySelectorAll('#pick .persona button').forEach(b => b.classList.toggle('on', b.dataset.role === role));
     $('#choices').innerHTML = role === 'student'
-      ? people.students.map(s => `<button class="choice" data-id="${esc(s.id)}"><b>${esc(s.name)}</b><span>${esc(s.campus || 'Student')} · ${esc(s.area)}</span></button>`).join('')
-      : people.businesses.map(b => `<button class="choice" data-name="${esc(b.name)}"><b>${esc(b.name)}</b><span>${b.jobs} job${b.jobs === 1 ? '' : 's'} posted</span></button>`).join('');
-    document.querySelectorAll('.choice').forEach(c => c.onclick = () => {
-      setMe(role === 'student' ? { role, id: c.dataset.id, name: c.querySelector('b').textContent } : { role, name: c.dataset.name });
-      show();
+      ? people.students.map(s => `<li><button type="button" class="secondary" data-id="${esc(s.id)}" data-name="${esc(s.name)}">${esc(s.name)}</button>
+          <p class="small">${esc(s.area)}${s.needs ? `. ${esc(s.needs)}` : s.campus ? `. ${esc(s.campus)}` : ''}</p></li>`).join('')
+      : people.businesses.map(b => `<li><button type="button" class="secondary" data-name="${esc(b.name)}">${esc(b.name)}</button>
+          <p class="small">${b.jobs} job${b.jobs === 1 ? '' : 's'} posted</p></li>`).join('');
+    $('#choices').querySelectorAll('button').forEach(c => c.onclick = () => {
+      setMe(role === 'student' ? { role, id: c.dataset.id, name: c.dataset.name } : { role, name: c.dataset.name });
+      show(true);
     });
   };
-  document.querySelectorAll('#pick .persona button').forEach(b => b.onclick = () => { role = b.dataset.role; render(); });
+  document.querySelectorAll('input[name="role"]').forEach(r => { r.checked = r.value === role; r.onchange = () => { role = r.value; render(); }; });
   render();
+  $('#pick-title').focus();
 }
 
 function header(me, sub) {
-  return `<div class="me-head"><div><p class="eyebrow">${me.role === 'student' ? 'Student' : 'Business owner'}</p><h1>${esc(me.name)}</h1>${sub ? `<p class="muted">${sub}</p>` : ''}</div>
-    <button class="btn ghost" id="switch">Switch person</button></div>`;
+  return `<h1 id="me-title" tabindex="-1">${esc(me.name)}</h1>
+    <p>${me.role === 'student' ? 'Job seeker' : 'Employer'}${sub ? `. ${sub}` : ''}</p>
+    <p><button type="button" class="secondary" id="switch">Switch person</button></p>`;
 }
 
-async function showStudent(me) {
+const STATUS = {
+  interview: ['Interview booked', 'good'], applied: ['Applied, waiting to hear', ''],
+  not_selected: ['Not selected this time', 'bad'], declined: ['You said you can\'t make it', ''],
+};
+
+function interviewCard(a) {
+  const iv = a.interview;
+  return `<li><h3>${esc(a.title)} at ${esc(a.business)}</h3>
+    <dl class="facts"><dt>When</dt><dd>${esc(iv.whenLong)} (Malaysia time)</dd>
+    <dt>How</dt><dd>${esc(iv.howToJoin || iv.mode)}</dd>
+    <dt>Pay</dt><dd>${esc(a.pay)}</dd>
+    <dt>Status</dt><dd>${iv.status === 'accepted' ? 'You accepted' : 'Waiting for your answer'}</dd></dl>
+    <div class="actions">
+      ${iv.meetUrl ? `<a class="btn" href="${esc(iv.meetUrl)}">Join the ${esc(a.business)} video call</a>` : ''}
+      <a class="btn secondary" href="${esc(iv.ics)}">Add to calendar</a>
+      ${iv.status !== 'accepted' ? `<button type="button" data-iv="${esc(iv.id)}" data-act="accept" data-label="${esc(a.business)}">Accept</button>` : ''}
+      <button type="button" class="danger" data-iv="${esc(iv.id)}" data-act="decline" data-label="${esc(a.business)}">I can't make it</button>
+    </div></li>`;
+}
+
+async function showStudent(me, focus) {
   const d = await fetch(`/api/me/student/${encodeURIComponent(me.id)}`).then(r => r.ok ? r.json() : null);
   if (!d) { setMe(null); return showPicker(); }
-  $('#view').innerHTML = header(me, `${esc(d.student.campus || '')}${d.student.campus ? ' · ' : ''}${esc(d.student.area)} · ${d.student.skills.map(esc).join(', ')}`) + `
-    <h2>My applications</h2>
-    ${d.mine.length ? d.mine.map(a => {
-      const [label, cls] = STATUS[a.status];
-      return `<article class="card app ${a.status}"><div class="app-top"><div><b><a href="${esc(a.url)}">${esc(a.title)}</a></b><div class="muted small">${esc(a.business)} · ${esc(a.area)} · ${esc(a.pay)}</div></div>
-        <span class="badge ${cls}">${label}</span></div>
-        ${a.status === 'interview' ? `<p class="when">${esc(a.interview.when)} · ${esc(a.interview.mode)}${a.interview.status === 'accepted' ? ' · <span class="good">Accepted</span>' : ''}</p>
-          <div class="iv-actions">${a.interview.meetUrl ? `<a class="btn" href="${esc(a.interview.meetUrl)}" target="_blank">Join video call</a>` : ''}<a href="${esc(a.interview.ics)}">Add to calendar</a>
-          ${a.interview.status !== 'accepted' ? `<button class="btn ghost" data-iv="${esc(a.interview.id)}" data-act="accept">Accept</button>` : ''}
-          <button class="btn ghost danger" data-iv="${esc(a.interview.id)}" data-act="decline">Can't make it</button></div>` : ''}
-        ${a.status === 'declined' ? `<p class="muted small">You declined ${esc(a.interview.when)}. HireBuddy offered the slot to the next best candidate.${a.interview.replanRunId ? ` <a href="/runs/${esc(a.interview.replanRunId)}">See what the agent did</a>` : ''}</p>` : ''}
-        ${!a.applied && a.interview ? '<p class="muted small">The business found you in the talent pool and invited you.</p>' : ''}</article>`;
-    }).join('') : '<p class="muted">No applications yet.</p>'}
-    <p id="iv-msg" class="muted small"></p>
-    <h2>Open jobs for you</h2><p class="muted small"><a href="/about#demo-data">Demo data, modelled on real listings</a></p>
-    ${d.open.map(j => `<a class="card row" href="${esc(j.url)}"><div><b>${esc(j.title)}</b><div class="muted small">${esc(j.business)} · ${esc(j.area)}${j.distanceKm != null ? ` (${j.distanceKm} km)` : ''} · ${esc(j.schedule)}</div></div>
-      <div class="right"><span class="chip">${esc(j.pay)}</span><div class="small muted">match ${j.score}/100</div></div></a>`).join('') || '<p class="muted">No open jobs right now.</p>'}`;
+  const n = d.student.needs;
+  const ivs = d.mine.filter(a => a.status === 'interview').sort((a, b) => a.interview.start.localeCompare(b.interview.start));
+  const others = d.mine.filter(a => a.status !== 'interview');
+  const suits = d.open.filter(j => !j.access || j.access.fit !== 'not suitable');
+  const notFor = d.open.filter(j => j.access && j.access.fit === 'not suitable');
+  document.title = `${me.name} · HireBuddy`;
+  $('#view').innerHTML = header(me, `${esc(d.student.area)}${n ? `. ${esc(n.vision.replace(/^\w/, c => c.toUpperCase()))}, uses ${esc(n.tool)}` : ''}`) + `
+    <p id="iv-msg" class="panel" hidden tabindex="-1"></p>
+    <h2>Your interviews (${ivs.length})</h2>
+    ${ivs.length ? `<ol class="interviews">${ivs.map(interviewCard).join('')}</ol>` : '<p>No interviews yet. <a href="/">Ask HireBuddy to find you work</a>.</p>'}
+    <h2>Your applications (${others.length})</h2>
+    ${others.length ? `<ul class="joblist">${others.map(a => `<li><h3><a href="${esc(a.url)}">${esc(a.title)}</a> at ${esc(a.business)}</h3>
+      <p><span class="status-word ${STATUS[a.status][1]}">${STATUS[a.status][0]}</span></p>
+      ${a.status === 'declined' && a.interview?.replanRunId ? `<p><a href="/runs/${esc(a.interview.replanRunId)}">What HireBuddy did next</a></p>` : ''}</li>`).join('')}</ul>` : '<p>No other applications.</p>'}
+    <h2>Jobs that suit you (${suits.length})</h2>
+    <ul class="joblist">${suits.map(j => `<li><h3><a href="${esc(j.url)}">${esc(j.title)}</a></h3>
+      <p>${esc(j.business)}, ${esc(j.workMode)}. ${esc(j.pay)}. Match ${j.score} out of 100.</p>
+      ${j.access ? `<p>${j.access.fit === 'good' ? 'Suits you' : 'Ask first'}: ${esc([...j.access.reasons, ...j.access.asks].join('; '))}.</p>` : ''}</li>`).join('') || '<li>None right now.</li>'}</ul>
+    ${notFor.length ? `<details><summary>Jobs that don't suit your needs (${notFor.length})</summary><ul>${notFor.map(j => `<li>${esc(j.title)} at ${esc(j.business)}: ${esc(j.access.blockers.join('; '))}.</li>`).join('')}</ul></details>` : ''}`;
+  bind(me);
+  if (focus) $('#me-title').focus();
+}
+
+function bind(me) {
+  $('#switch').onclick = () => { setMe(null); showPicker(); };
   document.querySelectorAll('[data-iv]').forEach(b => b.onclick = async () => {
     const decline = b.dataset.act === 'decline';
-    if (decline && !confirm('Decline this interview? HireBuddy will offer your slot to the next best candidate.')) return;
     b.disabled = true;
     const r = await fetch(`/api/interviews/${encodeURIComponent(b.dataset.iv)}/${b.dataset.act}`, { method: 'POST' }).then(r => r.json());
+    const msg = $('#iv-msg');
+    msg.hidden = false;
     if (decline && r.runId) {
-      $('#iv-msg').innerHTML = `Declined. The agent is booking the next best candidate now: <a href="/runs/${esc(r.runId)}">watch it work</a>.`;
-      setTimeout(() => showStudent(me).then(bindSwitch), 2500);
-    } else showStudent(me).then(bindSwitch);
+      msg.innerHTML = `Got it. HireBuddy is finding another time with ${esc(b.dataset.label)} now. <a href="/runs/${esc(r.runId)}">Follow what it does</a>.`;
+      msg.focus();
+      announce(`Got it. Finding another time with ${b.dataset.label}.`);
+      // Refresh once the agent has rebooked, then tell the person the new time.
+      for (let i = 0; i < 40; i++) {
+        await new Promise(res => setTimeout(res, 750));
+        const run = await fetch(`/api/runs/${r.runId}`).then(x => x.json());
+        if (run.status !== 'running') {
+          await showStudent(me, false);
+          const m2 = $('#iv-msg');
+          m2.hidden = false;
+          m2.className = 'panel good';
+          m2.textContent = run.summary || 'Done.';
+          m2.focus();
+          announce(run.summary || 'Done.');
+          return;
+        }
+      }
+    } else {
+      await showStudent(me, false);
+      const m2 = $('#iv-msg');
+      m2.hidden = false;
+      m2.textContent = `Accepted. ${b.dataset.label} knows you are coming.`;
+      m2.focus();
+      announce(`Accepted the ${b.dataset.label} interview.`);
+    }
   });
 }
 
-function bindSwitch() { const b = $('#switch'); if (b) b.onclick = () => { setMe(null); showPicker(); }; }
-
-async function showOwner(me) {
+async function showOwner(me, focus) {
   const d = await fetch(`/api/me/business?name=${encodeURIComponent(me.name)}`).then(r => r.json());
+  document.title = `${me.name} · HireBuddy`;
   $('#view').innerHTML = header(me, `${d.jobs.length} job${d.jobs.length === 1 ? '' : 's'} published`) + `
-    ${d.jobs.map(j => `<article class="card">
-      <div class="app-top"><div><b><a href="${esc(j.url)}">${esc(j.title)}</a></b><div class="muted small">${esc(j.area)} · ${esc(j.pay)} · ${esc(j.schedule)}</div></div>
-      ${j.runId ? `<a class="btn ghost" href="/runs/${esc(j.runId)}">How the agent did it</a>` : ''}</div>
-      ${j.interviews.length ? `<h3>Interviews booked</h3><div class="people">${j.interviews.map(i => i.status === 'declined'
-        ? `<div class="person declined"><div class="person-top"><b>${esc(i.name)}</b><span class="badge">Declined</span></div><div class="muted small">Was ${esc(i.when)}.${i.replanRunId ? ` <a href="/runs/${esc(i.replanRunId)}">Agent rebooked</a>` : ''}</div></div>`
-        : `<div class="person"><div class="person-top"><b>${esc(i.name)}</b><span class="score-pill">${i.score}/100</span></div><div class="when">${esc(i.when)}</div>${i.status === 'accepted' ? '<div class="good small">Accepted</div>' : ''}<a href="${esc(i.ics)}">Add to calendar</a></div>`).join('')}</div>` : '<p class="muted">No interviews booked yet.</p>'}
-      ${j.applicants.length ? `<h3>Applicants</h3><ul class="plain">${j.applicants.map(a => `<li>${esc(a.name)} <span class="muted small">match ${a.score}/100</span></li>`).join('')}</ul>` : ''}
-    </article>`).join('') || '<p class="muted">You have not published any jobs yet. Ask the agent to hire for you.</p>'}
-    <p><a class="btn" href="/">Hire with one prompt</a></p>`;
+    ${d.jobs.map(j => `<section class="panel" aria-labelledby="job-${esc(j.id)}">
+      <h2 id="job-${esc(j.id)}"><a href="${esc(j.url)}">${esc(j.title)}</a></h2>
+      <p>${esc(j.area)}. ${esc(j.pay)}. ${esc(j.schedule)}.</p>
+      ${j.runId ? `<p><a href="/runs/${esc(j.runId)}">How the agent did it</a></p>` : ''}
+      <h3>Interviews</h3>
+      ${j.interviews.length ? `<ul>${j.interviews.map(i => `<li>${esc(i.name)}: ${esc(i.when)}. ${i.status === 'declined' ? 'Declined.' : i.status === 'accepted' ? 'Accepted.' : 'Waiting for an answer.'} ${i.status !== 'declined' ? `<a href="${esc(i.ics)}">Calendar file for ${esc(i.name)}</a>` : ''}</li>`).join('')}</ul>` : '<p>None booked yet.</p>'}
+      ${j.applicants.length ? `<h3>Applicants</h3><ul>${j.applicants.map(a => `<li>${esc(a.name)}, match ${a.score} out of 100</li>`).join('')}</ul>` : ''}
+    </section>`).join('') || '<p>You have not published any jobs yet.</p>'}`;
+  bind(me);
+  if (focus) $('#me-title').focus();
 }
 
-async function show() {
+async function show(focus) {
   const me = getMe();
-  $('#me-link').textContent = me ? me.name.split(' ')[0] : 'My page';
   if (!me) return showPicker();
   $('#pick').hidden = true;
   $('#view').hidden = false;
-  $('#view').innerHTML = '<p class="muted">Loading…</p>';
-  await (me.role === 'student' ? showStudent(me) : showOwner(me));
-  bindSwitch();
+  $('#view').innerHTML = '<p>Loading…</p>';
+  await (me.role === 'student' ? showStudent(me, focus) : showOwner(me, focus));
+  const link = document.getElementById('me-link');
+  if (link) link.textContent = `My page (${me.name.split(' ')[0]})`;
 }
 
-show();
-
+show(false);

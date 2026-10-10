@@ -38,39 +38,80 @@ function readBody(req) {
   });
 }
 
-function page(title, inner) {
+// One shell for every page: skip link, labelled landmarks, the current page marked for screen readers,
+// and a text-size control that is applied before first paint.
+const NAV = [['/', 'Find work'], ['/me', 'My page'], ['/jobs', 'Jobs'], ['/outbox', 'Emails'], ['/about', 'How it works']];
+function page(title, inner, { current = '', scripts = '', description = 'HireBuddy: say what work you want in one sentence. An agent finds jobs that suit blind and low-vision people, applies, books interviews and checks its own work.' } = {}) {
+  const nav = NAV.map(([href, label]) => `<li><a href="${href}"${href === current ? ' aria-current="page"' : ''}${href === '/me' ? ' id="me-link"' : ''}>${label}</a></li>`).join('');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)}</title><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/style.css"></head>
-<body><header class="top"><a class="brand" href="/"><img src="/favicon.svg" alt="" width="26" height="26">HireBuddy</a>
-<nav><a href="/">Agent</a><a href="/me" id="me-link">My page</a><a href="/jobs">Jobs</a><a href="/outbox">Outbox</a><a href="/about">How it works</a></nav></header>
-<main class="wrap">${inner}</main></body></html>`;
+<title>${esc(title)} · HireBuddy</title><meta name="description" content="${esc(description)}">
+<link rel="icon" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<link rel="stylesheet" href="/style.css">
+<script>try{var z=localStorage.getItem('hirebuddy.size');if(z&&z!=='normal')document.documentElement.dataset.size=z;}catch(e){}</script>
+</head><body>
+<a class="skip" href="#main">Skip to main content</a>
+<header class="top"><div class="top-inner">
+<a class="brand" href="/"><img src="/favicon.svg" alt="" width="36" height="36">HireBuddy</a>
+<nav aria-label="Main"><ul>${nav}</ul></nav>
+<div class="textsize" role="group" aria-label="Text size"><span aria-hidden="true">Text size</span>
+<button type="button" class="secondary" data-size="normal" aria-label="Normal text">A</button><button type="button" class="secondary" data-size="large" aria-label="Large text">A+</button><button type="button" class="secondary" data-size="larger" aria-label="Largest text">A++</button></div>
+</div></header>
+<main id="main" tabindex="-1">${inner}</main>
+<footer><p>Built to work with screen readers (NVDA, JAWS, VoiceOver, TalkBack), with a keyboard alone, and at large text sizes. People and employers in this demo are fictional.</p></footer>
+<script src="/common.js"></script>${scripts}
+</body></html>`;
+}
+
+function staticPage(file) {
+  const raw = fs.readFileSync(path.join(PUBLIC, 'pages', file), 'utf8');
+  const meta = (raw.match(/^<!--\s*(\{.*\})\s*-->/) || [])[1];
+  return { opts: meta ? JSON.parse(meta) : {}, body: raw.replace(/^<!--.*-->\n?/, '') };
+}
+
+function accessFacts(j) {
+  const a = j.access || {};
+  const mode = a.workMode || 'on-site';
+  const rows = [['Where you work', mode === 'remote' ? 'Remote, from home' : `${mode === 'hybrid' ? 'Hybrid: partly from home, partly' : 'On site'} in ${j.area}`]];
+  if (mode !== 'remote') rows.push(['Getting there', a.transit ? `${a.transit.walkMin}-minute walk from ${a.transit.station}` : 'No train or bus stop listed']);
+  rows.push(['Screen readers', a.computerWork === false ? 'Not needed: no computer work' : (a.assistiveTech || []).length ? `Supported: ${a.assistiveTech.join(', ')}` : 'Not stated. HireBuddy asks the employer for you']);
+  rows.push(['Tasks that need sight', (a.sightTasks || []).length ? a.sightTasks.join('; ') : 'None listed']);
+  rows.push(['Interview', (a.interviewFormats || ['in person']).join(', ')]);
+  return `<dl class="facts">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
 }
 
 function jobView(j, base) {
   const apps = store.db.applications.filter(a => a.jobId === j.id);
   const wage = L.checkWage(j.pay, j.payUnit);
-  return page(`${j.title} · ${j.business}`, `
-<article class="card job">
-  <p class="eyebrow">${esc(j.business)} · ${esc(j.area)}</p>
-  <h1>${esc(j.title)}</h1>
-  <div class="chips"><span class="chip">RM${esc(j.pay)} / ${esc(j.payUnit)}</span><span class="chip">${esc(L.describeSchedule(j.schedule))}</span>
-  ${j.startDate ? `<span class="chip">Starts ${esc(j.startDate)}</span>` : ''}<span class="chip ${wage.ok ? 'ok' : 'bad'}">${wage.ok ? 'Legal minimum wage met' : 'Below minimum wage'}</span>
-  ${j.seed ? '<a class="chip" href="/about#demo-data">Demo data, modelled on real listings</a>' : ''}</div>
+  return page(`${j.title} at ${j.business}`, `
+<article aria-labelledby="job-title">
+  <h1 id="job-title">${esc(j.title)}</h1>
+  <p class="lede">${esc(j.business)}, ${esc(j.area)}</p>
+  <dl class="facts">
+    <dt>Pay</dt><dd>RM${esc(j.pay)} per ${esc(j.payUnit)}. <span class="status-word ${wage.ok ? 'good' : 'bad'}">${wage.ok ? 'Meets the legal minimum wage' : 'Below the legal minimum wage'}</span></dd>
+    <dt>Hours</dt><dd>${esc(L.describeSchedule(j.schedule))}</dd>
+    ${j.startDate ? `<dt>Starts</dt><dd>${esc(j.startDate)}</dd>` : ''}
+    <dt>Must have</dt><dd>${esc(j.requirements.join(', '))}</dd>
+    ${j.niceToHave?.length ? `<dt>Nice to have</dt><dd>${esc(j.niceToHave.join(', '))}</dd>` : ''}
+  </dl>
+  <h2>About the job</h2>
   <p>${esc(j.description)}</p>
-  <h3>Must have</h3><p>${j.requirements.map(r => `<span class="tag">${esc(r)}</span>`).join(' ')}</p>
-  ${j.niceToHave?.length ? `<h3>Nice to have</h3><p>${j.niceToHave.map(r => `<span class="tag soft">${esc(r)}</span>`).join(' ')}</p>` : ''}
-  <p class="muted">${apps.length} applicant${apps.length === 1 ? '' : 's'} so far · posted ${esc((j.createdAt || '').slice(0, 10) || 'earlier')}${j.runId ? ` by <a href="/runs/${esc(j.runId)}">the HireBuddy agent</a>` : ''}</p>
+  <h2>Access</h2>
+  ${accessFacts(j)}
+  <p class="small">${apps.length} applicant${apps.length === 1 ? '' : 's'} so far. ${j.runId ? `Posted by <a href="/runs/${esc(j.runId)}">the HireBuddy agent</a>.` : ''} ${j.seed ? '<a href="/about#demo-data">Demo data</a>.' : ''}</p>
 </article>
-<section class="card">
-  <h2>Apply in 30 seconds</h2>
-  <form method="post" action="/jobs/${esc(j.id)}/apply" class="form">
-    <label>Name<input name="name" required></label>
-    <label>Email<input name="email" type="email" required></label>
-    <label>Area<input name="area" placeholder="e.g. Subang Jaya" required></label>
-    <label>Skills (comma separated)<input name="skills" placeholder="espresso, customer service"></label>
-    <label>When are you free?<input name="free" placeholder="weekends 8am-2pm"></label>
-    <label>About you<textarea name="bio" rows="3" placeholder="Your experience in a few sentences"></textarea></label>
-    <button>Apply</button>
+<section aria-labelledby="apply-title">
+  <h2 id="apply-title">Apply</h2>
+  <p>Or let HireBuddy apply for you from <a href="/">one sentence</a>.</p>
+  <form method="post" action="/jobs/${esc(j.id)}/apply">
+    <p><label for="f-name">Name</label><input id="f-name" name="name" type="text" autocomplete="name" required></p>
+    <p><label for="f-email">Email</label><input id="f-email" name="email" type="email" autocomplete="email" required></p>
+    <p><label for="f-area">Where you live</label><span class="hint" id="f-area-hint">For example Subang Jaya</span><input id="f-area" name="area" type="text" aria-describedby="f-area-hint" required></p>
+    <p><label for="f-skills">Skills</label><span class="hint" id="f-skills-hint">Separate them with commas</span><input id="f-skills" name="skills" type="text" aria-describedby="f-skills-hint"></p>
+    <p><label for="f-free">When you are free</label><span class="hint" id="f-free-hint">For example weekdays 9am to 5pm</span><input id="f-free" name="free" type="text" aria-describedby="f-free-hint"></p>
+    <p><label for="f-bio">About you</label><textarea id="f-bio" name="bio" rows="4"></textarea></p>
+    <button type="submit">Send application</button>
   </form>
 </section>`);
 }
@@ -144,7 +185,8 @@ async function route(req, res) {
   if (p === '/api/people') {
     const businesses = [...new Set(store.db.jobs.map(j => j.business))].reverse();
     return json(res, 200, {
-      students: store.db.students.map(s => ({ id: s.id, name: s.name, area: s.area, campus: s.campus })),
+      students: store.db.students.map(s => ({ id: s.id, name: s.name, area: s.area, campus: s.campus, needs: s.needs ? `${s.needs.vision}, uses ${s.needs.tool}` : null }))
+        .sort((a, b) => !!b.needs - !!a.needs),
       businesses: businesses.map(b => ({ name: b, jobs: store.db.jobs.filter(j => j.business === b).length })),
     });
   }
@@ -165,15 +207,18 @@ async function route(req, res) {
       return {
         jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`, url: `${base}/jobs/${j.id}`,
         status, applied: !!app, appliedAt: app?.at || null, score: app?.score ?? L.scoreMatch(j, s).total,
-        interview: iv ? { id: iv.id, when: iv.when, mode: iv.mode, status: iv.status || 'booked', meetUrl: iv.meetUrl || null, ics: `${base}/ics/${iv.id}.ics`, replanRunId: iv.replanRunId || null } : null,
+        interview: iv ? { id: iv.id, when: iv.when, whenLong: iv.whenLong || L.fmtLong(new Date(iv.start)), start: iv.start, mode: iv.mode, format: iv.format || null, howToJoin: iv.howToJoin || null,
+          status: iv.status || 'booked', meetUrl: iv.meetUrl || null, ics: `${base}/ics/${iv.id}.ics`, replanRunId: iv.replanRunId || null } : null,
+        access: s.needs ? L.accessFit(j, s) : null,
         updatedAt: iv ? (store.db.emails.find(e => e.interviewId === iv.id)?.at || iv.start) : app?.at,
       };
     }).filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
     const open = store.db.jobs.filter(j => j.status === 'open' && !jobIds.has(j.id) && L.checkWage(j.pay, j.payUnit).ok)
       .map(j => ({ jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`,
-        schedule: L.describeSchedule(j.schedule), distanceKm: L.distanceKm(j.area, s.area), score: L.scoreMatch(j, s).total, url: `${base}/jobs/${j.id}` }))
-      .sort((a, b) => b.score - a.score);
-    return json(res, 200, { student: { id: s.id, name: s.name, area: s.area, campus: s.campus, skills: s.skills }, mine, open });
+        schedule: L.describeSchedule(j.schedule), distanceKm: L.distanceKm(j.area, s.area), score: L.scoreMatch(j, s).total, url: `${base}/jobs/${j.id}`,
+        workMode: j.access?.workMode || 'on-site', access: s.needs ? L.accessFit(j, s) : null }))
+      .sort((a, b) => ((b.access?.fit !== 'not suitable') - (a.access?.fit !== 'not suitable')) || b.score - a.score);
+    return json(res, 200, { student: { id: s.id, name: s.name, area: s.area, campus: s.campus, skills: s.skills, needs: s.needs || null }, mine, open });
   }
   if (p === '/api/me/business') {
     const name = url.searchParams.get('name') || '';
@@ -199,7 +244,7 @@ async function route(req, res) {
     if (m[2] === 'accept') { iv.status = 'accepted'; store.save(); return json(res, 200, { ok: true, status: iv.status }); }
     iv.status = 'declined';
     iv.declinedAt = new Date().toISOString();
-    const run = agent.replanAfterDecline(iv, base);
+    const run = iv.bookedBy === 'seeker' ? agent.rescheduleAfterDecline(iv, base) : agent.replanAfterDecline(iv, base);
     return json(res, 200, { ok: true, status: iv.status, runId: run.id, url: `${base}/runs/${run.id}` });
   }
   if (p === '/api/emails') return json(res, 200, store.db.emails.slice(-100).reverse());
@@ -222,8 +267,10 @@ async function route(req, res) {
 
   // ---- Pages ----
   if (p === '/jobs') {
-    const list = [...store.db.jobs].reverse().map(j => `<a class="card row" href="/jobs/${esc(j.id)}"><div><strong>${esc(j.title)}</strong><br><span class="muted">${esc(j.business)} · ${esc(j.area)}</span></div><span class="chip">RM${esc(j.pay)}/${esc(j.payUnit)}</span></a>`).join('');
-    return html(res, 200, page('Open jobs', `<h1>Open jobs</h1><p class="muted"><span class="chip">Demo data, modelled on real listings</span> <a href="/about#demo-data">Where the pay comes from</a></p>${list}`));
+    const open = [...store.db.jobs].reverse().filter(j => j.status === 'open');
+    const list = open.map(j => `<li><h2><a href="/jobs/${esc(j.id)}">${esc(j.title)}</a></h2>
+      <p>${esc(j.business)}, ${esc(j.area)}. RM${esc(j.pay)} per ${esc(j.payUnit)}. ${esc((j.access?.workMode || 'on-site').replace(/^\w/, c => c.toUpperCase()))}${j.access?.transit && j.access.workMode !== 'remote' ? `, ${esc(j.access.transit.walkMin)}-minute walk from ${esc(j.access.transit.station)}` : ''}.${(j.access?.assistiveTech || []).length ? ` Supports ${esc(j.access.assistiveTech.join(', '))}.` : ''}${L.checkWage(j.pay, j.payUnit).ok ? '' : ' <span class="status-word bad">Below the legal minimum wage</span>'}</p></li>`).join('');
+    return html(res, 200, page('Open jobs', `<h1>Open jobs (${open.length})</h1><p>Each job lists how you get there, whether screen readers are supported and any tasks that need sight. <a href="/about#demo-data">Employers here are fictional demo data.</a></p><ul class="joblist">${list}</ul>`, { current: '/jobs' }));
   }
   if ((m = p.match(/^\/jobs\/([\w-]+)$/))) {
     const j = store.db.jobs.find(x => x.id === m[1]);
@@ -248,17 +295,19 @@ async function route(req, res) {
       store.db.applications.push({ id: store.id('app'), jobId: j.id, studentId: s.id, coverNote: fields.bio, at: new Date().toISOString(), score: L.scoreMatch(j, s).total, source: 'web form' });
     }
     store.save();
-    return html(res, 200, page('Applied', `<section class="card"><h1>Thanks, ${esc(s.name)}!</h1><p>Your application for <a href="/jobs/${esc(j.id)}">${esc(j.title)}</a> is in. The next time the owner runs HireBuddy you'll be screened automatically.</p></section>`));
+    return html(res, 200, page('Application sent', `<h1>Application sent</h1><p class="panel good">Thank you, ${esc(s.name)}. Your application for <a href="/jobs/${esc(j.id)}">${esc(j.title)}</a> is in.</p>`));
   }
   if (p === '/outbox') {
     const runFilter = url.searchParams.get('run');
     const mails = store.db.emails.filter(e => !runFilter || e.runId === runFilter).slice(-60).reverse();
-    const list = mails.map(e => `<article class="card mail" id="${esc(e.id)}"><p class="eyebrow">${esc(e.kind)} · ${esc(new Date(e.at).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' }))} · ${esc(e.delivery?.channel || '')}</p>
-<h3>${esc(e.subject)}</h3><p class="muted">To: ${esc(e.to)}</p><pre>${esc(e.body)}</pre>${e.attachment ? `<p><a href="${esc(e.attachment)}">📎 interview.ics</a></p>` : ''}</article>`).join('') || '<p class="muted">No emails yet.</p>';
-    return html(res, 200, page('Outbox', `<h1>Outbox</h1><p class="muted">Every email the agent sends. Demo addresses (example.com) are kept here instead of being delivered.</p>${list}`));
+    const list = mails.map(e => `<article class="mail" id="${esc(e.id)}" aria-labelledby="${esc(e.id)}-s"><h2 id="${esc(e.id)}-s">${esc(e.subject)}</h2>
+<dl class="facts"><dt>To</dt><dd>${esc(e.to)}</dd><dt>Sent</dt><dd>${esc(new Date(e.at).toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur', dateStyle: 'full', timeStyle: 'short' }))}</dd><dt>Delivered by</dt><dd>${esc(e.delivery?.channel || 'demo outbox')}</dd></dl>
+<pre>${esc(e.body)}</pre>${e.attachment ? `<p><a href="${esc(e.attachment)}">Calendar invitation for “${esc(e.subject)}”</a></p>` : ''}</article>`).join('') || '<p>No emails yet.</p>';
+    return html(res, 200, page('Emails', `<h1>Emails (${mails.length})</h1><p>Every email the agent sends, in plain text with the time and how to join first. Demo addresses (example.com) stay here instead of being delivered.</p>${list}`, { current: '/outbox' }));
   }
   if (p === '/' || p === '/about' || p === '/me' || /^\/runs\/[\w-]+$/.test(p)) {
-    return fs.createReadStream(path.join(PUBLIC, p === '/about' ? 'about.html' : p === '/me' ? 'me.html' : 'index.html')).pipe((res.writeHead(200, { 'content-type': TYPES['.html'] }), res));
+    const { opts, body } = staticPage(p === '/about' ? 'about.html' : p === '/me' ? 'me.html' : 'home.html');
+    return html(res, 200, page(opts.title || 'HireBuddy', body, { current: p.startsWith('/runs/') ? '' : p, scripts: opts.script ? `<script src="${opts.script}"></script>` : '' }));
   }
 
   // ---- Static ----

@@ -1,0 +1,80 @@
+<!-- {"title":"How HireBuddy works"} -->
+<h1>How HireBuddy works</h1>
+<p class="lede">You say what work you want in one sentence. HireBuddy plans the search, uses real tools, checks its own work and gives you booked interviews you can verify.</p>
+
+<nav aria-labelledby="toc-title">
+  <h2 id="toc-title">On this page</h2>
+  <ul>
+    <li><a href="#who">Who it is for</a></li>
+    <li><a href="#steps">What happens after you press Find me work</a></li>
+    <li><a href="#access-checks">How it checks a job suits you</a></li>
+    <li><a href="#decisions">When too few jobs suit you</a></li>
+    <li><a href="#cant-make-it">If you can't make an interview</a></li>
+    <li><a href="#accessible">How this site works without sight</a></li>
+    <li><a href="#workbuddy">Using it from WorkBuddy</a></li>
+    <li><a href="#demo-data">About the demo data</a></li>
+  </ul>
+</nav>
+
+<section aria-labelledby="who">
+  <h2 id="who">Who it is for</h2>
+  <p>Blind and low-vision people looking for work in Malaysia. Job boards are built for sighted people: listings rarely say whether screen readers are supported or how far the office is from a station, and filling in many forms is slow with a screen reader. HireBuddy does that work for you and tells you the result in a form that is easy to hear.</p>
+  <p>Employers can use it too: one sentence publishes a job, screens applicants with evidence and books interviews. It refuses any job that pays below the legal minimum wage.</p>
+</section>
+
+<section aria-labelledby="steps">
+  <h2 id="steps">What happens after you press Find me work</h2>
+  <ol>
+    <li><b>It saves your profile and needs</b> from your sentence: skills, area, free time, whether you are blind or have low vision, the tool you use (for example NVDA or a screen magnifier), how far you can walk from a stop and how you like to be interviewed.</li>
+    <li><b>It checks every open job against your needs</b> and against the law, and leaves out the ones that don't suit you, saying why.</li>
+    <li><b>It applies for you</b> with a short note naming the job and your real skills. The employer also gets your interview needs, for example "send documents as Word, not scanned images".</li>
+    <li><b>It books interviews</b> inside the employer's interview hours and your free time, never two at once, by phone where you prefer it.</li>
+    <li><b>It emails you each interview</b> in plain text with the time on line one and how to join on line two, plus a calendar invitation.</li>
+    <li><b>It checks everything again</b> before it is allowed to finish, then reads you the result.</li>
+  </ol>
+</section>
+
+<section aria-labelledby="access-checks">
+  <h2 id="access-checks">How it checks a job suits you</h2>
+  <ul>
+    <li>Remote, or a short walk from a train or bus stop (10 minutes unless you say otherwise).</li>
+    <li>The employer supports your screen reader, or the job needs no computer work. If the listing does not say, HireBuddy can ask in the application.</li>
+    <li>No tasks in the listing that need sight, such as riding a motorcycle or reading printed tickets.</li>
+    <li>An interview format you can use. In-person interviews must be reachable by public transport.</li>
+    <li>Pay at or above the legal minimum: RM8.72 an hour, RM65.38 a day or RM1,700 a month under the Minimum Wages Order 2024.</li>
+  </ul>
+  <p>The final check repeats all of this, confirms each calendar file opens with the right time, and confirms every email to you puts the time and how to join first.</p>
+</section>
+
+<section aria-labelledby="decisions">
+  <h2 id="decisions">When too few jobs suit you</h2>
+  <p>The goal is three interviews. If fewer jobs suit you, HireBuddy tries each possible change on paper first and picks the one that adds jobs without giving up anything you asked for. For example, it may include jobs that don't mention screen reader support and ask the employer in your application. It never lowers your pay floor or your walking limit on its own: it tells you what that would add and lets you decide. Every decision is shown with the options it weighed and why it chose.</p>
+</section>
+
+<section aria-labelledby="cant-make-it">
+  <h2 id="cant-make-it">If you can't make an interview</h2>
+  <p>On your page, press "I can't make it". HireBuddy finds another time with the same employer, emails you the new time, tells the employer, and checks everything again. If that employer has no other time, it books the next best job instead.</p>
+</section>
+
+<section aria-labelledby="accessible">
+  <h2 id="accessible">How this site works without sight</h2>
+  <ul>
+    <li>Every page starts with a "Skip to main content" link and uses headings and landmarks, so you can jump around with your screen reader.</li>
+    <li>While the agent works, your screen reader hears one short update per step, for example "Step 3 of 8: Apply, with your interview needs". When it is done, focus moves to the result.</li>
+    <li>Everything works with a keyboard alone. The focus outline is thick and yellow so it is easy to see.</li>
+    <li>Text is high contrast, in Atkinson Hyperlegible, a typeface made by the Braille Institute for low-vision readers. The text size buttons make everything bigger, and the page follows your dark mode setting.</li>
+    <li>Status is always written in words ("Suits you", "Not suitable"), never shown by colour alone.</li>
+    <li>"Read aloud" speaks the result for people who don't use a screen reader. "Speak instead" lets you say your sentence, where your browser supports it.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="workbuddy">
+  <h2 id="workbuddy">Using it from WorkBuddy</h2>
+  <p>In WorkBuddy, type the same sentence. WorkBuddy calls HireBuddy's <code>hirebuddy_run</code> tool once, which does the whole job and returns the result as plain text that your screen reader reads out. Setup steps are in the project README.</p>
+</section>
+
+<section aria-labelledby="demo-data">
+  <h2 id="demo-data">About the demo data</h2>
+  <p>All people and employers in this demo are fictional, and their example.com emails are never delivered. The jobs for blind and low-vision seekers are illustrative. The original part-time jobs were modelled on public Klang Valley listings read on 10 October 2026, without scraping or copying text. One real Subang Jaya cashier listing offered RM50 to RM60 a day, which is below the legal minimum for an 8-hour shift, so HireBuddy refuses it.</p>
+  <p class="small">Full table and source links: <a href="https://github.com/Josan88/job-buddy/blob/main/docs/demo-data.md">demo data notes on GitHub</a>.</p>
+</section>

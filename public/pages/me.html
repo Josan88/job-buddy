@@ -1,0 +1,16 @@
+<!-- {"title":"My page","script":"/me.js"} -->
+<div id="announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+<section id="pick" aria-labelledby="pick-title" hidden>
+  <h1 id="pick-title" tabindex="-1">Who are you?</h1>
+  <p>There are no passwords in this demo. Choose a person and this browser remembers it.</p>
+  <fieldset>
+    <legend>I am</legend>
+    <div class="choices-row">
+      <label class="radio"><input type="radio" name="role" value="student" checked> Looking for work</label>
+      <label class="radio"><input type="radio" name="role" value="owner"> Hiring</label>
+    </div>
+  </fieldset>
+  <h2 id="choices-title">Choose a person</h2>
+  <ul id="choices" class="joblist" aria-labelledby="choices-title"></ul>
+</section>
+<section id="view" hidden></section>

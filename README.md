@@ -1,53 +1,48 @@
 # HireBuddy
 
-**One prompt. The hiring gets done.**
+**Say the work you want in one sentence. HireBuddy finds jobs that suit you, applies, books interviews and checks everything.**
 
-HireBuddy is an autonomous hiring agent for Malaysian small businesses and the students who want their part-time gigs. It runs inside **WorkBuddy** (as a Skill and an MCP server) and as a standalone web app that shows every step live.
+HireBuddy is an autonomous job agent built first for **blind and low-vision job seekers in Malaysia**. It runs inside **WorkBuddy** (as an MCP server and a Skill) and as a web app that works fully with a screen reader and a keyboard alone.
 
-> *"Need a weekend barista in Subang, RM12/hr, start next week"*
+> *"I'm Nadia Rahim. I'm blind and use NVDA. I live in Subang Jaya and take the LRT. I did customer service calls at a bank hotline for a year and type fast in English and Malay. Free weekdays 9am to 5pm, at least RM12 an hour, phone interviews please."*
 
-From that one line, with no further guidance, HireBuddy:
+From that one sentence, with no further questions, HireBuddy:
 
-1. **Plans** the job as a checklist, where each step names the tool that completes it.
-2. **Checks the pay is legal** under Malaysia's Minimum Wages Order 2024 (RM8.72/hour). If it isn't, the agent refuses to publish.
-3. **Publishes a live job page** with an apply form, then fetches the page back to prove it is up.
-4. **Finds candidates** in the student talent pool by distance, plus anyone who applied on the page.
-5. **Screens and ranks** every candidate out of 100. Every skill point quotes the candidate's own words.
-6. **Self-checks the ranking.** It recomputes each score independently and confirms every quote appears word for word, so no qualification is invented.
-7. **Books interviews** that fit both the owner's hours and each candidate's free time, with no clashes. Each interview gets its own Jitsi Meet video room and a real calendar invitation that shows Accept / Decline in Gmail or Outlook.
-8. **Emails each candidate** their time, the job link and the invite.
-9. **Verifies the whole outcome.** It checks the page is live and the pay is legal. It checks every slot sits inside the candidate's availability with no overlaps, downloads every `.ics` and compares its times with the booking, and confirms every email carries the right time and link.
-10. **Delivers** a summary with links. It is **not allowed to finish** until the final verification passes.
+1. **Plans** the work as a checklist, where each step names the tool that completes it.
+2. **Saves her profile and needs**: blind, uses NVDA, up to a 10-minute walk from a stop, phone interviews, at least RM12 an hour.
+3. **Checks every open job** against the law (Minimum Wages Order 2024, RM8.72 an hour) and against her needs: remote or a short walk from a train or bus stop, screen reader support stated, no tasks that need sight (for example riding a motorcycle), an interview format she can use. It says why each unsuitable job is left out.
+4. **Applies** with a short note naming the job and her real skills. The employer also receives her interview needs ("send documents as Word or plain text, not scanned images").
+5. **Books interviews** inside the employer's interview hours and her free time, never overlapping, by phone where offered. In-person interviews must be reachable by public transport.
+6. **Emails her each interview** in plain text with the time on line one and how to join on line two, plus a calendar invitation.
+7. **Verifies everything** (28 checks in the demo run) and is **not allowed to finish** until they pass. Then it gives a summary written to be heard on a screen reader.
 
-Students get the same engine from the other side:
+## What makes it an agent, not a button
 
-> *"I'm Aisyah from Sunway University, I make espresso and do latte art, free weekends 8am-2pm, want at least RM11/hr."*
+- **It adapts toward a goal.** The goal is 3 interviews. When too few jobs suit her, it tries each possible change on paper, picks the one that adds jobs without giving up anything she asked for, logs the decision with its reason, and searches again. In the Nadia demo it includes a clinic job whose listing doesn't mention screen readers and asks the employer about it in the application. It never lowers her pay floor or her walking limit itself: it tells her what that would add and leaves the choice to her.
+- **"I can't make it".** On her page, one button hands the interview back to the agent. It finds another time with the same employer (or the next best job), emails her the new time, tells the employer and re-verifies.
+- **It refuses illegal pay** from both sides: it never applies to an underpaid job, and an employer who types "RM55 a day, 8-hour shifts" is refused before anything is published.
+- **With `LLM_API_KEY`** the model makes these choices itself, judged by the same tools and checks. Without a key, the rule-based planner runs the same loop.
 
-The agent builds her profile and ranks the open gigs. It **skips jobs that pay below minimum wage**, applies to the best legal matches with a personal cover note, notifies each business, and verifies each application landed on the job's record.
+## Built for screen readers and low vision
 
-## Who it's for
-
-| User | Problem | What HireBuddy delivers |
-|---|---|---|
-| Small business owner (cafe, bakery, tuition centre) with no HR staff | Hiring a part-timer takes hours of posting, reading messages and juggling schedules | A live job post, a ranked shortlist with evidence, interviews booked in calendars and emails sent, all checked |
-| University student | Finding legal, nearby gigs that fit around classes | A talent-pool profile and applications to well-matched, legally paid jobs |
+- Skip link, landmarks and a clear heading structure on every page; the current page is announced in the menu.
+- While the agent works, one polite live-region update per step ("Step 3 of 8: Apply, with your interview needs"), not a flood. When it finishes, focus moves to the result.
+- Keyboard only throughout, with a thick yellow focus ring. Buttons are at least 48 pixels high.
+- AAA-contrast colours, Atkinson Hyperlegible (the Braille Institute's typeface for low vision), a remembered text-size control (up to 150%), dark mode, reduced motion respected.
+- Status always in words ("Suits you", "Not suitable", "Passed"), never colour alone. Tables have captions and header cells.
+- "Read aloud" speaks the result for people who don't use a screen reader; "Speak instead" takes the sentence by voice where the browser supports it.
+- Automated check: axe-core reports 0 WCAG 2.2 AA violations on every page, in light and dark mode, on desktop and phone widths.
 
 ## Try it
 
 **Live app: https://hirebuddy-k543.onrender.com** (free tier, so the first load after idle can take about a minute)
 
-- **Web app:** type a prompt on the home page, or click an example, and watch the plan, tool calls, self-fixes and checks stream in live.
-- **My page (`/me`):** pick who you are, with no password. A student sees open jobs and their own applications with a live status (applied, interview booked, not selected). A business owner sees only the jobs they published, with the interviews the agent booked.
+- **Web app:** type a sentence on the home page, or pick an example.
+- **My page (`/me`):** pick who you are, with no password. A job seeker hears their interviews first (when, how to join), can accept or say they can't make it, then sees jobs that suit them and why others don't. An employer sees their jobs and booked interviews.
 - **From WorkBuddy:** see [WorkBuddy setup](#workbuddy-setup).
-- **From a terminal:** `node workbuddy/hirebuddy-skill/scripts/hirebuddy.js "Need a weekend barista in Subang, RM12/hr"`
+- **From a terminal:** `node workbuddy/hirebuddy-skill/scripts/hirebuddy.js "<your sentence>"`
 
-## What makes it an agent, not a button
-
-The goal is 3 booked interviews with people who meet every must-have. Each time a round falls short, the agent simulates its options (widen the radius from 10 to 20 or 30 km, relax one non-core must-have, look 14 days ahead, or stop and report the closest near misses), picks the one that actually adds qualified candidates, logs the decision with its reason (`log_decision`, shown as a card in the run), and screens again.
-
-- **Demo prompt:** `Need 3 weekend baristas in Cyberjaya, must have latte art and Mandarin, RM13/hr`. Nobody within 10 km qualifies, so it widens to 20 km. Nobody has both latte art and Mandarin, so it relaxes Mandarin (the option that qualifies two people), books them, and reports who came closest.
-- **Decline:** on My page a student can tap *Can't make it*. The agent starts a new run, books the next best candidate (never someone who declined), emails them and re-verifies.
-- **With `LLM_API_KEY`:** the model makes these choices itself and can judge fit from a student's own words with `record_fit_judgement` (for example Chloe Ng's "poured hearts and rosettas" counts as latte art). The quote is checked word for word. Without a key, the rule-based planner does the same loop.
+The employer side still works too: `Need a weekend barista for MIXUE in Subang, RM12/hr, start next week` publishes the job, screens candidates with quoted evidence and books interviews; `Need 3 weekend baristas in Cyberjaya, must have latte art and Mandarin, RM13/hr` shows it widening the search and relaxing a requirement.
 
 ## Architecture
 

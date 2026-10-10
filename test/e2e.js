@@ -21,7 +21,12 @@ async function run(prompt) {
   throw new Error('timeout');
 }
 
+const NADIA = "I'm Nadia Rahim. I'm blind and use NVDA. I live in Subang Jaya and take the LRT. I did customer service calls at a bank hotline for a year and type fast in English and Malay. Free weekdays 9am to 5pm, at least RM12 an hour, phone interviews please.";
 const cases = [
+  ['blind seeker (Nadia)', NADIA, r => r.verified && r.persona === 'student' && r.interviews.length === 3 && (r.decisions || []).length >= 1
+    && !r.events.some(e => e.type === 'tool_call' && e.tool === 'apply_to_job' && e.args.jobId === 'job-delivery-subang')],
+  ['low vision, remote only', "I'm Nur Aqilah, I have low vision and use a screen magnifier. Remote work only. I write Malay articles and captions. Free Mon, Wed and Fri 10am-6pm.",
+    r => r.verified && r.interviews.length >= 1 && r.events.filter(e => e.type === 'tool_result' && e.tool === 'book_interview' && e.ok).every(e => e.result.format === 'video')],
   ['hirer', 'Need a weekend barista in Subang, RM12/hr, start next week', r => r.verified && r.jobId && r.interviews.length >= 2],
   ['illegal wage', 'Need a cashier for my kedai in USJ, RM7/hr, weekends', r => r.verified && !r.jobId && /below the legal minimum/.test(r.summary)],
   ['student', "I'm Aisyah from Sunway University, living in Bandar Sunway. I can make espresso and do latte art, good with customers. Free weekends 8am-2pm, want at least RM11/hr.", r => r.verified && r.persona === 'student' && r.applications.length >= 1],
@@ -55,6 +60,17 @@ const cases = [
   const declineOk = rr.verified && rr.source === 'decline' && replacement && rr.decisions.length >= 1 && after.mine.some(a => a.status === 'declined');
   if (!declineOk) fail++;
   console.log(`${declineOk ? 'PASS' : 'FAIL'} decline: ${rr.summary}`);
+  // Nadia can't make her first interview: the agent finds another time with the same employer.
+  const nadia = await fetch(`${base}/api/me/student/stu-nadia`).then(r => r.json());
+  const first = nadia.mine.find(a => a.status === 'interview');
+  const res2 = await fetch(`${base}/api/interviews/${first.interview.id}/decline`, { method: 'POST' }).then(r => r.json());
+  let rs;
+  for (let i = 0; i < 80; i++) { await sleep(250); rs = await fetch(`${base}/api/runs/${res2.runId}`).then(r => r.json()); if (rs.status !== 'running') break; }
+  const moved = await fetch(`${base}/api/me/student/stu-nadia`).then(r => r.json());
+  const now = moved.mine.find(a => a.jobId === first.jobId);
+  const reOk = rs.verified && now.status === 'interview' && now.interview.start !== first.interview.start && rs.decisions.length >= 1;
+  if (!reOk) fail++;
+  console.log(`${reOk ? 'PASS' : 'FAIL'} can't make it, rebooked: ${rs.summary}`);
   const mcp = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) }).then(r => r.json());
   const mcpOk = mcp.result.tools.some(t => t.name === 'hirebuddy_run');
   if (!mcpOk) fail++;

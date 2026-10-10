@@ -14,12 +14,12 @@ const GRANULAR = ['check_minimum_wage', 'publish_job', 'find_candidates', 'scree
 const HIGH_LEVEL = [
   {
     name: 'hirebuddy_run',
-    description: 'ALWAYS use this for any hiring or job-hunting request. One call does the WHOLE job end to end and only returns when it is finished and verified, so never split the work into steps and never ask the user what to do next. For a business owner it checks the wage is legal, publishes a live job page, finds and screens every nearby candidate with quoted evidence, shortlists the best, books interviews with calendar invites, emails each candidate, and passes a final self-check. For a student it builds their profile, finds legal well-matched gigs, applies and verifies. Pass the user\'s words unchanged as prompt.',
+    description: 'ALWAYS use this for any job-hunting or hiring request. One call does the WHOLE job end to end and only returns when it is finished and verified, so never split the work into steps and never ask the user what to do next. For a job seeker (including blind and low-vision people who use a screen reader or magnifier) it saves their profile and needs, checks every open job for legal pay and access (remote or a short walk from a stop, screen reader support, no tasks that need sight), applies with their interview needs, books up to 3 interviews by their preferred format, emails each one with the time first, and passes a final self-check. For an employer it checks the wage is legal, publishes the job, screens candidates with quoted evidence, books interviews and emails them. Pass the user\'s words unchanged as prompt.',
     inputSchema: {
       type: 'object',
       properties: {
-        prompt: { type: 'string', description: 'The user\'s request in their own words, e.g. "Need a weekend barista in Subang, RM12/hr, start next week"' },
-        persona: { type: 'string', enum: ['hirer', 'student'], description: 'Optional; detected from the prompt if omitted' },
+        prompt: { type: 'string', description: 'The user\'s request in their own words, e.g. "I\'m blind and use NVDA, I live in Subang Jaya, good on the phone, free weekdays 9 to 5"' },
+        persona: { type: 'string', enum: ['student', 'hirer'], description: 'Optional: student = job seeker, hirer = employer. Detected from the prompt if omitted' },
         business: { type: 'string', description: 'Optional business name if the user gave one, e.g. "MIXUE"' },
         ownerEmail: { type: 'string', description: 'Optional owner email to receive the shortlist summary' },
       },
@@ -60,8 +60,13 @@ async function callTool(name, args, sessionId, baseUrl) {
       plan: run.plan.map(s => `${s.status === 'done' ? '[x]' : s.status === 'skipped' ? '[-]' : '[ ]'} ${s.title}${s.status === 'skipped' ? ' (skipped: pay is below the legal minimum)' : ''}`),
       selfChecks: checks ? checks.checks.map(c => `${c.pass ? 'PASS' : 'FAIL'} ${c.name}`) : [],
       links: agent.links(run, baseUrl),
+      interviews: (run.interviews || []).map(id => store.db.interviews.find(i => i.id === id)).filter(Boolean).map(i => {
+        const j = store.db.jobs.find(x => x.id === i.jobId);
+        return { job: j?.title, employer: j?.business, person: i.name, when: i.whenLong || i.when, format: i.format || i.mode, howToJoin: i.howToJoin || i.meetUrl || null };
+      }),
+      decisions: (run.decisions || []).map(d => `${d.choice}. ${d.reason}`),
       note: run.done
-        ? 'The job is COMPLETE and verified. Tell the user the outcome (who is booked and when, or where they applied), show the self-checks and links. Do not offer or ask about further steps.'
+        ? 'The job is COMPLETE and verified. Give the user the summary as short plain sentences (it may be read by a screen reader): no tables, no emoji, the most important fact first, one line per interview with the day, time and how to join. Mention the number of self-checks passed and the run link. Do not offer or ask about further steps.'
         : 'The run did not finish. Tell the user what failed using the status and summary.',
     });
   }

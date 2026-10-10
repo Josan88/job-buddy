@@ -1,8 +1,8 @@
 name: hirebuddy
 version: 1.0.0
 description: >
-  One-prompt hiring agent for Malaysian small businesses and students. Publishes the job, screens and ranks
-  candidates with quoted evidence, books interviews with .ics invites, emails them, and verifies its own work.
+  One-sentence job agent for blind and low-vision job seekers in Malaysia. Checks every job for legal pay and
+  access, applies, books interviews in their preferred format, emails each one time-first, and verifies its own work.
 parameters:
   - name: prompt
     type: string

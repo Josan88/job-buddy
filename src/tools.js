@@ -236,6 +236,13 @@ tools.send_email = {
       const url = jobUrl(ctx, iv.jobId);
       if (!a.body.includes(url)) problems.push(`Body must include the job link ${url}.`);
       if (iv.meetUrl && !a.body.includes(iv.meetUrl)) problems.push(`Body must include the video call link ${iv.meetUrl}.`);
+      if (iv.bookedBy === 'seeker') {
+        // Screen reader users hear an email top to bottom: the time and how to join come first.
+        const head = a.body.split('\n').slice(0, 3).join(' ');
+        if (!head.includes(iv.when)) problems.push(`Put the interview time "${iv.when}" in the first three lines, before anything else.`);
+        if (!iv.meetUrl && !head.includes(iv.howToJoin.split('.')[0])) problems.push(`Put how to join ("${iv.howToJoin}") in the first three lines.`);
+        if (/<[a-z][^>]*>/i.test(a.body)) problems.push('Use plain text only, no HTML.');
+      }
       if (problems.length) return { ok: false, problems };
     }
     const email = {
@@ -353,22 +360,38 @@ tools.verify_hiring_outcome = {
 
 // ---- Student side -----------------------------------------------------------
 
+const needsSchema = {
+  type: 'object',
+  description: 'What a blind or low-vision seeker needs. Leave out entirely if they mention no sight loss.',
+  properties: {
+    vision: { type: 'string', description: '"blind" or "low vision"' },
+    screenReader: { type: 'boolean' }, magnification: { type: 'boolean' },
+    tool: { type: 'string', description: 'e.g. NVDA, JAWS, VoiceOver, TalkBack, screen magnifier' },
+    remoteOnly: { type: 'boolean' }, maxWalkMin: { type: 'number', description: 'Longest walk from a train or bus stop they accept (default 10)' },
+    interviewFormat: { type: 'string', description: '"phone", "video" or "in person"' },
+  },
+};
+
 tools.register_student = {
-  description: 'Create or update the student\'s profile in the talent pool so businesses can find them.',
+  description: 'Create or update the job seeker\'s profile so employers can find them. Record any sight-related needs exactly as they described them.',
   parameters: S('object', {
     name: { type: 'string' }, email: { type: 'string' }, area: { type: 'string' }, campus: { type: 'string' },
     skills: { type: 'array', items: { type: 'string' } }, availability: scheduleSchema,
-    expectedRate: { type: 'number', description: 'RM per hour' }, bio: { type: 'string', description: 'Short first-person summary built only from facts the student gave' },
+    expectedRate: { type: 'number', description: 'RM per hour' }, bio: { type: 'string', description: 'Short first-person summary built only from facts the seeker gave' },
+    needs: needsSchema,
   }, ['name', 'area', 'skills', 'availability', 'bio']),
   run: async (a, ctx) => {
     const area = L.findArea(a.area);
     const problems = [];
     if (!area) problems.push(`Unknown area "${a.area}".`);
-    if (!L.totalMinutes(a.availability)) problems.push('Availability has no hours. Use e.g. {"Sat":["09:00-17:00"]}.');
+    if (!L.totalMinutes(a.availability)) problems.push('Availability has no hours. Use e.g. {"Mon":["09:00-17:00"]}.');
     if (problems.length) return { ok: false, problems };
     const email = a.email || `${a.name.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '')}@example.com`;
     let s = store.db.students.find(x => x.email === email || x.name.toLowerCase() === a.name.toLowerCase());
-    const fields = { name: a.name, email, area, campus: a.campus || s?.campus || '', skills: a.skills.map(x => x.toLowerCase()), availability: a.availability, expectedRate: a.expectedRate || null, bio: a.bio };
+    const needs = a.needs && (a.needs.vision || a.needs.screenReader || a.needs.magnification) ? { maxWalkMin: L.DEFAULT_WALK, ...a.needs } : null;
+    const skills = a.skills.map(x => x.toLowerCase());
+    if (needs?.screenReader && !skills.includes('screen reader')) skills.push('screen reader');
+    const fields = { name: a.name, email, area, campus: a.campus || s?.campus || '', skills, availability: a.availability, expectedRate: a.expectedRate || null, bio: a.bio, needs };
     if (s) Object.assign(s, fields); else { s = { id: store.id('stu'), ...fields }; store.db.students.push(s); }
     store.save();
     ctx.run.studentId = s.id;
@@ -376,77 +399,190 @@ tools.register_student = {
   },
 };
 
+// Pure matcher shared by search_jobs and the planner's what-if checks.
+function matchJobs(s, { maxDistanceKm = 25, minPay = 0, maxWalkMin, askAboutTech = false } = {}) {
+  const out = [];
+  for (const j of store.db.jobs.filter(j => j.status === 'open')) {
+    const remote = j.access?.workMode === 'remote';
+    const km = L.distanceKm(j.area, s.area);
+    if (!remote && km != null && km > maxDistanceKm) continue;
+    const sc = L.scoreMatch(j, s);
+    const wage = L.checkWage(j.pay, j.payUnit);
+    const access = L.accessFit(j, s, { maxWalkMin, askAboutTech });
+    const applied = store.db.applications.some(a => a.jobId === j.id && a.studentId === s.id);
+    const suitable = wage.ok && L.hourlyRate(j) >= minPay && access.fit !== 'not suitable' && sc.total >= MINIMUM_MATCH && sc.requiredCoverage === 1;
+    out.push({
+      jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`,
+      score: sc.total, requiredCoverage: sc.requiredCoverage, why: L.explain(j, s, sc), evidence: sc.evidence, missing: sc.missing,
+      legalPay: wage.ok, belowMinPay: L.hourlyRate(j) < minPay, warning: wage.ok ? null : wage.message,
+      access, suitable, applied, workMode: access.workMode,
+    });
+  }
+  return out.sort((a, b) => (b.suitable - a.suitable) || b.score - a.score);
+}
+
 tools.search_jobs = {
-  description: 'Search open jobs and rank them for a student with the same 0-100 scoring businesses use. Jobs paying below minimum wage are flagged.',
-  parameters: S('object', { studentId: { type: 'string' }, maxDistanceKm: { type: 'number' }, minPay: { type: 'number' } }, ['studentId']),
-  run: async ({ studentId, maxDistanceKm = 25, minPay = 0 }, ctx) => {
-    const s = store.db.students.find(x => x.id === studentId);
-    if (!s) return { ok: false, error: 'Unknown student' };
-    const results = [];
-    for (const j of store.db.jobs.filter(j => j.status === 'open')) {
-      const km = L.distanceKm(j.area, s.area);
-      if (km != null && km > maxDistanceKm) continue;
-      const sc = L.scoreMatch(j, s);
-      const wage = L.checkWage(j.pay, j.payUnit);
-      results.push({
-        jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`,
-        score: sc.total, requiredCoverage: sc.requiredCoverage, why: L.explain(j, s, sc), evidence: sc.evidence,
-        legalPay: wage.ok, belowMinPay: L.hourlyRate(j) < minPay, warning: wage.ok ? null : wage.message, url: jobUrl(ctx, j.id),
-      });
-    }
-    results.sort((a, b) => b.score - a.score);
+  description: 'Search open jobs for a job seeker. Each job is scored 0-100 and, for blind or low-vision seekers, checked for access: remote or a short walk from a train or bus stop, screen reader support, no tasks that need sight, interview formats. suitable = legal pay, meets their minimum, no access blockers, every required skill, score >= 50. Options widen the search: maxWalkMin, askAboutTech (include jobs that do not state screen reader support), maxDistanceKm, minPay.',
+  parameters: S('object', {
+    studentId: { type: 'string' }, maxDistanceKm: { type: 'number' }, minPay: { type: 'number' },
+    maxWalkMin: { type: 'number' }, askAboutTech: { type: 'boolean' },
+  }, ['studentId']),
+  run: async (args, ctx) => {
+    const s = store.db.students.find(x => x.id === args.studentId);
+    if (!s) return { ok: false, error: 'Unknown job seeker' };
+    const opts = { maxDistanceKm: args.maxDistanceKm || 25, minPay: args.minPay || 0, maxWalkMin: args.maxWalkMin, askAboutTech: !!args.askAboutTech };
+    ctx.run.search = opts;
+    const results = matchJobs(s, opts).map(r => ({ ...r, url: jobUrl(ctx, r.jobId) }));
     ctx.run.jobSearch = results;
-    return { ok: true, count: results.length, results };
+    return { ok: true, count: results.length, suitable: results.filter(r => r.suitable).length, results };
   },
 };
 
+function accessNote(s) {
+  const n = s.needs;
+  if (!n) return '';
+  const bits = [`${s.name.split(' ')[0]} is ${n.vision === 'blind' ? 'blind' : 'a low-vision candidate'} and uses ${n.tool || (n.screenReader ? 'a screen reader' : 'screen magnification')}.`];
+  if (n.interviewFormat) bits.push(`Preferred interview format: ${n.interviewFormat}.`);
+  bits.push('Please send any documents or tests as Word or plain text, not scanned images or PDFs of pictures.');
+  return `\n\nAccess needs for the interview:\n${bits.join('\n')}`;
+}
+
 tools.apply_to_job = {
-  description: 'Submit an application for the student. The cover note must name the job title and mention at least one real skill from the profile. The business is emailed.',
+  description: 'Submit an application for the job seeker. The cover note must name the job title and mention at least one real skill from the profile. The employer is emailed in plain text, with the seeker\'s access needs for the interview. Refused for jobs with access blockers or illegal pay.',
   parameters: S('object', { studentId: { type: 'string' }, jobId: { type: 'string' }, coverNote: { type: 'string' } }, ['studentId', 'jobId', 'coverNote']),
   run: async ({ studentId, jobId, coverNote }, ctx) => {
     const s = store.db.students.find(x => x.id === studentId);
     const j = store.db.jobs.find(x => x.id === jobId);
-    if (!s || !j) return { ok: false, error: 'Unknown student or job' };
+    if (!s || !j) return { ok: false, error: 'Unknown job seeker or job' };
     const problems = [];
     if (j.status !== 'open') problems.push('Job is closed.');
     if (!L.checkWage(j.pay, j.payUnit).ok) problems.push(`This job pays below minimum wage (${L.checkWage(j.pay, j.payUnit).message}). Do not apply.`);
+    const fit = L.accessFit(j, s, ctx.run.search || {});
+    if (fit.fit === 'not suitable') problems.push(`Not suitable for this seeker: ${fit.blockers.join('; ')}. Do not apply.`);
     if (store.db.applications.some(a => a.jobId === jobId && a.studentId === studentId)) problems.push('Already applied to this job.');
     const note = coverNote.toLowerCase();
     if (!note.includes(j.title.toLowerCase()) && !note.includes(j.business.toLowerCase())) problems.push(`Cover note must name the job ("${j.title}") or the business.`);
     if (!s.skills.some(k => note.includes(k))) problems.push(`Cover note must mention at least one skill from the profile: ${s.skills.join(', ')}.`);
     if (problems.length) return { ok: false, problems };
-    const app = { id: store.id('app'), jobId, studentId, coverNote, at: new Date().toISOString(), runId: ctx.run.id, score: L.scoreMatch(j, s).total };
+    const app = { id: store.id('app'), jobId, studentId, coverNote, at: new Date().toISOString(), runId: ctx.run.id, score: L.scoreMatch(j, s).total, asks: fit.asks };
     store.db.applications.push(app);
     store.save();
     ctx.run.applications = (ctx.run.applications || []).concat(app.id);
+    const asks = fit.asks.some(a => /screen reader/.test(a)) ? `\n\nQuestion: does your setup work with ${s.needs.tool || 'a screen reader'}? HireBuddy checked your listing and it does not say.` : '';
     const email = {
       id: store.id('mail'), to: j.ownerEmail || 'owner@example.com', kind: 'application',
       subject: `New applicant for ${j.title}: ${s.name}`,
-      body: `${s.name} (${s.campus || 'student'}, ${s.area}) applied for ${j.title}.\n\n${coverNote}\n\nMatch score: ${app.score}/100\nReply to: ${s.email}\nJob page: ${jobUrl(ctx, j.id)}`,
+      body: `${s.name} (${s.area}) applied for ${j.title}.\n\n${coverNote}${accessNote(s)}${asks}\n\nMatch score: ${app.score}/100\nReply to: ${s.email}\nJob page: ${jobUrl(ctx, j.id)}`,
       at: new Date().toISOString(), runId: ctx.run.id,
     };
     email.delivery = await mail.deliver(email);
     store.db.emails.push(email);
     store.save();
-    return { ok: true, applicationId: app.id, job: j.title, business: j.business, businessNotified: email.delivery };
+    return { ok: true, applicationId: app.id, job: j.title, business: j.business, access: fit, businessNotified: email.delivery };
+  },
+};
+
+function joinText(iv, j) {
+  if (iv.format === 'phone') return `${j.business} will phone you. No link or travel needed.`;
+  if (iv.format === 'video') return `Join the video call: ${iv.meetUrl}`;
+  const t = j.access?.transit;
+  return `In person at ${j.business}, ${j.area}.${t ? ` Nearest stop: ${t.station}, about a ${t.walkMin}-minute walk.` : ''}`;
+}
+
+tools.book_interview = {
+  description: 'Book an interview for the job seeker with an employer they applied to. Picks the first slot in the next 14 days inside the employer\'s interview hours and the seeker\'s availability, clear of their other interviews. Format is the seeker\'s preference when the employer offers it, else the first accessible format offered. Creates a calendar invite.',
+  parameters: S('object', {
+    studentId: { type: 'string' }, jobId: { type: 'string' },
+    format: { type: 'string', description: 'Optional: "phone", "video" or "in person"' },
+  }, ['studentId', 'jobId']),
+  run: async ({ studentId, jobId, format }, ctx) => {
+    const s = store.db.students.find(x => x.id === studentId);
+    const j = store.db.jobs.find(x => x.id === jobId);
+    if (!s || !j) return { ok: false, error: 'Unknown job seeker or job' };
+    if (!store.db.applications.some(a => a.jobId === jobId && a.studentId === studentId)) return { ok: false, problems: ['Apply to this job before booking an interview.'] };
+    if (store.db.interviews.some(i => i.jobId === jobId && i.studentId === studentId && i.status !== 'declined')) return { ok: false, problems: ['An interview for this job is already booked.'] };
+    const offered = j.access?.interviewFormats || ['in person'];
+    const fmt = format && offered.includes(format) ? format : L.pickFormat(j, s);
+    const hours = j.access?.interviewHours || j.schedule;
+    // Avoid every interview this person has, including times they said they can't make.
+    const busy = store.db.interviews.filter(i => i.studentId === s.id || (i.jobId === jobId && i.status !== 'declined'))
+      .map(i => [new Date(i.start).getTime(), new Date(i.end).getTime()]);
+    const today = L.mytParts(new Date());
+    let found = null;
+    for (let d = 1; d <= 14 && !found; d++) {
+      const p = L.mytParts(L.mytDate(today.y, today.mo, today.d + d, 0));
+      for (const [os, oe] of L.ranges(hours[p.dow])) for (const [cs, ce] of L.ranges(s.availability?.[p.dow])) {
+        for (let t = Math.ceil(Math.max(os, cs) / 30) * 30; t + 30 <= Math.min(oe, ce) && !found; t += 30) {
+          const st = L.mytDate(p.y, p.mo, p.d, t).getTime(), en = st + 30 * 60000;
+          if (busy.some(([a, b]) => st < b + 30 * 60000 && en + 30 * 60000 > a)) continue;
+          found = [st, en];
+        }
+      }
+    }
+    if (!found) return { ok: false, problems: [`No time in the next 14 days fits both ${j.business}'s interview hours (${L.describeSchedule(hours)}) and ${s.name}'s availability.`] };
+    const iv = {
+      id: store.id('iv'), jobId, studentId: s.id, name: s.name, email: s.email,
+      start: new Date(found[0]).toISOString(), end: new Date(found[1]).toISOString(),
+      when: L.fmtMyt(new Date(found[0])), whenLong: L.fmtLong(new Date(found[0])), runId: ctx.run.id, bookedBy: 'seeker', format: fmt,
+    };
+    iv.meetUrl = fmt === 'video' ? `https://meet.jit.si/HireBuddy-${iv.id.replace(/^iv-/, '')}` : null;
+    iv.mode = fmt === 'video' ? 'Video call (Jitsi Meet)' : fmt === 'phone' ? 'Phone call' : 'In person';
+    iv.howToJoin = joinText(iv, j);
+    store.db.interviews.push(iv);
+    store.save();
+    ctx.run.interviews = (ctx.run.interviews || []).concat(iv.id);
+    return { ok: true, interviewId: iv.id, job: j.title, business: j.business, email: s.email, when: iv.when, whenLong: iv.whenLong, format: fmt,
+      preferred: s.needs?.interviewFormat || null, howToJoin: iv.howToJoin, meetUrl: iv.meetUrl, icsUrl: `${ctx.baseUrl}/ics/${iv.id}.ics` };
   },
 };
 
 tools.verify_applications = {
-  description: 'Self-check the student run: every application is stored, visible on the job\'s public data, the business was emailed, and no application went to an illegal-pay job.',
+  description: 'Final self-check for a job seeker: every application is stored and the employer notified, pay is legal, access is re-checked with no blockers, each interview fits both calendars and never clashes, the format is accessible, in-person venues are a short walk from a stop, each .ics invite downloads and matches, and each email to the seeker states the time and how to join in its first lines, in plain text.',
   parameters: S('object', { studentId: { type: 'string' } }, ['studentId']),
   run: async ({ studentId }, ctx) => {
+    const s = store.db.students.find(x => x.id === studentId);
     const apps = store.db.applications.filter(a => a.studentId === studentId && (ctx.run.applications || []).includes(a.id));
+    const ivs = store.db.interviews.filter(i => (ctx.run.interviews || []).includes(i.id));
     const checks = [];
     const add = (name, pass, detail) => checks.push({ name, pass: !!pass, detail });
-    add('At least one application submitted', apps.length > 0, `${apps.length} submitted`);
+    add('At least one application or interview', apps.length + ivs.length > 0, `${apps.length} applications, ${ivs.length} interviews`);
+    const goal = ctx.run.goal || 0;
+    if (goal) add(`Goal of ${goal} interviews met, or the shortfall explained`, ivs.length >= goal || (ctx.run.decisions || []).length > 0,
+      `${ivs.length} of ${goal} booked${ivs.length < goal ? `; ${(ctx.run.decisions || []).length} decision(s) logged` : ''}`);
     for (const a of apps) {
       const j = store.db.jobs.find(x => x.id === a.jobId);
       const data = await fetch(`${ctx.baseUrl}/api/jobs/${a.jobId}`).then(r => r.json()).catch(() => null);
       add(`${j.title}: application is on the job record`, data?.applicants?.some(x => x.applicationId === a.id), `${ctx.baseUrl}/api/jobs/${a.jobId}`);
       add(`${j.title}: pays at least minimum wage`, L.checkWage(j.pay, j.payUnit).ok, L.checkWage(j.pay, j.payUnit).message);
+      if (s.needs) {
+        const fit = L.accessFit(j, s, ctx.run.search || {});
+        add(`${j.title}: suits your access needs`, fit.fit !== 'not suitable', [...fit.reasons, ...fit.asks].join('; ') || 'no blockers');
+      }
       const em = store.db.emails.find(e => e.kind === 'application' && e.runId === ctx.run.id && e.subject.includes(j.title));
-      add(`${j.business} was notified`, !!em, em ? em.delivery?.channel : 'no email');
+      add(`${j.business} was sent the application as plain text`, !!em && !/<[a-z][^>]*>/i.test(em.body), em ? em.delivery?.channel : 'no email');
+    }
+    const sorted = [...ivs].filter(i => i.status !== 'declined').sort((a, b) => a.start.localeCompare(b.start));
+    add('No two interviews overlap', !sorted.some((x, i) => i && new Date(x.start) < new Date(sorted[i - 1].end)), sorted.map(i => i.when).join('; ') || 'none');
+    for (const iv of ivs) {
+      const j = store.db.jobs.find(x => x.id === iv.jobId);
+      const p = L.mytParts(new Date(iv.start)), q = L.mytParts(new Date(iv.end));
+      const st = p.h * 60 + p.mi, en = q.h * 60 + q.mi;
+      const inside = (m) => L.ranges(m?.[p.dow]).some(([a, b]) => st >= a && en <= b);
+      add(`${j.business}: ${iv.when} is inside your free time and their interview hours`, inside(s.availability) && inside(j.access?.interviewHours || j.schedule), `${p.dow}: you ${(s.availability?.[p.dow] || []).join(', ')}`);
+      const offered = j.access?.interviewFormats || ['in person'];
+      add(`${j.business}: ${iv.format} interview is offered${s.needs?.interviewFormat ? ` (you asked for ${s.needs.interviewFormat})` : ''}`, offered.includes(iv.format), `Offered: ${offered.join(', ')}`);
+      if (iv.format === 'in person' && s.needs) {
+        const t = j.access?.transit, max = (ctx.run.search?.maxWalkMin) || s.needs.maxWalkMin || L.DEFAULT_WALK;
+        add(`${j.business}: venue is reachable by public transport`, t && t.walkMin <= max, t ? `${t.walkMin}-minute walk from ${t.station}` : 'no stop listed');
+      }
+      const icsRes = await fetch(`${ctx.baseUrl}/ics/${iv.id}.ics`).then(r => r.text()).catch(() => '');
+      const parsed = icsRes ? L.parseIcs(icsRes) : {};
+      add(`${j.business}: calendar invite downloads and matches`, parsed.method === 'REQUEST' && parsed.start && parsed.start.toISOString() === iv.start,
+        parsed.start ? `DTSTART ${parsed.start.toISOString()}` : 'could not fetch .ics');
+      const em = store.db.emails.find(e => e.interviewId === iv.id);
+      const head = em ? em.body.split('\n').slice(0, 3).join(' ') : '';
+      add(`${j.business}: your email says the time and how to join in its first lines`, em && head.includes(iv.when) && (iv.meetUrl ? em.body.includes(iv.meetUrl) : head.includes(iv.howToJoin.split('.')[0])) && !/<[a-z][^>]*>/i.test(em.body),
+        em ? `"${em.subject}"` : 'no email found');
     }
     const pass = checks.every(c => c.pass);
     ctx.run.verified = pass;
@@ -471,6 +607,6 @@ tools.finish = {
 
 const HIRER_TOOLS = ['set_plan', 'check_minimum_wage', 'publish_job', 'find_candidates', 'screen_candidates', 'record_fit_judgement', 'verify_screening',
   'log_decision', 'relax_requirement', 'schedule_interviews', 'send_email', 'verify_hiring_outcome', 'finish'];
-const STUDENT_TOOLS = ['set_plan', 'register_student', 'search_jobs', 'check_minimum_wage', 'apply_to_job', 'verify_applications', 'finish'];
+const STUDENT_TOOLS = ['set_plan', 'register_student', 'search_jobs', 'check_minimum_wage', 'log_decision', 'apply_to_job', 'book_interview', 'send_email', 'verify_applications', 'finish'];
 
-module.exports = { tools, HIRER_TOOLS, STUDENT_TOOLS, MINIMUM_MATCH, jobUrl };
+module.exports = { tools, HIRER_TOOLS, STUDENT_TOOLS, MINIMUM_MATCH, jobUrl, matchJobs };

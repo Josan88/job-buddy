@@ -15,7 +15,31 @@ const ROLES = [
 
 const SKILL_WORDS = ['espresso', 'latte art', 'cashier', 'customer service', 'food handling', 'tutoring', 'mathematics', 'physics',
   'social media', 'canva', 'video editing', 'copywriting', 'data entry', 'excel', 'python', 'web development', 'event crew',
-  'photography', 'warehouse', 'driving license', 'english', 'bahasa melayu', 'mandarin', 'cantonese', 'tamil'];
+  'photography', 'warehouse', 'driving license', 'english', 'bahasa melayu', 'mandarin', 'cantonese', 'tamil',
+  'phone', 'typing', 'screen reader', 'massage'];
+
+// What a blind or low-vision seeker needs, read from their own sentence. null if they mention none.
+function needs(prompt) {
+  const t = prompt.toLowerCase();
+  const tool = (prompt.match(/\b(NVDA|JAWS|VoiceOver|TalkBack|screen magnifier|magnifier|ZoomText)\b/i) || [])[1] || null;
+  const blind = /\bblind\b|no sight|cannot see|can't see|totally blind|buta/.test(t);
+  const low = /low vision|partially sighted|visually impaired|vision impair|rabun|poor eyesight|weak eyesight/.test(t);
+  const reader = /screen ?reader|nvda|jaws|voiceover|talkback/.test(t);
+  const magnification = /magnif|zoomtext|large text|big text|enlarge/.test(t);
+  if (!blind && !low && !reader && !magnification) return null;
+  const walk = t.match(/(\d+)\s*(?:-\s*)?min(?:ute)?s?\s*(?:'|of\s+)?walk/);
+  return {
+    vision: blind ? 'blind' : 'low vision',
+    screenReader: blind || reader,
+    magnification: magnification || (!blind && low && !reader),
+    tool: tool || (blind ? 'a screen reader' : magnification ? 'a screen magnifier' : null),
+    remoteOnly: /remote( work| jobs?)? only|only (do )?remote|(from|at) home only|only (work )?from home|wfh only|only wfh|can(no|')t travel/.test(t),
+    maxWalkMin: walk ? Number(walk[1]) : 10, walkStated: !!walk,
+    interviewFormat: /phone interview|interview(s)? (by|over the) phone|over the phone|by phone/.test(t) ? 'phone'
+      : /video (call|interview)|online interview|interview(s)? online/.test(t) ? 'video' : /in person|face to face/.test(t) ? 'in person' : null,
+    travel: (t.match(/\b(lrt|mrt|brt|ktm|train|bus|public transport)\b/) || [])[1] || null,
+  };
+}
 
 const DAY_WORDS = { 'mon(day)?': 'Mon', 'tue(s|sday)?': 'Tue', 'wed(nesday)?': 'Wed', 'thu(r|rs|rsday)?': 'Thu', 'fri(day)?': 'Fri', 'sat(urday)?': 'Sat', 'sun(day)?': 'Sun' };
 
@@ -107,7 +131,9 @@ function student(prompt) {
   const t = prompt.toLowerCase();
   const name = (prompt.match(/(?:\b[Ii] am|\b[Ii]'m|\b[Ii]m|[Mm]y name is|[Tt]his is)\s+([A-Z][a-z]+(?:\s+(?!From\b|At\b)[A-Z][a-z]+)?)/) || [])[1] || 'Student';
   const campus = CAMPUSES.find(c => t.includes(c.toLowerCase().split(' ')[0].replace("'s", ''))) || '';
+  const need = needs(prompt);
   const skills = SKILL_WORDS.filter(s => L.termsFor(s).some(w => t.includes(w)));
+  if (need?.screenReader && !skills.includes('screen reader')) skills.push('screen reader');
   if (/coffee|barista/.test(t) && !skills.includes('espresso')) skills.push('espresso');
   const pay = parsePay(prompt);
   return {
@@ -116,8 +142,8 @@ function student(prompt) {
     availability: parseSchedule(prompt, '09:00-18:00'),
     expectedRate: pay ? pay.pay : null,
     minPay: pay ? pay.pay : 0,
-    bio: prompt.trim(),
+    bio: prompt.trim(), needs: need,
   };
 }
 
-module.exports = { hirer, student, parseEmail };
+module.exports = { hirer, student, parseEmail, needs };
