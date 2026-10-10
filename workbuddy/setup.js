@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// One-step WorkBuddy hookup: checks the live app answers, runs one verified demo,
+// One-step WorkBuddy hookup: checks the live app and its MCP endpoint answer,
 // and prints the MCP entry with this machine's absolute path filled in.
 // Usage (from the repo root): node workbuddy/setup.js
 const path = require('path');
@@ -26,9 +26,9 @@ const bridge = path.resolve(__dirname, 'hirebuddy-mcp.js').split(path.sep).join(
 
   console.log('3/3 Done. Paste this into WorkBuddy\'s MCP server settings (also saved to workbuddy/mcp_servers.local.json):\n');
   console.log(JSON.stringify(entry, null, 2));
-  console.log('\nThen restart WorkBuddy and type: I am Nadia Rahim. I am blind and use NVDA. I live in Subang Jaya. I did customer service calls at a bank hotline and type fast in English and Malay. Free weekdays 9am to 5pm, phone interviews please.');
+  console.log('\nThen restart WorkBuddy and type: I\'m Nadia Rahim. I\'m blind and use NVDA. I live in Subang Jaya and take the LRT. I did customer service calls at a bank hotline for a year and type fast in English and Malay. Free weekdays 9am to 5pm, at least RM12 an hour, phone interviews please. Check JobStreet and Indeed too.');
   console.log('\nNo MCP settings in your WorkBuddy? Give it this task instead:');
-  console.log(`  Run: node "${path.resolve(__dirname, 'hirebuddy-skill', 'scripts', 'hirebuddy.js').split(path.sep).join('/')}" "I am Nadia Rahim. I am blind and use NVDA. I live in Subang Jaya. I did customer service calls at a bank hotline and type fast in English and Malay. Free weekdays 9am to 5pm, phone interviews please." and show me the result.`);
+  console.log(`  Run: node "${path.resolve(__dirname, 'hirebuddy-skill', 'scripts', 'hirebuddy.js').split(path.sep).join('/')}" "I am Nadia Rahim. I am blind and use NVDA. I live in Subang Jaya and take the LRT. I did customer service calls at a bank hotline for a year and type fast in English and Malay. Free weekdays 9am to 5pm, at least RM12 an hour, phone interviews please." and show me the result.`);
 })().catch(e => {
   console.error(`\nCould not reach ${BASE}: ${e.message}. Check the laptop's internet and try again.`);
   process.exit(1);
