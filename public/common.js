@@ -18,6 +18,18 @@ document.querySelectorAll('details.menu').forEach(m => {
 });
 
 window.HB = {
+  async sendApplication(jobId, studentId) {
+    let key = '';
+    try { key = localStorage.getItem('hirebuddy.telegramKey') || ''; } catch {}
+    try {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/apply/${encodeURIComponent(studentId)}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key }),
+      });
+      return await response.json();
+    } catch {
+      return { ok: false, error: 'The application request could not be sent. Check your connection and try again.' };
+    }
+  },
   esc: s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
   // Polite announcement for screen readers through the page's live region.
   announce(text) {

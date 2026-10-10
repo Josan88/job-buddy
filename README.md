@@ -139,3 +139,11 @@ The talent pool holds 12 fictional students. The 9 open gigs use made-up shop na
 ## License
 
 MIT
+
+## Keyboard applications through Telegram
+
+On Jobs and My details, use Tab to focus a job card and Enter to request an application through WorkBuddy's Telegram connection. Select your job seeker profile on My details and pair the browser using the Telegram hand-off key on Find work first.
+
+Application requests instruct WorkBuddy to send only to `stephanieshinhui@gmail.com`. The original company email is retained in the email body and stored application data, together with the job details, applicant profile, availability, accessibility/interview needs, and resume link when available. A successful Telegram hand-off does not confirm email delivery; WorkBuddy reports the actual send result through Telegram. Failed hand-offs can be retried.
+
+Run `npm run test:application` to check keyboard activation and the hand-off using a mocked Telegram connection.

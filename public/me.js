@@ -39,6 +39,7 @@ function header(me, sub) {
 }
 
 const STATUS = {
+  requested: ['Sent to Telegram, email delivery not confirmed', ''],
   interview: ['Interview booked', 'good'], applied: ['Applied, waiting to hear', ''],
   not_selected: ['Not selected this time', 'bad'], declined: ['You said you can\'t make it', ''],
 };
@@ -171,14 +172,16 @@ function bind(me) {
   document.querySelectorAll('[data-job-card]').forEach(card => {
     card.addEventListener('focus', () => window.HB.readFocus(`${card.innerText} Press Enter to send this application.`));
     card.addEventListener('keydown', e => {
-      if (e.key !== 'Enter' || e.target !== card) return;
+      if (e.key !== 'Enter' || e.target !== card || e.repeat) return;
       e.preventDefault();
       card.querySelector('[data-apply-job]').click();
     });
   });
   document.querySelectorAll('[data-apply-job]').forEach(b => b.onclick = async () => {
+    if (b.disabled) return;
     b.disabled = true;
-    const r = await fetch(`/api/jobs/${encodeURIComponent(b.dataset.applyJob)}/apply/${encodeURIComponent(me.id)}`, { method: 'POST' }).then(x => x.json());
+    announce('Sending application request to Telegram.');
+    const r = await window.HB.sendApplication(b.dataset.applyJob, me.id);
     const msg = $('#apply-msg');
     msg.hidden = false;
     msg.className = `panel ${r.ok ? 'good' : 'bad'}`;
