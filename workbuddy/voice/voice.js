@@ -235,7 +235,7 @@ const BRIDGE_PORT = Number(cfg.bridgePort || 47321);
 function bridge() {
   const http = require('http');
   const allowed = new Set([new URL(BASE).origin, ...(cfg.allowOrigins || [])]);
-  let busy = false;
+  let busy = false, lastSend = 0;
   const server = http.createServer(async (req, res) => {
     const origin = req.headers.origin || '';
     const hostOk = [`127.0.0.1:${BRIDGE_PORT}`, `localhost:${BRIDGE_PORT}`].includes(req.headers.host);
@@ -254,7 +254,9 @@ function bridge() {
     for await (const c of req) { raw += c; if (raw.length > 1000) return send(413, { error: 'too large' }); }
     const id = (() => { try { return String(JSON.parse(raw).handoff || ''); } catch { return ''; } })();
     if (!/^ho-[a-z0-9]{4,12}$/.test(id)) return send(400, { error: 'handoff code required' });
-    if (busy) return send(409, { result: 'busy' });
+    // Dropped, never queued: a request while one is under way, or within 10 seconds of the last send.
+    // Keys from one send are finished before the next Yes/No box can open, so they can never answer it.
+    if (busy || Date.now() - lastSend < 10000) { log('bridge: dropped', id, busy ? '(busy)' : '(too soon after the last send)'); return send(409, { result: 'busy' }); }
     busy = true;
     try {
       const h = await fetch(`${BASE}/api/handoffs/${id}`).then(r => r.ok ? r.json() : null).catch(() => null);
@@ -263,6 +265,7 @@ function bridge() {
       log('bridge: asking to send', id);
       if (!confirmSend(h.prompt || h.task)) { log('bridge: declined', id); return send(200, { result: 'declined' }); }
       const result = sendToWorkBuddy(h.task);
+      lastSend = Date.now();
       log('bridge:', result, id);
       if (result === 'notfound') speak('WorkBuddy is not open. Open WorkBuddy, then press Control V and Enter. The task is copied.');
       else if (result === 'nofocus') speak('I could not switch to WorkBuddy. Switch to it, then press Control V and Enter. The task is copied.');
