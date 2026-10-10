@@ -147,7 +147,7 @@ async function bookTowardGoal(ctx, jobId, goal, { radius = RADII[0], relaxBudget
         const relaxedJob = { ...job, requirements: job.requirements.filter(r => r !== k), niceToHave: [k, ...(job.niceToHave || [])] };
         const gained = qualifiedUnder(relaxedJob, radius, skip).filter(s => !qualifiedUnder(job, radius, skip).includes(s));
         options.push({ label: `Relax "${k}" from must-have to nice-to-have`, gain: gained.length, rank: 2, skill: k,
-          why: gained.length ? `nobody nearby has every must-have; dropping only "${k}" qualifies ${names(gained)}, and ${job.requirements.filter(r => r !== k).join(', ')} stay required`
+          why: gained.length ? `nobody nearby has every must-have; dropping only "${k}" qualifies ${names(gained)}, and ${(rest => `${rest.join(', ')} ${rest.length === 1 ? 'stays' : 'stay'}`)(job.requirements.filter(r => r !== k))} required`
             : `would not add anyone at ${radius} km`,
           apply: async () => {
             await callTool(ctx, 'relax_requirement', { jobId, skill: k, reason: `Only way to reach ${goal} interviews: qualifies ${names(gained)}` });
@@ -166,7 +166,7 @@ async function bookTowardGoal(ctx, jobId, goal, { radius = RADII[0], relaxBudget
     const choice = best.gain > 0 ? best
       : options.find(o => o.rank === 1 && o.potential > 0 && relaxBudget > 0) || stop;
     await callTool(ctx, 'log_decision', {
-      situation: `${booked.length} of ${goal} interviews booked after round ${round}; ${screened.ranked.filter(r => r.qualified).length} more qualified candidate(s) at ${radius} km.`,
+      situation: `${booked.length} of ${goal} interviews booked after round ${round}; ${qualifiedUnder(job, radius, skip).length || 'no'} other qualified candidate(s) within ${radius} km.`,
       options: options.map(o => `${o.label} (${o.gain ? `+${o.gain} qualified` : 'adds nobody'})`),
       choice: choice.label,
       reason: `${choice.why[0].toUpperCase()}${choice.why.slice(1)}.`,
