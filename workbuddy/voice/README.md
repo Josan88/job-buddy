@@ -25,3 +25,13 @@ That adds a "HireBuddy Voice" Start menu shortcut with the Ctrl+Alt+H hotkey. Ot
 - `newTaskKeys`: SendKeys codes to open a new task, if WorkBuddy needs them, e.g. `"^n"`.
 
 **If WorkBuddy doesn't come to the front:** HireBuddy Voice says so. The task is already copied, so switch to WorkBuddy, press Ctrl+V, then Enter.
+
+## Bridge: "Hand it to WorkBuddy" without Alt+Tab
+
+Run `node workbuddy\voice\voice.js --bridge` and leave that window open. Then "Hand it to WorkBuddy" on the HireBuddy page (or Alt+V, "Hand it to WorkBuddy") opens a Windows box: "Send this to WorkBuddy?" with her sentence. Enter sends it. The bridge brings WorkBuddy to the front, pastes the task and presses Enter, and the page reads out each step.
+
+- It listens on 127.0.0.1:47321 only, and only HireBuddy's own pages may call it (the browser's Origin header).
+- The page sends only a handoff code; the bridge fetches the task from HireBuddy, never text from the page.
+- Nothing reaches WorkBuddy until the person at the computer presses Yes.
+- Chrome or Edge may ask once to let the site reach "apps on this device": press Allow.
+- Without the bridge, the page falls back to "Copied. Press Alt Tab to WorkBuddy, Control V, then Enter."

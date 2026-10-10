@@ -90,6 +90,16 @@ $('#ask').onsubmit = async e => {
 // Enter starts, like a search box. Shift+Enter adds a new line.
 $('#prompt').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('#ask').requestSubmit(); } });
 
+// The HireBuddy bridge (workbuddy/voice/voice.js --bridge) listens on this computer only. Returns 'sent',
+// another result from the bridge, or null when no bridge is running.
+async function sendViaBridge(handoff) {
+  const slow = setTimeout(() => announce('Sending to WorkBuddy. A box will ask you to confirm. Press Enter for yes.'), 700);
+  try {
+    const r = await fetch('http://127.0.0.1:47321/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ handoff }) });
+    return (await r.json()).result || null;
+  } catch { return null; } finally { clearTimeout(slow); }
+}
+
 // Hand the sentence to WorkBuddy: make a task to paste, then follow the run here once WorkBuddy starts it.
 $('#handoff').onclick = async () => {
   const prompt = $('#prompt').value.trim();
@@ -110,9 +120,19 @@ $('#handoff').onclick = async () => {
   };
   const copied = await copy();
   $('#handoff-panel').hidden = false;
-  if (copied) $('#handoff-title').focus(); else $('#handoff-task').focus();
-  announce(copied ? 'Copied. Press Alt Tab to WorkBuddy, Control V, then Enter.' : 'Press Control C to copy the selected task, then paste it into WorkBuddy.');
   $('#handoff-copy').onclick = copy;
+  // With the HireBuddy bridge running on this computer, it pastes the task into WorkBuddy after a Yes/No
+  // box. Without it (or if the person says No), the copy-and-paste steps below still work.
+  const viaBridge = await sendViaBridge(h.id);
+  if (viaBridge === 'sent') {
+    $('#handoff-title').textContent = 'Sent to WorkBuddy';
+    $('#handoff-status').textContent = 'WorkBuddy has the task. This page follows each step.';
+    $('#handoff-title').focus();
+    announce('Sent to WorkBuddy. I will tell you each step here.');
+  } else {
+    if (copied) $('#handoff-title').focus(); else $('#handoff-task').focus();
+    announce(copied ? 'Copied. Press Alt Tab to WorkBuddy, Control V, then Enter.' : 'Press Control C to copy the selected task, then paste it into WorkBuddy.');
+  }
   for (let i = 0; i < 600; i++) {
     await new Promise(r => setTimeout(r, 2000));
     const st = await fetch(`/api/handoffs/${h.id}`).then(r => r.json()).catch(() => null);

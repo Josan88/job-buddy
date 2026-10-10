@@ -8,6 +8,8 @@
 //   HireBuddyVoice.exe             listen now (what the shortcut runs)
 //   HireBuddyVoice.exe --type      type instead of speaking
 //   HireBuddyVoice.exe --say "..." skip listening and use this sentence
+//   HireBuddyVoice.exe --bridge    let "Hand it to WorkBuddy" on the HireBuddy page send the task straight in
+//   HireBuddyVoice.exe --test      check speech, recognition, the WorkBuddy window and the shortcut
 //
 // Optional hirebuddy-voice.json next to the exe: { "url": "...", "windowTitle": "WorkBuddy", "newTaskKeys": "" }
 // newTaskKeys are SendKeys codes pressed after WorkBuddy comes to the front, e.g. "^n" if a new task needs Ctrl+N.
@@ -190,7 +192,68 @@ async function follow(handoffId) {
   }
 }
 
+// Ask the person at this computer before anything is sent. A standard Windows Yes/No box: screen readers
+// read it, Enter means Yes. Returns true only if they chose Yes.
+function confirmSend(sentence) {
+  if (process.platform !== 'win32') { log('[confirm skipped: not Windows]', sentence); return process.env.HB_BRIDGE_TEST_YES === '1'; }
+  const r = ps(`Add-Type -AssemblyName System.Windows.Forms
+$a = [System.Windows.Forms.MessageBox]::Show($env:HB_TEXT, 'HireBuddy: send to WorkBuddy?', 'YesNo', 'Question', 'Button1', 'DefaultDesktopOnly')
+Write-Output $a`, { HB_TEXT: `Send this to WorkBuddy?\n\n"${sentence}"\n\nPress Enter for Yes, or Escape for No.` });
+  return r.stdout === 'Yes';
+}
+
+// HireBuddy bridge: a small web server on this computer only (127.0.0.1). When the person presses
+// "Hand it to WorkBuddy" on the HireBuddy page, the page asks the bridge to paste the task into WorkBuddy,
+// so there is no Alt+Tab or Ctrl+V. Guards, because any web page in the browser can call 127.0.0.1:
+//  - only HireBuddy's own pages may call it (the browser's Origin header, which pages can't fake);
+//  - the page sends only a handoff code; the task text comes from HireBuddy, never from the request;
+//  - every task is shown and confirmed in a Windows Yes/No box by the person at the computer first;
+//  - one task at a time, and a handoff that WorkBuddy already started can't be sent again.
+const BRIDGE_PORT = Number(cfg.bridgePort || 47321);
+function bridge() {
+  const http = require('http');
+  const allowed = new Set([new URL(BASE).origin, ...(cfg.allowOrigins || [])]);
+  let busy = false;
+  const server = http.createServer(async (req, res) => {
+    const origin = req.headers.origin || '';
+    const hostOk = [`127.0.0.1:${BRIDGE_PORT}`, `localhost:${BRIDGE_PORT}`].includes(req.headers.host);
+    const send = (code, body) => {
+      const h = { 'content-type': 'application/json', 'cache-control': 'no-store', vary: 'Origin' };
+      if (allowed.has(origin)) Object.assign(h, { 'access-control-allow-origin': origin, 'access-control-allow-methods': 'GET, POST', 'access-control-allow-headers': 'content-type', 'access-control-allow-private-network': 'true' });
+      res.writeHead(code, h); res.end(body ? JSON.stringify(body) : '');
+    };
+    if (!hostOk || !allowed.has(origin)) { log('bridge: refused', req.method, req.url, 'from', origin || '(no origin)'); return send(403, { error: 'Only HireBuddy pages may use this bridge.' }); }
+    if (req.method === 'OPTIONS') return send(204);
+    if (req.method === 'GET' && req.url === '/status') return send(200, { ok: true, app: 'hirebuddy-bridge' });
+    if (req.method !== 'POST' || req.url !== '/send') return send(404, { error: 'not found' });
+    let raw = '';
+    for await (const c of req) { raw += c; if (raw.length > 1000) return send(413, { error: 'too large' }); }
+    const id = (() => { try { return String(JSON.parse(raw).handoff || ''); } catch { return ''; } })();
+    if (!/^ho-[a-z0-9]{4,12}$/.test(id)) return send(400, { error: 'handoff code required' });
+    if (busy) return send(409, { result: 'busy' });
+    busy = true;
+    try {
+      const h = await fetch(`${BASE}/api/handoffs/${id}`).then(r => r.ok ? r.json() : null).catch(() => null);
+      if (!h?.task) return send(404, { result: 'unknown' });
+      if (h.runId) return send(409, { result: 'already-started' });
+      log('bridge: asking to send', id);
+      if (!confirmSend(h.prompt || h.task)) { log('bridge: declined', id); return send(200, { result: 'declined' }); }
+      const result = sendToWorkBuddy(h.task);
+      log('bridge:', result, id);
+      if (result === 'notfound') speak('WorkBuddy is not open. Open WorkBuddy, then press Control V and Enter. The task is copied.');
+      else if (result === 'nofocus') speak('I could not switch to WorkBuddy. Switch to it, then press Control V and Enter. The task is copied.');
+      return send(200, { result });
+    } finally { busy = false; }
+  });
+  server.listen(BRIDGE_PORT, '127.0.0.1', () => {
+    log(`HireBuddy bridge is on. Pages from ${[...allowed].join(', ')} can ask to send a task to WorkBuddy; you confirm each one. Leave this window open. Ctrl+C stops it.`);
+    speak('HireBuddy bridge is on.');
+  });
+  server.on('error', e => { log('bridge could not start:', e.message); speak(e.code === 'EADDRINUSE' ? 'The HireBuddy bridge is already running.' : 'The HireBuddy bridge could not start.'); });
+}
+
 (async () => {
+  if (args.includes('--bridge')) return bridge();
   if (args.includes('--install')) return install();
   if (args.includes('--test')) {
     const out = selfTest();

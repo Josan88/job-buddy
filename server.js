@@ -141,6 +141,7 @@ async function route(req, res) {
 
   // Hand Nadia's sentence to WorkBuddy. The website never starts anything on a computer: it only makes
   // a task for the person to paste into their own WorkBuddy, then follows that run live when it starts.
+  const handoffTask = ho => `Use the HireBuddy skill to find me work. HireBuddy handoff code: ${ho.id}. My request: "${ho.prompt}" Check JobStreet and Indeed too.`;
   if (p === '/api/handoffs' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
     const prompt = String(body.prompt || '').trim().slice(0, 2000);
@@ -148,15 +149,15 @@ async function route(req, res) {
     const ho = { id: `ho-${Math.random().toString(36).slice(2, 8)}`, prompt, createdAt: new Date().toISOString(), runId: null };
     store.db.handoffs = (store.db.handoffs || []).concat(ho).slice(-200);
     store.save();
-    const task = `Use the HireBuddy skill to find me work. HireBuddy handoff code: ${ho.id}. My request: "${prompt}" Check JobStreet and Indeed too.`;
-    return json(res, 201, { id: ho.id, task });
+    return json(res, 201, { id: ho.id, task: handoffTask(ho) });
   }
   const hm = p.match(/^\/api\/handoffs\/(ho-[a-z0-9]+)$/);
   if (hm) {
     const ho = (store.db.handoffs || []).find(h => h.id === hm[1]);
     if (!ho) return json(res, 404, { error: 'not found' });
     const run = ho.runId && store.db.runs.find(r => r.id === ho.runId);
-    return json(res, 200, { id: ho.id, status: run ? run.status : 'waiting', runId: ho.runId });
+    // The task is included so the HireBuddy bridge on the person's own computer can paste it into WorkBuddy.
+    return json(res, 200, { id: ho.id, status: run ? run.status : 'waiting', runId: ho.runId, prompt: ho.prompt, task: handoffTask(ho) });
   }
   if (p === '/api/runs' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
