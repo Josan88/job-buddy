@@ -1,0 +1,46 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+Object.assign(process.env, { PORT: '3997', DATA_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'hirebuddy-search-')), LLM_API_KEY: '', PUBLIC_URL: '', RENDER_EXTERNAL_URL: '' });
+const http = require('node:http');
+const createServer = http.createServer;
+let server;
+http.createServer = (...args) => (server = createServer(...args));
+require('../server');
+http.createServer = createServer;
+const agent = require('../src/agent');
+const store = require('../src/store');
+const { steps } = require('../src/steps');
+const { tools, STUDENT_TOOLS, HIRER_TOOLS } = require('../src/tools');
+const base = 'http://localhost:3997';
+const prompt = "I'm Nadia Rahim. I'm blind and use NVDA. I live in Subang Jaya. I did customer service calls for a year. Free weekdays 9am to 5pm, at least RM12 an hour.";
+(async () => {
+  await new Promise(resolve => setTimeout(resolve, 150));
+  const run = await agent.execute(agent.newRun(prompt, 'student'), base);
+  assert.equal(run.status, 'done', JSON.stringify(run.events));
+  assert.equal(store.db.applications.length, 0);
+  assert.equal(store.db.interviews.length, 0);
+  assert.equal(store.db.emails.length, 0);
+  const first = await steps.hirebuddy_1_understand.run({ prompt }, base);
+  const search = await steps.hirebuddy_2_check_jobs.run({ runId: first.runId }, base);
+  await steps.hirebuddy_3_apply_and_book.run({ runId: first.runId, jobIds: search.suitable.map(j => j.jobId) }, base);
+  const result = await steps.hirebuddy_4_verify.run({ runId: first.runId }, base);
+  assert.equal(result.ok, true);
+  assert.doesNotMatch(result.summary, /interview/i);
+  assert.doesNotMatch(result.saveToComputer.files[0].content, /interview/i);
+  assert.equal(store.db.applications.length, 0);
+  assert.equal(store.db.interviews.length, 0);
+  const hirer = await agent.execute(agent.newRun('Need a weekend barista in Subang Jaya, RM12/hr, start next week', 'hirer'), base);
+  assert.equal(hirer.status, 'done');
+  assert.equal(store.db.interviews.length, 0);
+  assert.doesNotMatch(hirer.summary, /interview|undefined/i);
+  for (const name of ['book_interview', 'schedule_interviews']) {
+    assert.equal((await tools[name].run({}, {})).ok, false);
+    assert.equal(STUDENT_TOOLS.includes(name), false);
+    assert.equal(HIRER_TOOLS.includes(name), false);
+  }
+  assert.equal((await fetch(`${base}/api/interviews/old/decline`, { method: 'POST' })).status, 410);
+  console.log('PASS search-only flows, manual selection, candidate shortlist and disabled booking');
+  server.close();
+})().catch(e => { console.error(e); process.exit(1); });

@@ -6,7 +6,7 @@ const { esc, announce } = window.HB;
 
 const EXAMPLES = {
   student: [
-    "I'm Nadia Rahim. I'm blind and use NVDA. I live in Subang Jaya and take the LRT. I did customer service calls at a bank hotline for a year and type fast in English and Malay. Free weekdays 9am to 5pm, at least RM12 an hour, phone interviews please.",
+    "I'm Nadia Rahim. I'm blind and use NVDA. I live in Subang Jaya and take the LRT. I did customer service calls at a bank hotline for a year and type fast in English and Malay. Free weekdays 9am to 5pm, at least RM12 an hour.",
     "I'm Nur Aqilah, I have low vision and use a screen magnifier. Remote work only. I write Malay articles and captions. Free Mon, Wed and Fri 10am-6pm.",
     "I'm Ravi Chandran, I'm blind and use TalkBack. I live in Kuala Lumpur and hold a massage certificate. Free Wednesday to Sunday 11am-7pm.",
   ],
@@ -27,7 +27,6 @@ const IDEAS = {
     ['Skills and experience', 'I am good at '],
     ['When you are free', 'I am free '],
     ['Pay', 'I need at least RM an hour.'],
-    ['Interviews', 'I prefer interviews by phone.'],
   ],
   hirer: [
     ['The job', 'Need a '],
@@ -40,9 +39,9 @@ const IDEAS = {
 
 const TOOL_LABEL = {
   check_minimum_wage: 'Checked the pay is legal', publish_job: 'Published the job page', find_candidates: 'Found candidates',
-  screen_candidates: 'Screened candidates', verify_screening: 'Self-check: screening', schedule_interviews: 'Booked interviews',
+  screen_candidates: 'Screened candidates', verify_screening: 'Self-check: screening',
   send_email: 'Sent an email', verify_hiring_outcome: 'Final self-check', register_student: 'Saved the profile',
-  search_jobs: 'Checked jobs against your needs', apply_to_job: 'Applied', book_interview: 'Booked an interview',
+  search_jobs: 'Checked jobs against your needs', apply_to_job: 'Applied',
   verify_applications: 'Final self-check', check_outside_listings: 'Checked jobs WorkBuddy found on other sites', finish: 'Delivered the result', relax_requirement: 'Relaxed a must-have',
   record_fit_judgement: 'Judged fit from their own words',
 };
@@ -455,8 +454,6 @@ function render(e, live) {
       const li = pending.get(e.tool) || logItem(`<h3>${esc(TOOL_LABEL[e.tool] || e.tool)}</h3><div class="out"></div>`, 'tool');
       pending.delete(e.tool);
       li.classList.add(e.ok ? 'ok' : 'fail');
-      if (e.ok && e.tool === 'book_interview') outcome.booked = (outcome.booked || []).concat(e.result);
-      if (e.ok && e.tool === 'schedule_interviews') outcome.slots = (outcome.slots || []).concat(e.result.scheduled);
       if (e.ok && e.tool === 'screen_candidates') outcome.screen = e.result.details;
       if (e.ok && e.tool === 'check_outside_listings') outcome.outside = e.result.results;
       li.querySelector('.out').innerHTML = (e.ok ? '' : '<p><b>Problem found.</b></p>') + pretty(e.tool, e.result, e.ok);
@@ -498,14 +495,12 @@ function pretty(tool, r, ok) {
       return `<p>${esc(r.message)} <span class="muted">(${esc(r.source)})</span></p>`;
     case 'register_student': {
       const n = r.profile.needs;
-      return `<p>${esc(r.profile.name)}${r.profile.area ? `, ${esc(r.profile.area)}` : ''}. Skills: ${esc(r.profile.skills.join(', '))}.</p>${n ? `<p>Needs: ${esc(n.vision)}, uses ${esc(n.tool || 'assistive tech')}${n.remoteOnly ? ', remote only' : `, up to a ${esc(n.maxWalkMin)}-minute walk from a stop`}${n.interviewFormat ? `, ${esc(n.interviewFormat)} interviews` : ''}.</p>` : ''}`;
+      return `<p>${esc(r.profile.name)}${r.profile.area ? `, ${esc(r.profile.area)}` : ''}. Skills: ${esc(r.profile.skills.join(', '))}.</p>${n ? `<p>Needs: ${esc(n.vision)}, uses ${esc(n.tool || 'assistive tech')}${n.remoteOnly ? ', remote only' : `, up to a ${esc(n.maxWalkMin)}-minute walk from a stop`}.</p>` : ''}`;
     }
     case 'search_jobs':
       return `<p>${r.suitable} of ${r.count} jobs suit you.</p><table><caption>Jobs checked</caption><thead><tr><th scope="col">Job</th><th scope="col">Pay</th><th scope="col">Access</th><th scope="col">Match</th></tr></thead><tbody>${r.results.map(j => `<tr><th scope="row"><a href="${esc(j.url)}">${esc(j.title)}</a><br><span class="small">${esc(j.business)}, ${esc(j.workMode)}</span></th><td>${esc(j.pay)}${j.legalPay ? '' : `<br><span class="status-word bad">Illegal pay</span>`}${j.belowMinPay && j.legalPay ? '<br><span class="small">Below your minimum</span>' : ''}</td><td>${accessText(j.access)}</td><td>${j.score} out of 100</td></tr>`).join('')}</tbody></table>`;
     case 'apply_to_job':
-      return `<p>Applied to ${esc(r.job)} at ${esc(r.business)}. The employer was emailed your application and your interview needs.</p>`;
-    case 'book_interview':
-      return `<p><b>${esc(r.whenLong)}</b>, ${esc(r.format)} interview with ${esc(r.business)}. ${esc(r.howToJoin)}</p>`;
+      return `<p>Applied to ${esc(r.job)} at ${esc(r.business)}. The employer was emailed your application .</p>`;
     case 'publish_job':
       return `<p>Live at <a href="${esc(r.job.url)}">${esc(r.job.url)}</a>. Fetched it back: HTTP ${esc(r.liveCheck.status)}.</p>`;
     case 'find_candidates':
@@ -514,8 +509,6 @@ function pretty(tool, r, ok) {
       return `<table><caption>Candidates ranked</caption><thead><tr><th scope="col">Name</th><th scope="col">Score</th><th scope="col">Why</th></tr></thead><tbody>${r.details.map(d => `<tr><th scope="row">${esc(d.name)}${d.qualified ? '<br><span class="status-word good">Qualified</span>' : ''}${d.unavailable ? `<br><span class="small">${esc(d.unavailable)}</span>` : ''}</th><td>${d.score} out of 100</td><td>${esc(d.why)}${(d.evidence || []).filter(ev => ev.source === 'bio').slice(0, 1).map(ev => `<br><span class="small">Evidence: “${esc(ev.quote)}”</span>`).join('')}</td></tr>`).join('')}</tbody></table>`;
     case 'verify_screening':
       return `<p>${r.checks.filter(c => c.pass).length} of ${r.checked} scores reproduced exactly, and every quote was found word for word.</p>`;
-    case 'schedule_interviews':
-      return `<ul>${r.scheduled.map(s => `<li>${esc(s.name)}: ${esc(s.when)}</li>`).join('')}${r.unscheduled.map(u => `<li>${esc(u.name || u.id)}: not booked, ${esc(u.reason)}</li>`).join('')}</ul>`;
     case 'send_email':
       return `<p>“${esc(r.subject)}” to ${esc(r.to)}. <a href="${esc(r.viewUrl)}">Read the email</a> <span class="muted small">(${esc(r.delivery?.channel)})</span></p>`;
     case 'verify_hiring_outcome':
@@ -543,14 +536,6 @@ function showResult(e, live) {
   sec.className = `result panel ${ok && !refused ? 'good' : 'bad'}`;
   const lines = (e.summary || 'The agent stopped before finishing. Open the step-by-step list below.').split('\n');
   const head = lines[0];
-  const booked = outcome.booked || [];
-  const interviews = booked.length
-    ? `<h3>Your interviews</h3><ol class="interviews">${booked.map(b => `<li><h4>${esc(b.job)} at ${esc(b.business)}</h4>
-        <dl class="facts"><dt>When</dt><dd>${esc(b.whenLong)} (Malaysia time)</dd><dt>How</dt><dd>${esc(b.howToJoin)}${b.preferred && b.preferred !== b.format ? ` You asked for ${esc(b.preferred)}, but they only interview ${esc(b.format)}.` : ''}</dd></dl>
-        <p class="actions">${b.meetUrl ? `<a class="btn" href="${esc(b.meetUrl)}">Join the ${esc(b.business)} video call</a>` : ''}</p></li>`).join('')}</ol>`
-    : (outcome.slots || []).length
-      ? `<h3>Interviews booked</h3><ul>${outcome.slots.map(s => `<li>${esc(s.name)}: ${esc(s.when)}.</li>`).join('')}</ul>`
-      : '';
   const out = outcome.outside || [];
   const others = out.length ? `<h3>Jobs WorkBuddy found on other sites</h3>
     <p>Press Tab to focus a job card, then Enter to ask WorkBuddy on Telegram to email your application to the demo inbox.</p>
@@ -560,9 +545,9 @@ function showResult(e, live) {
       ${esc(r.verdict === 'not suitable' ? r.blockers.join('; ') : r.reasons.join('; '))}.</p>
       ${r.draft ? `<p><button type="button" data-result-apply="${i}">Apply for ${esc(r.title)} at ${esc(r.employer || 'this company')} through Telegram</button></p><p data-application-status role="status" tabindex="-1"></p><details><summary>Application ready to send, with ${(r.questions || r.asks || []).length} question${(r.questions || r.asks || []).length === 1 ? '' : 's'} for ${esc(r.employer || 'the employer')}</summary>
         <pre id="draft-${i}">${esc(r.draft)}</pre><p><button type="button" class="secondary" data-copy="draft-${i}">Copy the application for ${esc(r.employer || r.title)}</button></p></details>` : ''}</li>`).join('')}</ol>` : '';
-  const rest = lines.slice(1).filter(l => !/^\d+\. /.test(l) || !booked.length);
+  const rest = lines.slice(1);
   $('#result-body').innerHTML = `<p><span class="status-word ${e.verified && !refused ? 'good' : 'bad'}">${refused ? 'Refused: pay is below the legal minimum' : e.verified ? 'Checked and verified' : ok ? 'Done' : 'Needs attention'}</span></p>
-    <p class="lede">${linkify(esc(head))}</p>${interviews}${others}${rest.map(l => `<p>${linkify(esc(l))}</p>`).join('')}
+    <p class="lede">${linkify(esc(head))}</p>${others}${rest.map(l => `<p>${linkify(esc(l))}</p>`).join('')}
     ${(outcome.decisions || []).length ? `<h3>Decisions made on the way</h3><ul>${outcome.decisions.map(d => `<li><b>${esc(d.choice)}.</b> ${esc(d.reason)}</li>`).join('')}</ul>` : ''}
     <p class="actions"><button type="button" class="secondary" id="read-aloud">Read aloud</button>${(e.links || []).map(l => `<a class="btn secondary" href="${esc(l.url)}">${esc(l.label)}</a>`).join('')}</p>`;
   $('#read-aloud').onclick = ev => window.HB.speak((e.summary || '').replace(/https?:\/\/\S+/g, 'the link'), ev.currentTarget);

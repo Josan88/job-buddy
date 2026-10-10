@@ -326,27 +326,6 @@ tools.verify_hiring_outcome = {
     add('Screening recomputed and every quote is verbatim', ctx.run.screeningVerified === true,
       ctx.run.screeningVerified ? 'All scores matched on recompute' : 'verify_screening has not passed');
 
-    const ivs = store.db.interviews.filter(i => i.jobId === jobId && (ctx.run.interviews || []).includes(i.id));
-    add('At least one interview booked, or why not explained', ivs.length > 0 || (ctx.run.decisions || []).some(d => /^Stop|Leave/.test(d.choice)), `${ivs.length} booked`);
-    const goal = ctx.run.goal || 0;
-    if (goal) add(`Goal of ${goal} interviews met, or the shortfall explained`, ivs.length >= goal || (ctx.run.decisions || []).length > 0,
-      ivs.length >= goal ? `${ivs.length} of ${goal} booked` : `${ivs.length} of ${goal} booked; ${(ctx.run.decisions || []).length} decision(s) logged`);
-    add('Nobody who declined was rebooked', ivs.filter(i => i.status !== 'declined').every(i => !store.db.interviews.some(x => x.jobId === jobId && x.studentId === i.studentId && x.status === 'declined')), 'checked against declines');
-    const sorted = [...ivs].sort((a, b) => a.start.localeCompare(b.start));
-    const clash = sorted.some((x, i) => i && new Date(x.start) < new Date(sorted[i - 1].end));
-    add('No two interviews overlap', !clash, sorted.map(i => `${i.name}: ${i.when}`).join('; '));
-
-    for (const iv of ivs) {
-      const s = store.db.students.find(x => x.id === iv.studentId);
-      const p = L.mytParts(new Date(iv.start)), q = L.mytParts(new Date(iv.end));
-      const st = p.h * 60 + p.mi, en = q.h * 60 + q.mi;
-      const inside = L.ranges(s.availability?.[p.dow]).some(([a, b]) => st >= a && en <= b);
-      add(`${iv.name} is free at ${iv.when}`, inside, `Their ${p.dow} availability: ${(s.availability?.[p.dow] || []).join(', ') || 'none'}`);
-
-      const em = store.db.emails.find(e => e.interviewId === iv.id);
-      add(`${iv.name} was emailed the right time and links`, em && em.body.includes(iv.when) && em.body.includes(jobUrl(ctx, jobId)) && (!iv.meetUrl || em.body.includes(iv.meetUrl)),
-        em ? `${em.delivery?.channel}: "${em.subject}"` : 'no interview email found');
-    }
     const pass = checks.every(c => c.pass);
     ctx.run.verified = pass;
     return { ok: true, pass, passed: checks.filter(c => c.pass).length, total: checks.length, checks };
@@ -568,13 +547,10 @@ tools.verify_applications = {
   run: async ({ studentId }, ctx) => {
     const s = store.db.students.find(x => x.id === studentId);
     const apps = store.db.applications.filter(a => a.studentId === studentId && (ctx.run.applications || []).includes(a.id));
-    const ivs = store.db.interviews.filter(i => (ctx.run.interviews || []).includes(i.id));
     const checks = [];
     const add = (name, pass, detail) => checks.push({ name, pass: !!pass, detail });
-    add(ctx.run.daily ? 'Daily check: any new application or interview is recorded' : 'At least one application or interview', ctx.run.daily || apps.length + ivs.length > 0, `${apps.length} applications, ${ivs.length} interviews${ctx.run.daily && !ivs.length ? ' (no new suitable jobs today)' : ''}`);
-    const goal = ctx.run.goal || 0;
-    if (goal) add(`Goal of ${goal} interviews met, or the shortfall explained`, ivs.length >= goal || (ctx.run.decisions || []).length > 0,
-      `${ivs.length} of ${goal} booked${ivs.length < goal ? `; ${(ctx.run.decisions || []).length} decision(s) logged` : ''}`);
+    add('Profile is saved', !!s, studentId);
+    add('Jobs were checked', ctx.run.events.some(e => e.tool === 'search_jobs' && e.type === 'tool_result' && e.ok), 'Job search completed');
     for (const a of apps) {
       const j = store.db.jobs.find(x => x.id === a.jobId);
       const data = await fetch(`${ctx.baseUrl}/api/jobs/${a.jobId}`).then(r => r.json()).catch(() => null);
@@ -586,25 +562,6 @@ tools.verify_applications = {
       }
       const em = store.db.emails.find(e => e.kind === 'application' && e.runId === ctx.run.id && e.subject.includes(j.title));
       add(`${j.business} was sent the application as plain text`, !!em && !/<[a-z][^>]*>/i.test(em.body), em ? em.delivery?.channel : 'no email');
-    }
-    const sorted = [...ivs].filter(i => i.status !== 'declined').sort((a, b) => a.start.localeCompare(b.start));
-    add('No two interviews overlap', !sorted.some((x, i) => i && new Date(x.start) < new Date(sorted[i - 1].end)), sorted.map(i => i.when).join('; ') || 'none');
-    for (const iv of ivs) {
-      const j = store.db.jobs.find(x => x.id === iv.jobId);
-      const p = L.mytParts(new Date(iv.start)), q = L.mytParts(new Date(iv.end));
-      const st = p.h * 60 + p.mi, en = q.h * 60 + q.mi;
-      const inside = (m) => L.ranges(m?.[p.dow]).some(([a, b]) => st >= a && en <= b);
-      add(`${j.business}: ${iv.when} is inside your free time and their interview hours`, inside(s.availability) && inside(j.access?.interviewHours || j.schedule), `${p.dow}: you ${(s.availability?.[p.dow] || []).join(', ')}`);
-      const offered = j.access?.interviewFormats || ['in person'];
-      add(`${j.business}: ${iv.format} interview is offered${s.needs?.interviewFormat ? ` (you asked for ${s.needs.interviewFormat})` : ''}`, offered.includes(iv.format), `Offered: ${offered.join(', ')}`);
-      if (iv.format === 'in person' && s.needs) {
-        const t = j.access?.transit, max = (ctx.run.search?.maxWalkMin) || s.needs.maxWalkMin || L.DEFAULT_WALK;
-        add(`${j.business}: venue is reachable by public transport`, t && t.walkMin <= max, t ? `${t.walkMin}-minute walk from ${t.station}` : 'no stop listed');
-      }
-      const em = store.db.emails.find(e => e.interviewId === iv.id);
-      const head = em ? em.body.split('\n').slice(0, 3).join(' ') : '';
-      add(`${j.business}: your email says the time and how to join in its first lines`, em && head.includes(iv.when) && (iv.meetUrl ? em.body.includes(iv.meetUrl) : head.includes(iv.howToJoin.split('.')[0])) && !/<[a-z][^>]*>/i.test(em.body),
-        em ? `"${em.subject}"` : 'no email found');
     }
     const given = outside.clean(ctx.run.options?.listings || []);
     if (given.length) {
@@ -640,7 +597,10 @@ tools.finish = {
 };
 
 const HIRER_TOOLS = ['set_plan', 'check_minimum_wage', 'publish_job', 'find_candidates', 'screen_candidates', 'record_fit_judgement', 'verify_screening',
-  'log_decision', 'relax_requirement', 'schedule_interviews', 'send_email', 'verify_hiring_outcome', 'finish'];
-const STUDENT_TOOLS = ['set_plan', 'register_student', 'search_jobs', 'check_outside_listings', 'check_minimum_wage', 'log_decision', 'apply_to_job', 'book_interview', 'send_email', 'verify_applications', 'finish'];
+  'log_decision', 'relax_requirement', 'send_email', 'verify_hiring_outcome', 'finish'];
+const STUDENT_TOOLS = ['set_plan', 'register_student', 'search_jobs', 'check_outside_listings', 'check_minimum_wage', 'log_decision', 'verify_applications', 'finish'];
+
+// Booking is disabled for every caller, including legacy clients.
+for (const name of ['book_interview', 'schedule_interviews']) tools[name].run = async () => ({ ok: false, problems: ['Interview booking has been removed.'] });
 
 module.exports = { tools, HIRER_TOOLS, STUDENT_TOOLS, MINIMUM_MATCH, jobUrl, matchJobs };

@@ -10,12 +10,12 @@ const PROTOCOL = '2025-06-18';
 const sessions = new Map(); // mcp session id -> run used by granular tools
 
 const GRANULAR = ['check_minimum_wage', 'publish_job', 'find_candidates', 'screen_candidates', 'record_fit_judgement', 'verify_screening', 'log_decision', 'relax_requirement',
-  'schedule_interviews', 'send_email', 'verify_hiring_outcome', 'register_student', 'search_jobs', 'apply_to_job', 'verify_applications'];
+  'send_email', 'verify_hiring_outcome', 'register_student', 'search_jobs', 'apply_to_job', 'verify_applications'];
 
 const HIGH_LEVEL = [
   {
     name: 'hirebuddy_run',
-    description: 'For an EMPLOYER hiring staff: call this once with their words; it checks the wage is legal, publishes the job, screens candidates with quoted evidence, books interviews and emails them, and verifies. For a JOB SEEKER, use the four steps hirebuddy_1_understand to hirebuddy_4_verify instead, and use this only as a backup if those steps fail: one call does the whole seeker job (profile, checks every job including any listings you pass, applies, books 3 interviews, emails them time first, verifies). Never answer a job request from your own web search instead. Pass the user\'s words unchanged as prompt.',
+    description: 'For an EMPLOYER hiring staff: call this once with their words; it checks the wage is legal, publishes the job, screens candidates with quoted evidence, returns a candidate shortlist, and verifies. For a JOB SEEKER, use the four steps hirebuddy_1_understand to hirebuddy_4_verify instead, and use this only as a backup if those steps fail: one call does the whole seeker job (profile, checks every job including any listings you pass, returns suitable jobs for manual application and verifies). Never answer a job request from your own web search instead. Pass the user\'s words unchanged as prompt.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -78,15 +78,11 @@ async function callTool(name, args, sessionId, baseUrl) {
       plan: run.plan.map(s => `${s.status === 'done' ? '[x]' : s.status === 'skipped' ? '[-]' : '[ ]'} ${s.title}${s.status === 'skipped' ? ' (skipped: pay is below the legal minimum)' : ''}`),
       selfChecks: checks ? checks.checks.map(c => `${c.pass ? 'PASS' : 'FAIL'} ${c.name}`) : [],
       links: agent.links(run, baseUrl),
-      interviews: (run.interviews || []).map(id => store.db.interviews.find(i => i.id === id)).filter(Boolean).map(i => {
-        const j = store.db.jobs.find(x => x.id === i.jobId);
-        return { job: j?.title, employer: j?.business, person: i.name, when: i.whenLong || i.when, format: i.format || i.mode, howToJoin: i.howToJoin || i.meetUrl || null };
-      }),
       decisions: (run.decisions || []).map(d => `${d.choice}. ${d.reason}`),
       otherSites: (run.outside || []).map(r => ({ job: r.title, employer: r.employer, site: r.site, url: r.url, verdict: r.verdict,
         why: r.verdict === 'not suitable' ? r.blockers.join('; ') : r.reasons.join('; '), questionsForEmployer: r.asks, draftApplication: r.draft })),
       note: run.done
-        ? 'The job is COMPLETE and verified. Give the user the summary as short plain sentences (it may be read by a screen reader): no tables, no emoji, the most important fact first, one line per interview with the day, time and how to join. Mention the number of self-checks passed and the run link. If otherSites is not empty, say which jobs from other sites are worth asking about and that their applications are drafted but NOT sent (HireBuddy cannot apply on other sites), and which do not suit and why, one short sentence each. Do not offer or ask about further steps.'
+        ? 'The job is COMPLETE and verified. Give the user the summary as short plain sentences (it may be read by a screen reader): no tables, no emoji, the most important fact first, suitable jobs first, with manual application links. Mention the number of self-checks passed and the run link. If otherSites is not empty, say which jobs from other sites are worth asking about and that their applications are drafted but NOT sent (HireBuddy cannot apply on other sites), and which do not suit and why, one short sentence each. Do not offer or ask about further steps.'
         : 'The run did not finish. Tell the user what failed using the status and summary.',
     });
   }
@@ -139,7 +135,7 @@ async function handle(req, res, body, baseUrl, allTools = false) {
             protocolVersion: m.params?.protocolVersion || PROTOCOL,
             capabilities: { tools: { listChanged: false } },
             serverInfo: { name: 'hirebuddy', title: 'HireBuddy hiring agent', version: '1.0.0' },
-            instructions: 'For a job seeker: (optionally search real job sites first), then call hirebuddy_1_understand, hirebuddy_2_check_jobs, hirebuddy_3_apply_and_book and hirebuddy_4_verify in order, following each result\'s next field without asking the user, then save the files it returns. For an employer, call hirebuddy_run ONCE with the user\'s words. Never answer a job search with your own report instead: the request is only complete after hirebuddy_4_verify (or hirebuddy_run) returns. For a job seeker, if you can browse, first search real job sites (JobStreet, Indeed, Hiredly, Maukerja) and pass up to 5 listings you found, copied as written, as listings in that same call. It completes the whole job (publish, screen, book interviews, email, verify) autonomously. Then report the outcome, self-checks and links. Never stop halfway or ask the user for the next step.',
+            instructions: 'For a job seeker: (optionally search real job sites first), then call hirebuddy_1_understand, hirebuddy_2_check_jobs, hirebuddy_3_apply_and_book and hirebuddy_4_verify in order, following each result\'s next field without asking the user, then save the files it returns. For an employer, call hirebuddy_run ONCE with the user\'s words. Never answer a job search with your own report instead: the request is only complete after hirebuddy_4_verify (or hirebuddy_run) returns. For a job seeker, if you can browse, first search real job sites (JobStreet, Indeed, Hiredly, Maukerja) and pass up to 5 listings you found, copied as written, as listings in that same call. It completes the whole job (publish, screen, verify) autonomously. Then report the outcome, self-checks and links. Never stop halfway or ask the user for the next step.',
           } });
           break;
         case 'ping': reply({ result: {} }); break;
