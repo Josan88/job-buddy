@@ -7,6 +7,7 @@ const L = require('./src/lib');
 const agent = require('./src/agent');
 const mcp = require('./src/mcp');
 const llm = require('./src/llm');
+const telegram = require('./src/telegram');
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC = path.join(__dirname, 'public');
@@ -137,10 +138,17 @@ async function route(req, res) {
   // ---- API ----
   if (p === '/robots.txt') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('User-agent: *\nAllow: /\nDisallow: /reset\n'); }
   if (p === '/health') return json(res, 200, { ok: true, mode: llm.status(), jobs: store.db.jobs.length, students: store.db.students.length, version: (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || 'local' });
-  if (p === '/api/config') return json(res, 200, { llm: llm.enabled(), model: llm.enabled() ? llm.MODEL : null, email: !!process.env.RESEND_API_KEY });
+  if (p === '/api/config') return json(res, 200, { llm: llm.enabled(), model: llm.enabled() ? llm.MODEL : null, email: !!process.env.RESEND_API_KEY, telegram: telegram.configured() });
+  // Pairs a browser for sending hand-offs to WorkBuddy through Telegram (see src/telegram.js).
+  if (p === '/api/telegram/check' && req.method === 'POST') {
+    const body = JSON.parse(await readBody(req) || '{}');
+    if (!telegram.configured()) return json(res, 200, { ok: false, error: 'Telegram is not set up on this HireBuddy.' });
+    return json(res, 200, telegram.keyOk(body.key) ? { ok: true, bot: telegram.BOT } : { ok: false, error: 'That key is not right.' });
+  }
 
-  // Hand Nadia's sentence to WorkBuddy. The website never starts anything on a computer: it only makes
-  // a task for the person to paste into their own WorkBuddy, then follows that run live when it starts.
+  // Hand Nadia's sentence to WorkBuddy. The website makes a task for the person's own WorkBuddy and follows
+  // that run live when it starts. A browser paired through Telegram has the server send it; otherwise the
+  // person pastes it.
   const handoffTask = ho => `Use the HireBuddy skill to find me work. HireBuddy handoff code: ${ho.id}. My request: "${ho.prompt}" Check JobStreet and Indeed too.`;
   if (p === '/api/handoffs' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
@@ -149,6 +157,10 @@ async function route(req, res) {
     const ho = { id: `ho-${Math.random().toString(36).slice(2, 8)}`, prompt, createdAt: new Date().toISOString(), runId: null };
     store.db.handoffs = (store.db.handoffs || []).concat(ho).slice(-200);
     store.save();
+    if (body.key && telegram.keyOk(body.key)) {
+      try { await telegram.send(handoffTask(ho)); return json(res, 201, { id: ho.id, task: handoffTask(ho), sent: 'telegram', bot: telegram.BOT }); }
+      catch (e) { console.error('telegram hand-off failed:', e.message); return json(res, 201, { id: ho.id, task: handoffTask(ho), sendError: e.message }); }
+    }
     return json(res, 201, { id: ho.id, task: handoffTask(ho) });
   }
   const hm = p.match(/^\/api\/handoffs\/(ho-[a-z0-9]+)$/);

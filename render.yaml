@@ -3,7 +3,7 @@ services:
     name: hirebuddy
     runtime: node
     plan: free
-    buildCommand: echo "no build step"
+    buildCommand: npm ci --omit=dev
     startCommand: node server.js
     healthCheckPath: /health
     envVars:
@@ -21,3 +21,14 @@ services:
         sync: false
       - key: RESET_TOKEN
         generateValue: true
+      # Send hand-offs to WorkBuddy through Telegram (node workbuddy/telegram-login.js prints these).
+      - key: WORKBUDDY_TELEGRAM_BOT
+        sync: false
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: TELEGRAM_SESSION
+        sync: false
+      - key: TELEGRAM_HANDOFF_KEY
+        sync: false

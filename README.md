@@ -61,7 +61,7 @@ Web console ──REST/SSE──▶ Agent ──▶ Tools ──▶ store (jobs,
 - **Tools** (`src/tools.js`): deterministic and auditable. Each returns either a result or a list of specific `problems`, and the agent fixes those and retries. The timeline shows each fix as "Caught a problem, fixing it".
 - **Scoring** (`src/lib.js`): must-have skills 35, nice-to-have 5, shift-availability overlap 25, distance 15 (Haversine over Klang Valley areas), experience 15, pay fit 5.
 - **MCP server** (`src/mcp.js`): Streamable HTTP at `/mcp`. By default it exposes only `hirebuddy_run` (the whole job from one prompt, returning only when it is verified) plus two read tools. That way a client's model can't stop halfway. Add `?tools=all` to the URL, or set `HIREBUDDY_MCP_TOOLS=all` for the bridge, to expose every step tool as well.
-- **No dependencies.** Plain Node 20+, so it deploys anywhere in seconds.
+- **One optional dependency.** Plain Node 20+. The Telegram client (`telegram`, gramjs) is loaded only when the Telegram hand-off is set up.
 
 ## Run locally
 
@@ -115,15 +115,20 @@ WorkBuddy is Tencent's desktop AI agent. HireBuddy plugs into it in two ways:
 
 **B. Skill.** Import `workbuddy/hirebuddy-skill/` (which contains `SKILL.md`, `skill.yaml` and `scripts/hirebuddy.js`) through WorkBuddy's Skills panel. The skill tells WorkBuddy when to use HireBuddy, how to call it (MCP, or the script as a fallback), and what to report back.
 
-**C. HireBuddy hands the task to WorkBuddy through Telegram.** WorkBuddy's built-in Assistant channel connects it to a Telegram bot that you own. HireBuddy can't message that bot itself, because Telegram bots never see messages from other bots. So "Hand it to WorkBuddy" on the HireBuddy page opens your WorkBuddy chat in Telegram with the task already typed in (handoff code included), you press Send, and the HireBuddy page follows the run live and reads out each step. It works from the same computer or from a phone, and needs no bridge, no Alt+Tab and no secrets on the server. WorkBuddy's reply in Telegram is plain text ending with the run log link.
+**C. HireBuddy hands the task to WorkBuddy through Telegram.** WorkBuddy's built-in Assistant channel connects it to a Telegram bot that you own. HireBuddy can't message that bot itself, because Telegram bots never see messages from other bots. So HireBuddy's server sends it as a Telegram *user* account. When you press "Hand it to WorkBuddy" in a paired browser, the server sends the task (handoff code included) to the bot, WorkBuddy runs it, and the HireBuddy page follows the run live and reads out each step. Nobody pastes or presses Send. WorkBuddy replies to that account in plain text ending with the run log link.
 
 1. In Telegram, message **@BotFather**, send `/newbot`, give it a name and a username that is hard to guess (it must end in `bot`), and copy the token it returns.
 2. Still in BotFather, send `/setjoingroups`, pick the bot and choose **Disable**, so nobody can add it to a group.
 3. In WorkBuddy: **Assistant** (sidebar), then **Assistant Settings**, then **Channels**, then **Telegram**. Paste the token and press **Save**. Keep WorkBuddy open and the computer awake.
 4. Do one run at the computer first and choose "Always allow" for the hirebuddy tools. A permission prompt that appears on the computer can't be answered from the phone.
-5. On the HireBuddy home page, open **Send to WorkBuddy through Telegram** (under the buttons), type the bot's username and press **Save**. The button then reads "Hand it to WorkBuddy on Telegram". Only that browser remembers it; the server never sees it. From then on, Hand it to WorkBuddy opens Telegram straight away. "Stop using Telegram" goes back to copy and paste (or the bridge, if it is running).
+5. Get an **API ID** and **API hash** at [my.telegram.org](https://my.telegram.org) (API development tools), signed in with the account HireBuddy will send from. Use a second number, not your personal account.
+6. On your computer, from the repo root: `npm install`, then `node workbuddy/telegram-login.js`. It asks for the API ID and hash, the bot's username, the phone number and the login code Telegram sends. Then it prints five settings, including a random hand-off key.
+7. Add those five settings in Render (the HireBuddy service, **Environment**): `WORKBUDDY_TELEGRAM_BOT`, `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, `TELEGRAM_HANDOFF_KEY`. Render redeploys.
+8. On the HireBuddy home page, open **Send to WorkBuddy automatically, through Telegram** (under the buttons), type the hand-off key and press **Pair this browser**. The button then reads "Hand it to WorkBuddy on Telegram". Browsers that aren't paired still get copy and paste (or the bridge), so visitors to the public site can't start tasks on your computer.
 
-Treat the token like a password: anyone who has it, or who finds the bot and messages it, can give WorkBuddy tasks on your computer. If the token leaks, revoke it in BotFather with `/revoke`. See [WorkBuddy's Telegram guide](https://www.workbuddy.ai/docs/workbuddy/Platform-Integration/Telegram-Guide).
+`TELEGRAM_SESSION` is full access to that Telegram account: keep it only in Render's secret settings. Telegram may limit accounts that look automated, so keep it to real hand-offs (HireBuddy sends at most one every 10 seconds).
+
+Treat the bot token like a password too: anyone who has it, or who finds the bot and messages it, can give WorkBuddy tasks on your computer. If the token leaks, revoke it in BotFather with `/revoke`. See [WorkBuddy's Telegram guide](https://www.workbuddy.ai/docs/workbuddy/Platform-Integration/Telegram-Guide).
 
 Every run started from WorkBuddy also appears in the web app's **Recent runs**, labelled "via WorkBuddy/MCP".
 
