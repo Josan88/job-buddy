@@ -1,10 +1,9 @@
-<!-- {"title":"Find work in one sentence","script":"/app.js"} -->
+<!-- {"title":"Find work","script":"/app.js"} -->
 <div id="announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <section id="composer" class="hero" aria-labelledby="hero-title">
   <h1 id="hero-title">Tell HireBuddy the work you want</h1>
-  <p class="lede">One sentence is enough: what you can do, where you live, when you are free and what you need. HireBuddy finds jobs that suit you, applies, books interviews and checks everything twice.</p>
-  <p>Made for blind and low-vision job seekers. It works with your screen reader, with a keyboard alone, and in WorkBuddy.</p>
+  <p class="lede">Introduce yourself in a few lines. HireBuddy finds jobs that suit you, applies and books interviews.</p>
 
   <form id="ask" novalidate>
     <fieldset>
@@ -15,20 +14,36 @@
       </div>
     </fieldset>
 
-    <label for="prompt">Your sentence</label>
-    <span class="hint" id="prompt-hint">For example: I'm blind and use NVDA, I live in Subang Jaya, I'm good on the phone, free weekdays 9 to 5.</span>
+    <label for="prompt" id="prompt-label">Introduce yourself</label>
+    <span class="hint" id="prompt-hint">Type or speak. Not sure what to write? Use the ideas below.</span>
+    <div class="mic-row">
+      <button id="speak" type="button" class="mic" aria-describedby="speak-hint" hidden><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="13" rx="4" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg> <span id="speak-label">Speak</span></button>
+      <span class="hint" id="speak-hint" hidden>Press Enter when you finish.</span>
+    </div>
+    <div id="again" class="panel again" role="group" aria-labelledby="again-title" hidden>
+      <p id="again-title">You already said something. What now?</p>
+      <p class="actions"><button type="button" id="again-add">Keep it and add more</button> <button type="button" id="again-new" class="secondary">Clear it and start again</button></p>
+    </div>
     <textarea id="prompt" name="prompt" aria-describedby="prompt-hint prompt-error" spellcheck="true"></textarea>
     <p id="prompt-error" class="panel bad" hidden></p>
 
     <div class="actions">
-      <button id="go" type="submit">Find me work</button>
-      <button id="handoff" type="button" class="secondary">Hand it to WorkBuddy</button>
-      <button id="speak" type="button" class="secondary" hidden>Speak instead</button>
+      <button id="go" type="submit" hidden>Hire for me</button>
+      <button id="handoff" type="button">Hand it to WorkBuddy</button>
     </div>
 
+    <h2 id="ideas-title">Ideas for what to write</h2>
+    <p class="hint">Choose one to start that line in the box.</p>
+    <ul id="ideas" class="ideas" aria-labelledby="ideas-title"></ul>
+
+    <details id="examples-wrap">
+      <summary>See a full example</summary>
+      <ul id="examples" class="examples" aria-label="Examples"></ul>
+    </details>
+
     <details id="tg" hidden>
-      <summary id="tg-title">Send to WorkBuddy automatically, through Telegram</summary>
-      <p>This HireBuddy can send your task to WorkBuddy through Telegram by itself, so you don't have to paste it. Type the hand-off key once to pair this browser. Only the person whose WorkBuddy it is should have the key.</p>
+      <summary id="tg-title">Send to WorkBuddy through Telegram</summary>
+      <p>Type the hand-off key once to pair this browser. Then HireBuddy sends your task to WorkBuddy for you.</p>
       <label for="tg-key">Hand-off key</label>
       <input id="tg-key" type="password" autocomplete="off" aria-describedby="tg-error">
       <p id="tg-error" class="panel bad" hidden></p>
@@ -40,16 +55,13 @@
         <ol id="tg-replies" class="replies" aria-labelledby="tg-replies-title"></ol>
       </div>
     </details>
-
-    <h2 id="examples-title">Or start from an example</h2>
-    <ul id="examples" class="examples" aria-labelledby="examples-title"></ul>
   </form>
-  <p class="notice" id="mode"></p>
+  <p class="notice small" id="mode"></p>
 </section>
 
 <section id="handoff-panel" class="panel" aria-labelledby="handoff-title" hidden>
   <h2 id="handoff-title" tabindex="-1">Your task for WorkBuddy</h2>
-  <p id="handoff-how">It is already copied. Press <kbd>Alt</kbd>+<kbd>Tab</kbd> to WorkBuddy, <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste, then <kbd>Enter</kbd>. WorkBuddy searches job sites, applies through HireBuddy, books interviews and saves the results in your Documents folder. This page follows each step and reads out the result.</p>
+  <p id="handoff-how">It is copied. Press <kbd>Alt</kbd>+<kbd>Tab</kbd> to WorkBuddy, <kbd>Ctrl</kbd>+<kbd>V</kbd>, then <kbd>Enter</kbd>. This page follows each step.</p>
   <label for="handoff-task">Task for WorkBuddy</label>
   <textarea id="handoff-task" readonly rows="5"></textarea>
   <p class="actions"><button type="button" id="handoff-copy">Copy the task</button></p>
@@ -73,7 +85,7 @@
   <ol id="plan" class="plan" aria-labelledby="plan-title"><li>Planning…</li></ol>
 
   <details id="log-wrap">
-    <summary>Everything the agent did, step by step</summary>
+    <summary>Every step the agent took</summary>
     <ol id="timeline" class="log"></ol>
   </details>
 
