@@ -178,21 +178,15 @@ async function route(req, res) {
   // Hand Nadia's sentence to WorkBuddy. The website makes a task for the person's own WorkBuddy and follows
   // that run live when it starts. A browser paired through Telegram has the server send it; otherwise the
   // person pastes it.
-  const handoffTask = ho => `Use the HireBuddy skill to find me work. My request: "${ho.prompt}"`;
-  if (p === '/api/job-search/details' && req.method === 'POST') {
-    const body = JSON.parse(await readBody(req) || '{}');
-    const profile = store.db.students.find(s => s.id === body.studentId);
-    return json(res, 200, intake.collect(String(body.prompt || '').slice(0, 2000), profile, body.details));
-  }
+  const handoffTask = ho => ho.intake ? intake.task(ho, base) : `Use the HireBuddy skill to find me work. My request: "${ho.prompt}"`;
   if (p === '/api/handoffs' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
-    let prompt = String(body.prompt || '').trim().slice(0, 2000);
+    const prompt = String(body.prompt || '').trim().slice(0, 2000);
     if (!prompt) return json(res, 400, { error: 'prompt required' });
     const profile = store.db.students.find(s => s.id === body.studentId);
-    const collected = intake.collect(prompt, profile, body.details);
-    if (!collected.complete) return json(res, 422, { error: 'Please provide the missing applicant details before searching for jobs.', ...collected });
-    prompt = intake.append(prompt, collected.details);
-    const ho = { id: `ho-${Math.random().toString(36).slice(2, 8)}`, prompt, createdAt: new Date().toISOString(), runId: null };
+    const ho = { id: `ho-${Math.random().toString(36).slice(2, 8)}`, prompt, createdAt: new Date().toISOString(), runId: null,
+      studentId: profile?.id, resumeUrl: profile?.resume ? `${base}/api/me/student/${profile.id}/resume` : null,
+      intake: { status: 'reviewing', revision: 1, answers: intake.answers(body.details), details: {}, missing: [] } };
     store.db.handoffs = (store.db.handoffs || []).concat(ho).slice(-200);
     store.save();
     if (body.key && telegram.keyOk(body.key)) {
@@ -201,13 +195,29 @@ async function route(req, res) {
     }
     return json(res, 201, { id: ho.id, task: handoffTask(ho) });
   }
+  const detailMatch = p.match(/^\/api\/handoffs\/(ho-[a-z0-9]+)\/details$/);
+  if (detailMatch && req.method === 'POST') {
+    const body = JSON.parse(await readBody(req) || '{}');
+    const ho = (store.db.handoffs || []).find(h => h.id === detailMatch[1]);
+    if (!ho) return json(res, 404, { error: 'Handoff not found.' });
+    if (ho.intake?.status !== 'needs_details' || body.revision !== ho.intake.revision) return json(res, 409, { error: 'This details request is no longer current.' });
+    ho.intake.answers = { ...ho.intake.answers, ...intake.answers(body.details) };
+    ho.intake.status = 'reviewing';
+    ho.intake.revision++;
+    store.save();
+    if (body.key && telegram.keyOk(body.key)) {
+      try { await telegram.send(handoffTask(ho)); return json(res, 200, { id: ho.id, task: handoffTask(ho), sent: 'telegram', bot: telegram.BOT }); }
+      catch (e) { return json(res, 200, { id: ho.id, task: handoffTask(ho), sendError: e.message }); }
+    }
+    return json(res, 200, { id: ho.id, task: handoffTask(ho) });
+  }
   const hm = p.match(/^\/api\/handoffs\/(ho-[a-z0-9]+)$/);
   if (hm) {
     const ho = (store.db.handoffs || []).find(h => h.id === hm[1]);
     if (!ho) return json(res, 404, { error: 'not found' });
     const run = ho.runId && store.db.runs.find(r => r.id === ho.runId);
     // The task is included so the HireBuddy bridge on the person's own computer can paste it into WorkBuddy.
-    return json(res, 200, { id: ho.id, status: run ? run.status : 'waiting', runId: ho.runId, prompt: ho.prompt, task: handoffTask(ho) });
+    return json(res, 200, { id: ho.id, status: run ? run.status : 'waiting', runId: ho.runId, prompt: ho.prompt, resumeUrl: ho.resumeUrl, intake: ho.intake, labels: intake.FIELDS, task: handoffTask(ho) });
   }
   if (p === '/api/runs' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
@@ -336,7 +346,7 @@ async function route(req, res) {
       .map(r => { const j = store.db.jobs.find(x => x.id === r.jobId); return { jobId: r.jobId, title: r.title, business: r.business, area: r.area, pay: r.pay,
         schedule: L.describeSchedule(j.schedule), distanceKm: L.distanceKm(j.area, s.area), score: r.score, url: `${base}/jobs/${r.jobId}`,
         workMode: r.workMode, access: s.needs ? r.access : null, suitable: r.suitable, whyNot: r.whyNot }; });
-    return json(res, 200, { student: { id: s.id, name: s.name, bio: s.bio || '', resume: s.resume || null, area: s.area, campus: s.campus, skills: s.skills, needs: s.needs || null, minPay: s.expectedRate || null, free: L.describeSchedule(s.availability || {}) }, mine, open });
+    return json(res, 200, { student: { id: s.id, name: s.name, bio: s.bio || '', resume: s.resume || null, area: s.area, campus: s.campus, age: s.age, education: s.education, workExperience: s.workExperience, interestedPosition: s.interestedPosition, skills: s.skills, needs: s.needs || null, minPay: s.expectedRate || null, free: L.describeSchedule(s.availability || {}) }, mine, open });
   }
   if (p === '/api/me/business') {
     const name = url.searchParams.get('name') || '';
