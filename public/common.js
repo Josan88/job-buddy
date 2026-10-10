@@ -233,7 +233,15 @@ document.addEventListener('focusin', event => {
 document.addEventListener('focusin', event => {
   if (!event.target.matches?.('#prompt')) return;
   const label = document.querySelector('label[for="prompt"]')?.textContent.trim() || 'Introduce yourself';
-  window.HB.readControl(`${label}. Text area. Type your introduction. Press Enter to send it. Press Shift plus Enter to add another line.`);
+  const content = event.target.value.trim();
+  window.HB.readControl(`${label}. Text area. ${content ? `Current content: ${content}. ` : 'It is empty. '}Type your introduction. Press Enter to send it. Press Shift plus Enter to add another line.`);
+});
+
+// This heading is deliberately in the Tab order between the WorkBuddy button and
+// the individual idea buttons, so the user hears the section before "Your name".
+document.addEventListener('focusin', event => {
+  if (!event.target.matches?.('#ideas-title')) return;
+  window.HB.readControl('Ideas for what to write. Section heading. Press Tab to hear each idea button.');
 });
 
 // Announce expandable sections in the main page. On the home page this follows the

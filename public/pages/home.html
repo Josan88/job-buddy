@@ -7,7 +7,7 @@
     <label for="prompt" id="prompt-label">Introduce yourself</label>
     <span class="hint" id="prompt-hint">Type or speak. Press Enter to send. Press Shift+Enter to add another line. Not sure what to write? Use the ideas below.</span>
     <div class="mic-row">
-      <button id="speak" type="button" class="mic" aria-describedby="speak-hint" hidden><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="13" rx="4" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg> <span id="speak-label">Speak</span></button>
+      <button id="speak" type="button" class="mic" aria-label="Speak for self introduction" aria-describedby="speak-hint" hidden><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="13" rx="4" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg> <span id="speak-label">Speak</span></button>
       <span class="hint" id="speak-hint" hidden>Press Enter when you finish.</span>
     </div>
     <div id="again" class="panel again" role="group" aria-labelledby="again-title" hidden>
@@ -27,8 +27,7 @@
       <button id="handoff" type="button">Hand it to WorkBuddy</button>
     </div>
 
-    <h2 id="ideas-title">Ideas for what to write</h2>
-    <p class="hint">Choose one to start that line in the box.</p>
+    <h2 id="ideas-title" tabindex="0">Ideas for what to write</h2>
     <ul id="ideas" class="ideas" aria-labelledby="ideas-title"></ul>
 
     <p><button type="button" id="examples-toggle" class="secondary" aria-expanded="false" aria-controls="examples">See a full example</button></p>

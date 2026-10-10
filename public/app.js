@@ -16,7 +16,8 @@ const EXAMPLES = {
   ],
 };
 
-// Ideas for what to write. Choosing one starts that line in the box for the person to finish.
+// Topics a person may want to include. These remain focusable buttons so the site's voice
+// reads them individually, but activating one never changes the introduction text.
 const IDEAS = {
   student: [
     ['Your name', "I'm "],
@@ -60,7 +61,9 @@ function setPersona(p) {
   $('#tg').hidden = p !== 'student' || !telegramOn;
   $('#prompt-label').textContent = p === 'student' ? 'Introduce yourself' : 'Describe the job';
   $('#ideas').innerHTML = IDEAS[p].map(([label], i) => `<li><button type="button" class="secondary" data-i="${i}">${esc(label)}</button></li>`).join('');
-  $('#ideas').querySelectorAll('button').forEach(b => b.onclick = () => addIdea(IDEAS[p][b.dataset.i]));
+  $('#ideas').querySelectorAll('button').forEach(b => b.onclick = () => {
+    window.HB.readControl(`${b.textContent.trim()}. Idea for what to write. Your introduction was not changed.`);
+  });
   $('#examples').innerHTML = EXAMPLES[p].map((e, i) => `<li><button type="button" data-i="${i}"><span><b>Use this example:</b> ${esc(e)}</span></button></li>`).join('');
   $('#examples').querySelectorAll('button').forEach(b => b.onclick = () => {
     $('#prompt').value = EXAMPLES[p][b.dataset.i];
@@ -82,19 +85,6 @@ $('#examples-toggle').addEventListener('click', () => {
     ? 'Full sentence examples opened. Press Tab to hear the first example button.'
     : 'Full sentence examples closed.');
 });
-
-// Add the idea's opening words on a new line and put the cursor where the person carries on typing.
-// A blank in the phrase ("RM an hour") puts the cursor right after "RM".
-function addIdea([label, phrase]) {
-  const box = $('#prompt');
-  const before = box.value.replace(/\s+$/, '');
-  box.value = (before ? `${before}${persona === 'student' ? '\n' : ' '}` : '') + phrase;
-  const gap = phrase.indexOf('RM ');
-  const at = gap >= 0 ? box.value.length - phrase.length + gap + 2 : box.value.length;
-  box.focus();
-  box.setSelectionRange(at, at);
-  announce(`${label}: ${phrase} Carry on typing.`);
-}
 
 document.querySelectorAll('input[name="persona"]').forEach(r => r.addEventListener('change', () => setPersona(r.value)));
 
@@ -119,12 +109,14 @@ if (window.SpeechRecognition || window.webkitSpeechRecognition) {
     stop = window.HB.listen('en-MY', text => {
       stop = null;
       btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute('aria-label', 'Speak for self introduction');
       $('#speak-label').textContent = 'Speak';
       if (text) { box.value = [box.value.trim(), text].filter(Boolean).join(' '); announce(`Heard: ${text}`); }
       else announce('Stopped. Nothing added.');
       box.focus();
     });
     btn.setAttribute('aria-pressed', 'true');
+    btn.setAttribute('aria-label', 'Stop speaking for self introduction');
     $('#speak-label').textContent = 'Stop (Enter)';
     btn.focus();
     announce(mode === 'add' ? 'Listening. Carry on, then press Enter.' : 'Listening. Speak, then press Enter.');
