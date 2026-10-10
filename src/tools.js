@@ -38,6 +38,14 @@ async function httpCheck(url, mustContain) {
 // ---------------------------------------------------------------------------
 const tools = {};
 
+// Someone who declined, or already holds a live interview for this job, can't be booked again.
+function unavailableFor(jobId, studentId) {
+  const ivs = store.db.interviews.filter(i => i.jobId === jobId && i.studentId === studentId);
+  if (ivs.some(i => i.status === 'declined')) return 'declined this interview';
+  if (ivs.length) return 'already has an interview booked';
+  return null;
+}
+
 tools.set_plan = {
   description: 'Write your task plan before doing anything else. Each step names the tool that completes it, so progress is tracked automatically.',
   parameters: S('object', {
@@ -95,9 +103,9 @@ tools.publish_job = {
 };
 
 tools.find_candidates = {
-  description: 'Find students who could fill the job: people in the talent pool within range plus anyone who applied on the job page.',
+  description: 'Find students who could fill the job: people in the talent pool within range (default 10 km) plus anyone who applied on the job page. Widen maxDistanceKm if too few qualify.',
   parameters: S('object', { jobId: { type: 'string' }, maxDistanceKm: { type: 'number' } }, ['jobId']),
-  run: async ({ jobId, maxDistanceKm = 15 }) => {
+  run: async ({ jobId, maxDistanceKm = 10 }) => {
     const job = store.db.jobs.find(j => j.id === jobId);
     if (!job) return { ok: false, error: 'No such job' };
     const applied = new Set(store.db.applications.filter(a => a.jobId === jobId).map(a => a.studentId));
@@ -108,12 +116,12 @@ tools.find_candidates = {
         out.push({ id: s.id, name: s.name, area: s.area, distanceKm: km, campus: s.campus, applied: applied.has(s.id) });
       }
     }
-    return { ok: true, job: job.title, count: out.length, candidates: out, excludedOutOfRange: store.db.students.length - out.length };
+    return { ok: true, job: job.title, radiusKm: maxDistanceKm, count: out.length, candidates: out, excludedOutOfRange: store.db.students.length - out.length };
   },
 };
 
 tools.screen_candidates = {
-  description: 'Score candidates 0-100 against the job (skills 35, nice-to-have 5, availability 25, distance 15, experience 15, pay fit 5). Every skill point cites a verbatim quote from the candidate profile.',
+  description: 'Score candidates 0-100 against the job (skills 35, nice-to-have 5, availability 25, distance 15, experience 15, pay fit 5). Every skill point cites a verbatim quote from the candidate profile. qualified = meets every must-have, scores at least 50, and has not declined or already been booked.',
   parameters: S('object', { jobId: { type: 'string' }, candidateIds: { type: 'array', items: { type: 'string' } } }, ['jobId', 'candidateIds']),
   run: async ({ jobId, candidateIds }, ctx) => {
     const job = store.db.jobs.find(j => j.id === jobId);
@@ -123,11 +131,14 @@ tools.screen_candidates = {
       const s = store.db.students.find(x => x.id === cid);
       if (!s) { results.push({ id: cid, error: 'unknown candidate' }); continue; }
       const sc = L.scoreMatch(job, s);
-      results.push({ id: s.id, name: s.name, score: sc.total, requiredCoverage: sc.requiredCoverage, breakdown: sc.breakdown, why: L.explain(job, s, sc), evidence: sc.evidence, missing: sc.missing });
+      const unavailable = unavailableFor(jobId, s.id);
+      results.push({ id: s.id, name: s.name, score: sc.total, requiredCoverage: sc.requiredCoverage,
+        qualified: sc.requiredCoverage === 1 && sc.total >= MINIMUM_MATCH && !unavailable, unavailable, bio: s.bio, breakdown: sc.breakdown, why: L.explain(job, s, sc), evidence: sc.evidence, missing: sc.missing });
     }
     results.sort((a, b) => (b.score || 0) - (a.score || 0));
     ctx.run.screening = { jobId, results };
-    return { ok: true, ranked: results.map(r => ({ id: r.id, name: r.name, score: r.score, requiredCoverage: r.requiredCoverage, why: r.why })), details: results };
+    return { ok: true, ranked: results.map(r => ({ id: r.id, name: r.name, score: r.score, qualified: r.qualified, missing: r.missing, unavailable: r.unavailable, why: r.why })), details: results.map(({ bio, ...r }) => r),
+      profiles: results.filter(r => r.missing?.length && !r.unavailable).map(r => ({ id: r.id, name: r.name, missing: r.missing, bio: r.bio })) };
   },
 };
 
@@ -154,18 +165,18 @@ tools.verify_screening = {
 };
 
 tools.schedule_interviews = {
-  description: 'Book interview slots for shortlisted candidates in the next 7 days. Each slot sits inside both the owner hours and the candidate availability, never overlaps another, and gets a downloadable .ics calendar invite.',
+  description: 'Book interview slots for shortlisted candidates in the next withinDays days (default 7). Each slot sits inside both the owner hours and the candidate availability, never overlaps another, and gets a downloadable .ics calendar invite.',
   parameters: S('object', {
     jobId: { type: 'string' }, candidateIds: { type: 'array', items: { type: 'string' } },
-    durationMinutes: { type: 'number' }, ownerHours: scheduleSchema,
+    durationMinutes: { type: 'number' }, ownerHours: scheduleSchema, withinDays: { type: 'number' },
     mode: { type: 'string', description: 'Optional. Default is a video call with a unique Jitsi Meet link. Use e.g. "In person at the cafe" to override.' },
   }, ['jobId', 'candidateIds']),
-  run: async ({ jobId, candidateIds, durationMinutes = 20, ownerHours, mode }, ctx) => {
+  run: async ({ jobId, candidateIds, durationMinutes = 20, ownerHours, mode, withinDays = 7 }, ctx) => {
     const job = store.db.jobs.find(j => j.id === jobId);
     if (!job) return { ok: false, error: 'No such job' };
     const weekly = ownerHours && L.totalMinutes(ownerHours) ? ownerHours
       : Object.fromEntries(L.DAYS.map(d => [d, ['10:00-18:00']]));
-    const booked = store.db.interviews.filter(i => i.jobId === jobId).map(i => [new Date(i.start).getTime(), new Date(i.end).getTime()]);
+    const booked = store.db.interviews.filter(i => i.jobId === jobId && i.status !== 'declined').map(i => [new Date(i.start).getTime(), new Date(i.end).getTime()]);
     const now = new Date();
     const today = L.mytParts(now);
     const out = [], unscheduled = [];
@@ -173,7 +184,9 @@ tools.schedule_interviews = {
       const s = store.db.students.find(x => x.id === cid);
       if (!s) { unscheduled.push({ id: cid, reason: 'unknown candidate' }); continue; }
       let found = null;
-      for (let dayOffset = 1; dayOffset <= 7 && !found; dayOffset++) {
+      if (unavailableFor(jobId, s.id)) { unscheduled.push({ id: s.id, name: s.name, reason: unavailableFor(jobId, s.id) }); continue; }
+      const theirs = store.db.interviews.filter(i => i.studentId === s.id && i.status !== 'declined').map(i => [new Date(i.start).getTime(), new Date(i.end).getTime()]);
+      for (let dayOffset = 1; dayOffset <= withinDays && !found; dayOffset++) {
         const base = L.mytDate(today.y, today.mo, today.d + dayOffset, 0);
         const p = L.mytParts(base);
         for (const [os, oe] of L.ranges(weekly[p.dow])) for (const [cs, ce] of L.ranges(s.availability?.[p.dow])) {
@@ -181,11 +194,12 @@ tools.schedule_interviews = {
           for (let t = Math.ceil(lo / 30) * 30; t + durationMinutes <= hi && !found; t += 30) {
             const st = L.mytDate(p.y, p.mo, p.d, t).getTime(), en = st + durationMinutes * 60000;
             if (booked.some(([a, b]) => st < b + 10 * 60000 && en + 10 * 60000 > a)) continue;
+            if (theirs.some(([a, b]) => st < b + 30 * 60000 && en + 30 * 60000 > a)) continue; // their interviews for other jobs
             found = [st, en];
           }
         }
       }
-      if (!found) { unscheduled.push({ id: s.id, name: s.name, reason: 'no common free time in the next 7 days' }); continue; }
+      if (!found) { unscheduled.push({ id: s.id, name: s.name, reason: `no common free time in the next ${withinDays} days` }); continue; }
       booked.push(found);
       const iv = {
         id: store.id('iv'), jobId, studentId: s.id, name: s.name, email: s.email,
@@ -237,6 +251,58 @@ tools.send_email = {
   },
 };
 
+tools.log_decision = {
+  description: 'Record a decision whenever results fall short of the goal (for example too few qualified candidates, nobody free, a decline). State the situation, the options you considered, which one you chose and why. Then act on it.',
+  parameters: S('object', {
+    situation: { type: 'string' }, options: { type: 'array', items: { type: 'string' } },
+    choice: { type: 'string' }, reason: { type: 'string' },
+  }, ['situation', 'options', 'choice', 'reason']),
+  run: async (a, ctx) => {
+    const d = { situation: a.situation, options: a.options, choice: a.choice, reason: a.reason, at: new Date().toISOString() };
+    ctx.run.decisions = (ctx.run.decisions || []).concat(d);
+    ctx.emit({ type: 'decision', ...d });
+    return { ok: true, decisions: ctx.run.decisions.length };
+  },
+};
+
+tools.relax_requirement = {
+  description: 'Move one must-have skill to nice-to-have when nobody (or too few) meet every must-have. The job page updates. The first must-have is the core of the role and cannot be relaxed.',
+  parameters: S('object', { jobId: { type: 'string' }, skill: { type: 'string' }, reason: { type: 'string' } }, ['jobId', 'skill', 'reason']),
+  run: async ({ jobId, skill, reason }, ctx) => {
+    const job = store.db.jobs.find(j => j.id === jobId);
+    if (!job) return { ok: false, error: 'No such job' };
+    const k = skill.toLowerCase();
+    if (!job.requirements.includes(k)) return { ok: false, problems: [`"${skill}" is not a must-have. Must-haves: ${job.requirements.join(', ')}`] };
+    if (job.requirements[0] === k) return { ok: false, problems: [`"${skill}" is the core skill of this role and cannot be relaxed.`] };
+    job.requirements = job.requirements.filter(r => r !== k);
+    job.niceToHave = [...new Set([k, ...(job.niceToHave || [])])];
+    job.relaxed = [...(job.relaxed || []), { skill: k, reason, at: new Date().toISOString() }];
+    store.save();
+    return { ok: true, requirements: job.requirements, niceToHave: job.niceToHave, note: 'Re-run screen_candidates to apply the change.' };
+  },
+};
+
+tools.record_fit_judgement = {
+  description: 'Use your judgement on what a candidate actually wrote: if their profile shows a must-have in other words (e.g. "worked at a bubble tea shop" shows drinks preparation), record it with a verbatim quote from their bio. The quote is checked word for word. Re-run screen_candidates afterwards.',
+  parameters: S('object', {
+    jobId: { type: 'string' }, candidateId: { type: 'string' }, skill: { type: 'string' },
+    quote: { type: 'string', description: 'Exact sentence or phrase copied from the candidate bio' }, reasoning: { type: 'string' },
+  }, ['jobId', 'candidateId', 'skill', 'quote', 'reasoning']),
+  run: async ({ jobId, candidateId, skill, quote, reasoning }, ctx) => {
+    const job = store.db.jobs.find(j => j.id === jobId);
+    const s = store.db.students.find(x => x.id === candidateId);
+    if (!job || !s) return { ok: false, error: 'Unknown job or candidate' };
+    const k = skill.toLowerCase();
+    if (![...job.requirements, ...(job.niceToHave || [])].includes(k)) return { ok: false, problems: [`"${skill}" is not a skill this job asks for.`] };
+    if (!quote || !s.bio.includes(quote)) return { ok: false, problems: ['Quote must be copied word for word from the candidate bio.'] };
+    job.judged = job.judged || {};
+    job.judged[s.id] = { ...(job.judged[s.id] || {}), [k]: { quote, reasoning } };
+    store.save();
+    ctx.emit({ type: 'thought', text: `Judged ${s.name} has "${k}": "${quote}" (${reasoning})` });
+    return { ok: true };
+  },
+};
+
 tools.verify_hiring_outcome = {
   description: 'Final self-check before finishing: job page is live, pay is legal, screening verified, interviews fit both calendars without clashes, every .ics invite downloads and matches, and every shortlisted candidate got a correct invite email.',
   parameters: S('object', { jobId: { type: 'string' } }, ['jobId']),
@@ -253,7 +319,11 @@ tools.verify_hiring_outcome = {
       ctx.run.screeningVerified ? 'All scores matched on recompute' : 'verify_screening has not passed');
 
     const ivs = store.db.interviews.filter(i => i.jobId === jobId && (ctx.run.interviews || []).includes(i.id));
-    add('At least one interview booked', ivs.length > 0, `${ivs.length} booked`);
+    add('At least one interview booked, or why not explained', ivs.length > 0 || (ctx.run.decisions || []).some(d => /^Stop|Leave/.test(d.choice)), `${ivs.length} booked`);
+    const goal = ctx.run.goal || 0;
+    if (goal) add(`Goal of ${goal} interviews met, or the shortfall explained`, ivs.length >= goal || (ctx.run.decisions || []).length > 0,
+      ivs.length >= goal ? `${ivs.length} of ${goal} booked` : `${ivs.length} of ${goal} booked; ${(ctx.run.decisions || []).length} decision(s) logged`);
+    add('Nobody who declined was rebooked', ivs.filter(i => i.status !== 'declined').every(i => !store.db.interviews.some(x => x.jobId === jobId && x.studentId === i.studentId && x.status === 'declined')), 'checked against declines');
     const sorted = [...ivs].sort((a, b) => a.start.localeCompare(b.start));
     const clash = sorted.some((x, i) => i && new Date(x.start) < new Date(sorted[i - 1].end));
     add('No two interviews overlap', !clash, sorted.map(i => `${i.name}: ${i.when}`).join('; '));
@@ -399,7 +469,8 @@ tools.finish = {
   },
 };
 
-const HIRER_TOOLS = ['set_plan', 'check_minimum_wage', 'publish_job', 'find_candidates', 'screen_candidates', 'verify_screening', 'schedule_interviews', 'send_email', 'verify_hiring_outcome', 'finish'];
+const HIRER_TOOLS = ['set_plan', 'check_minimum_wage', 'publish_job', 'find_candidates', 'screen_candidates', 'record_fit_judgement', 'verify_screening',
+  'log_decision', 'relax_requirement', 'schedule_interviews', 'send_email', 'verify_hiring_outcome', 'finish'];
 const STUDENT_TOOLS = ['set_plan', 'register_student', 'search_jobs', 'check_minimum_wage', 'apply_to_job', 'verify_applications', 'finish'];
 
 module.exports = { tools, HIRER_TOOLS, STUDENT_TOOLS, MINIMUM_MATCH, jobUrl };

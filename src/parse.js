@@ -70,8 +70,10 @@ function hirer(prompt) {
   const weekend = Object.keys(schedule).every(d => d === 'Sat' || d === 'Sun');
   const req = [...role.req];
   const nice = [...role.nice];
-  for (const s of SKILL_WORDS) if (t.includes(s) && !req.includes(s) && !nice.includes(s)) {
-    if (new RegExp(`(must|need|required?)[^.]{0,30}${s}`).test(t)) req.push(s); else nice.push(s);
+  for (const s of SKILL_WORDS) if (t.includes(s) && !req.includes(s)) {
+    // "must have latte art and Mandarin" makes both must-haves, even ones the role lists as nice-to-have.
+    if (new RegExp(`(must|need|required?)[^.,]{0,40}${s}`).test(t)) { req.push(s); if (nice.includes(s)) nice.splice(nice.indexOf(s), 1); }
+    else if (!nice.includes(s)) nice.push(s);
   }
   if (role.title === 'Tutor') {
     for (const subj of ['mathematics', 'physics', 'english', 'mandarin']) {

@@ -136,3 +136,13 @@ table.rank tr.illegal td { opacity: .65; }
 .card.app.interview { border-color: var(--good); }
 .card.app.not_selected { opacity: .75; }
 .plain { margin: 4px 0; padding-left: 18px; }
+
+/* Agent decisions (replanning) */
+.ev.decision { background: var(--soft); border-left-color: var(--brand); }
+.ev.decision .opts { margin: 6px 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+.ev.decision .opts .chosen { color: var(--ink); font-weight: 700; }
+.ev.decision .opts .chosen::marker { content: '✓  '; color: var(--brand); }
+.ev.decision p { margin: 4px 0; }
+.iv-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 6px; }
+.btn.danger { color: var(--bad); border-color: var(--bad); }
+.person.declined { opacity: .7; }

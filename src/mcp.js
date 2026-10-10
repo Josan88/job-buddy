@@ -8,7 +8,7 @@ const { tools } = require('./tools');
 const PROTOCOL = '2025-06-18';
 const sessions = new Map(); // mcp session id -> run used by granular tools
 
-const GRANULAR = ['check_minimum_wage', 'publish_job', 'find_candidates', 'screen_candidates', 'verify_screening',
+const GRANULAR = ['check_minimum_wage', 'publish_job', 'find_candidates', 'screen_candidates', 'record_fit_judgement', 'verify_screening', 'log_decision', 'relax_requirement',
   'schedule_interviews', 'send_email', 'verify_hiring_outcome', 'register_student', 'search_jobs', 'apply_to_job', 'verify_applications'];
 
 const HIGH_LEVEL = [

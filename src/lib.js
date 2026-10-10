@@ -160,14 +160,16 @@ function scoreMatch(job, person) {
   const evidence = [];
   const missing = [];
 
+  const judged = (job.judged || {})[person.id] || {};
+  const find = r => evidenceFor(person, r) || (judged[r] && person.bio?.includes(judged[r].quote) ? { quote: judged[r].quote, source: 'bio', judged: true } : null);
   let reqHit = 0;
   for (const r of req) {
-    const ev = evidenceFor(person, r);
+    const ev = find(r);
     if (ev) { reqHit++; evidence.push({ skill: r, required: true, ...ev }); } else missing.push(r);
   }
   let niceHit = 0;
   for (const r of nice) {
-    const ev = evidenceFor(person, r);
+    const ev = find(r);
     if (ev) { niceHit++; evidence.push({ skill: r, required: false, ...ev }); }
   }
   const skills = req.length ? Math.round((35 * reqHit) / req.length) : 35;

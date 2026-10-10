@@ -5,6 +5,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const EXAMPLES = {
   hirer: [
     'Need a weekend barista in Subang, RM12/hr, start next week',
+    'Need 3 weekend baristas in Cyberjaya, must have latte art and Mandarin, RM13/hr',
     'Hiring 2 part-time cashiers for my bakery in Petaling Jaya, RM10/hr, weekends 10am-6pm',
     'Looking for an SPM maths tutor in Subang Jaya, RM30/hr, Saturday mornings',
     'Need a cashier for my kedai in USJ, RM7/hr, weekends',
@@ -21,6 +22,7 @@ const TOOL_LABEL = {
   schedule_interviews: 'Booking interviews', send_email: 'Sending email', verify_hiring_outcome: 'Self-check: final outcome',
   register_student: 'Creating your profile', search_jobs: 'Searching gigs', apply_to_job: 'Applying',
   verify_applications: 'Self-check: applications', finish: 'Delivering result',
+  relax_requirement: 'Relaxing a must-have', record_fit_judgement: 'Judging fit from what they wrote',
 };
 
 let persona = 'hirer';
@@ -76,7 +78,7 @@ function renderPlan(plan) {
 }
 
 function renderStats() {
-  $('#stats').textContent = `${stats.tools} tool calls · ${stats.passed}/${stats.checks} checks passed${stats.fixes ? ` · ${stats.fixes} self-fixes` : ''}`;
+  $('#stats').textContent = `${stats.tools} tool calls · ${stats.passed}/${stats.checks} checks passed${stats.decisions ? ` · ${stats.decisions} decision${stats.decisions === 1 ? '' : 's'}` : ''}${stats.fixes ? ` · ${stats.fixes} self-fixes` : ''}`;
 }
 
 const pending = new Map();
@@ -104,8 +106,13 @@ function render(e) {
     case 'thought':
       add(`<p>${linkify(esc(e.text))}</p>`, 'thought');
       break;
+    case 'decision':
+      stats.decisions = (stats.decisions || 0) + 1;
+      add(`<div class="tool-head"><b>Decision: ${esc(e.choice)}</b></div><p class="small">${esc(e.situation)}</p>
+        <ul class="opts">${e.options.map(o => `<li class="${o.startsWith(e.choice) ? 'chosen' : ''}">${esc(o)}</li>`).join('')}</ul><p><b>Why:</b> ${esc(e.reason)}</p>`, 'decision');
+      break;
     case 'tool_call': {
-      if (e.tool === 'set_plan') break;
+      if (e.tool === 'set_plan' || e.tool === 'log_decision') break;
       stats.tools++;
       const el = add(`<div class="tool-head"><span class="spin"></span><b>${esc(TOOL_LABEL[e.tool] || e.tool)}</b><code>${esc(e.tool)}</code></div>
         <details><summary>Input</summary><pre>${esc(JSON.stringify(e.args, null, 2))}</pre></details><div class="out"></div>`, 'tool');
@@ -113,7 +120,7 @@ function render(e) {
       break;
     }
     case 'tool_result': {
-      if (e.tool === 'set_plan') break;
+      if (e.tool === 'set_plan' || e.tool === 'log_decision') break;
       const el = pending.get(e.tool) || add('', 'tool');
       pending.delete(e.tool);
       el.classList.add(e.ok ? 'ok' : 'fail');
@@ -163,8 +170,8 @@ function pretty(tool, r, ok) {
     case 'find_candidates':
       return `<p>${r.count} candidates in range${r.excludedOutOfRange ? `, ${r.excludedOutOfRange} too far` : ''}.</p><p class="chips">${r.candidates.map(c => `<span class="chip">${esc(c.name)} · ${esc(c.area)}${c.applied ? ' · applied' : ''}</span>`).join('')}</p>`;
     case 'screen_candidates':
-      return `<table class="rank"><tbody>${r.details.map((d, i) => `<tr><td>${i + 1}</td><td><b>${esc(d.name)}</b><div class="muted small">${esc(d.why)}</div>
-        <details class="evidence"><summary>Evidence</summary><ul>${(d.evidence || []).map(ev => `<li><span class="tag ${ev.required ? '' : 'soft'}">${esc(ev.skill)}</span> “${esc(ev.quote)}”</li>`).join('') || '<li class="muted">No matching skills found</li>'}</ul>
+      return `<table class="rank"><tbody>${r.details.map((d, i) => `<tr><td>${i + 1}</td><td><b>${esc(d.name)}</b>${d.qualified ? ' <span class="chip ok">qualified</span>' : ''}${d.unavailable ? ` <span class="chip">${esc(d.unavailable)}</span>` : ''}<div class="muted small">${esc(d.why)}</div>
+        <details class="evidence"><summary>Evidence</summary><ul>${(d.evidence || []).map(ev => `<li><span class="tag ${ev.required ? '' : 'soft'}">${esc(ev.skill)}</span> “${esc(ev.quote)}”${ev.judged ? ' <span class="muted small">(judged from their wording)</span>' : ''}</li>`).join('') || '<li class="muted">No matching skills found</li>'}</ul>
         <p class="small muted">Skills ${d.breakdown.skills}/35 · Nice-to-have ${d.breakdown.niceToHave}/5 · Availability ${d.breakdown.availability}/25 · Distance ${d.breakdown.distance}/15 · Experience ${d.breakdown.experience}/15 · Pay fit ${d.breakdown.payFit}/5</p></details></td>
         <td class="right">${bar(d.score)}</td></tr>`).join('')}</tbody></table>`;
     case 'verify_screening':
@@ -182,6 +189,10 @@ function pretty(tool, r, ok) {
       return `<table class="rank"><tbody>${r.results.map(j => `<tr class="${j.legalPay ? '' : 'illegal'}"><td><b><a href="${esc(j.url)}" target="_blank">${esc(j.title)}</a></b> · ${esc(j.business)}<div class="muted small">${esc(j.pay)} · ${esc(j.area)} · ${esc(j.why)}</div>${j.warning ? `<div class="bad small">${esc(j.warning)}</div>` : ''}</td><td class="right">${bar(j.score)}</td></tr>`).join('')}</tbody></table>`;
     case 'apply_to_job':
       return `<p>Applied to <b>${esc(r.job)}</b> at ${esc(r.business)}. Business notified via ${esc(r.businessNotified?.channel)}.</p>`;
+    case 'relax_requirement':
+      return `<p>Must-have now: ${r.requirements.map(x => `<span class="tag">${esc(x)}</span>`).join(' ')} · nice-to-have: ${r.niceToHave.map(x => `<span class="tag soft">${esc(x)}</span>`).join(' ')}</p>`;
+    case 'record_fit_judgement':
+      return '<p>Judgement recorded with a verbatim quote.</p>';
     case 'finish':
       return '<p>Result delivered.</p>';
     default:

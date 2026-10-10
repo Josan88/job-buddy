@@ -11,6 +11,7 @@ const STATUS = {
   interview: ['Interview booked', 'good'],
   applied: ['Applied', ''],
   not_selected: ['Not selected this round', 'bad'],
+  declined: ['You declined', ''],
 };
 
 let role = 'student';
@@ -47,13 +48,30 @@ async function showStudent(me) {
       const [label, cls] = STATUS[a.status];
       return `<article class="card app ${a.status}"><div class="app-top"><div><b><a href="${esc(a.url)}">${esc(a.title)}</a></b><div class="muted small">${esc(a.business)} · ${esc(a.area)} · ${esc(a.pay)}</div></div>
         <span class="badge ${cls}">${label}</span></div>
-        ${a.interview ? `<p class="when">${esc(a.interview.when)} · ${esc(a.interview.mode)}</p>${a.interview.meetUrl ? `<a class="btn" href="${esc(a.interview.meetUrl)}" target="_blank">Join video call</a> ` : ''}<a href="${esc(a.interview.ics)}">Add to calendar</a>` : ''}
+        ${a.status === 'interview' ? `<p class="when">${esc(a.interview.when)} · ${esc(a.interview.mode)}${a.interview.status === 'accepted' ? ' · <span class="good">Accepted</span>' : ''}</p>
+          <div class="iv-actions">${a.interview.meetUrl ? `<a class="btn" href="${esc(a.interview.meetUrl)}" target="_blank">Join video call</a>` : ''}<a href="${esc(a.interview.ics)}">Add to calendar</a>
+          ${a.interview.status !== 'accepted' ? `<button class="btn ghost" data-iv="${esc(a.interview.id)}" data-act="accept">Accept</button>` : ''}
+          <button class="btn ghost danger" data-iv="${esc(a.interview.id)}" data-act="decline">Can't make it</button></div>` : ''}
+        ${a.status === 'declined' ? `<p class="muted small">You declined ${esc(a.interview.when)}. HireBuddy offered the slot to the next best candidate.${a.interview.replanRunId ? ` <a href="/runs/${esc(a.interview.replanRunId)}">See what the agent did</a>` : ''}</p>` : ''}
         ${!a.applied && a.interview ? '<p class="muted small">The business found you in the talent pool and invited you.</p>' : ''}</article>`;
     }).join('') : '<p class="muted">No applications yet.</p>'}
+    <p id="iv-msg" class="muted small"></p>
     <h2>Open jobs for you</h2><p class="muted small"><a href="/about#demo-data">Demo data, modelled on real listings</a></p>
     ${d.open.map(j => `<a class="card row" href="${esc(j.url)}"><div><b>${esc(j.title)}</b><div class="muted small">${esc(j.business)} · ${esc(j.area)}${j.distanceKm != null ? ` (${j.distanceKm} km)` : ''} · ${esc(j.schedule)}</div></div>
       <div class="right"><span class="chip">${esc(j.pay)}</span><div class="small muted">match ${j.score}/100</div></div></a>`).join('') || '<p class="muted">No open jobs right now.</p>'}`;
+  document.querySelectorAll('[data-iv]').forEach(b => b.onclick = async () => {
+    const decline = b.dataset.act === 'decline';
+    if (decline && !confirm('Decline this interview? HireBuddy will offer your slot to the next best candidate.')) return;
+    b.disabled = true;
+    const r = await fetch(`/api/interviews/${encodeURIComponent(b.dataset.iv)}/${b.dataset.act}`, { method: 'POST' }).then(r => r.json());
+    if (decline && r.runId) {
+      $('#iv-msg').innerHTML = `Declined. The agent is booking the next best candidate now: <a href="/runs/${esc(r.runId)}">watch it work</a>.`;
+      setTimeout(() => showStudent(me).then(bindSwitch), 2500);
+    } else showStudent(me).then(bindSwitch);
+  });
 }
+
+function bindSwitch() { const b = $('#switch'); if (b) b.onclick = () => { setMe(null); showPicker(); }; }
 
 async function showOwner(me) {
   const d = await fetch(`/api/me/business?name=${encodeURIComponent(me.name)}`).then(r => r.json());
@@ -61,7 +79,9 @@ async function showOwner(me) {
     ${d.jobs.map(j => `<article class="card">
       <div class="app-top"><div><b><a href="${esc(j.url)}">${esc(j.title)}</a></b><div class="muted small">${esc(j.area)} · ${esc(j.pay)} · ${esc(j.schedule)}</div></div>
       ${j.runId ? `<a class="btn ghost" href="/runs/${esc(j.runId)}">How the agent did it</a>` : ''}</div>
-      ${j.interviews.length ? `<h3>Interviews booked</h3><div class="people">${j.interviews.map(i => `<div class="person"><div class="person-top"><b>${esc(i.name)}</b><span class="score-pill">${i.score}/100</span></div><div class="when">${esc(i.when)}</div><a href="${esc(i.ics)}">Add to calendar</a></div>`).join('')}</div>` : '<p class="muted">No interviews booked yet.</p>'}
+      ${j.interviews.length ? `<h3>Interviews booked</h3><div class="people">${j.interviews.map(i => i.status === 'declined'
+        ? `<div class="person declined"><div class="person-top"><b>${esc(i.name)}</b><span class="badge">Declined</span></div><div class="muted small">Was ${esc(i.when)}.${i.replanRunId ? ` <a href="/runs/${esc(i.replanRunId)}">Agent rebooked</a>` : ''}</div></div>`
+        : `<div class="person"><div class="person-top"><b>${esc(i.name)}</b><span class="score-pill">${i.score}/100</span></div><div class="when">${esc(i.when)}</div>${i.status === 'accepted' ? '<div class="good small">Accepted</div>' : ''}<a href="${esc(i.ics)}">Add to calendar</a></div>`).join('')}</div>` : '<p class="muted">No interviews booked yet.</p>'}
       ${j.applicants.length ? `<h3>Applicants</h3><ul class="plain">${j.applicants.map(a => `<li>${esc(a.name)} <span class="muted small">match ${a.score}/100</span></li>`).join('')}</ul>` : ''}
     </article>`).join('') || '<p class="muted">You have not published any jobs yet. Ask the agent to hire for you.</p>'}
     <p><a class="btn" href="/">Hire with one prompt</a></p>`;
@@ -75,7 +95,7 @@ async function show() {
   $('#view').hidden = false;
   $('#view').innerHTML = '<p class="muted">Loading…</p>';
   await (me.role === 'student' ? showStudent(me) : showOwner(me));
-  $('#switch').onclick = () => { setMe(null); showPicker(); };
+  bindSwitch();
 }
 
 show();

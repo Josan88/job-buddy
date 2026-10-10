@@ -135,7 +135,7 @@ async function route(req, res) {
       const s = store.db.students.find(x => x.id === a.studentId);
       return { applicationId: a.id, name: s?.name, area: s?.area, score: a.score, at: a.at };
     });
-    const interviews = store.db.interviews.filter(i => i.jobId === j.id).map(i => ({ name: i.name, when: i.when, start: i.start, ics: `${base}/ics/${i.id}.ics` }));
+    const interviews = store.db.interviews.filter(i => i.jobId === j.id).map(i => ({ name: i.name, when: i.when, start: i.start, status: i.status || 'booked', ics: `${base}/ics/${i.id}.ics` }));
     return json(res, 200, { ...j, url: `${base}/jobs/${j.id}`, applicants, interviews });
   }
   if (p === '/api/students') return json(res, 200, store.db.students.map(({ email, ...s }) => s));
@@ -161,11 +161,11 @@ async function route(req, res) {
       const app = store.db.applications.find(a => a.jobId === jid && a.studentId === s.id);
       const iv = store.db.interviews.filter(i => i.jobId === jid && i.studentId === s.id).pop();
       const roundDone = store.db.interviews.some(i => i.jobId === jid);
-      const status = iv ? 'interview' : roundDone ? 'not_selected' : 'applied';
+      const status = iv ? (iv.status === 'declined' ? 'declined' : 'interview') : roundDone ? 'not_selected' : 'applied';
       return {
         jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`, url: `${base}/jobs/${j.id}`,
         status, applied: !!app, appliedAt: app?.at || null, score: app?.score ?? L.scoreMatch(j, s).total,
-        interview: iv ? { when: iv.when, mode: iv.mode, meetUrl: iv.meetUrl || null, ics: `${base}/ics/${iv.id}.ics` } : null,
+        interview: iv ? { id: iv.id, when: iv.when, mode: iv.mode, status: iv.status || 'booked', meetUrl: iv.meetUrl || null, ics: `${base}/ics/${iv.id}.ics`, replanRunId: iv.replanRunId || null } : null,
         updatedAt: iv ? (store.db.emails.find(e => e.interviewId === iv.id)?.at || iv.start) : app?.at,
       };
     }).filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
@@ -185,11 +185,22 @@ async function route(req, res) {
         url: `${base}/jobs/${j.id}`, runId: j.runId || null, createdAt: j.createdAt || null,
         applicants: apps.map(a => ({ name: store.db.students.find(x => x.id === a.studentId)?.name, score: a.score, at: a.at }))
           .sort((a, b) => b.score - a.score),
-        interviews: ivs.map(i => ({ name: i.name, when: i.when, ics: `${base}/ics/${i.id}.ics`,
+        interviews: ivs.map(i => ({ name: i.name, when: i.when, ics: `${base}/ics/${i.id}.ics`, status: i.status || 'booked', replanRunId: i.replanRunId || null,
           score: L.scoreMatch(j, store.db.students.find(x => x.id === i.studentId) || {}).total })),
       };
     });
     return json(res, 200, { business: name, jobs });
+  }
+  // A student answers their invite. Declining hands the slot back to the agent, which books the next best candidate.
+  if ((m = p.match(/^\/api\/interviews\/([\w-]+)\/(accept|decline)$/)) && req.method === 'POST') {
+    const iv = store.db.interviews.find(i => i.id === m[1]);
+    if (!iv) return json(res, 404, { error: 'not found' });
+    if (iv.status === 'declined') return json(res, 409, { error: 'already declined', runId: iv.replanRunId || null });
+    if (m[2] === 'accept') { iv.status = 'accepted'; store.save(); return json(res, 200, { ok: true, status: iv.status }); }
+    iv.status = 'declined';
+    iv.declinedAt = new Date().toISOString();
+    const run = agent.replanAfterDecline(iv, base);
+    return json(res, 200, { ok: true, status: iv.status, runId: run.id, url: `${base}/runs/${run.id}` });
   }
   if (p === '/api/emails') return json(res, 200, store.db.emails.slice(-100).reverse());
   if (p === '/api/reset' && req.method === 'POST') {

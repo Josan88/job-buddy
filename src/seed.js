@@ -86,6 +86,14 @@ const students = [
     availability: { Sat: ['08:00-18:00'], Sun: ['08:00-18:00'] },
     bio: 'Logistics student with a B2 motorcycle and D car driving license. Packed and dispatched e-commerce orders at a warehouse in Klang during holidays.',
   },
+  {
+    // Her drinks experience is written in her own words, not keywords: keyword rules miss it, a model reading the bio catches it.
+    id: 'stu-chloe', name: 'Chloe Ng', email: 'chloe.ng@example.com', area: 'Cyberjaya',
+    campus: 'Multimedia University', expectedRate: 12,
+    skills: ['customer service', 'mandarin', 'english', 'bahasa melayu'],
+    availability: { Sat: ['08:00-16:00'], Sun: ['08:00-16:00'] },
+    bio: 'Diploma student. Worked a year at a bubble tea kiosk in Cyberjaya that also sells lattes: I pulled the shots, steamed the milk and poured hearts and rosettas on top. Took orders at the counter in Mandarin, Malay and English.',
+  },
 ];
 
 // Open gigs posted by other small businesses (for the student flow).

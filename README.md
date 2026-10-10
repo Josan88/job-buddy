@@ -41,6 +41,14 @@ The agent builds her profile and ranks the open gigs. It **skips jobs that pay b
 - **From WorkBuddy:** see [WorkBuddy setup](#workbuddy-setup).
 - **From a terminal:** `node workbuddy/hirebuddy-skill/scripts/hirebuddy.js "Need a weekend barista in Subang, RM12/hr"`
 
+## What makes it an agent, not a button
+
+The goal is 3 booked interviews with people who meet every must-have. Each time a round falls short, the agent simulates its options (widen the radius from 10 to 20 or 30 km, relax one non-core must-have, look 14 days ahead, or stop and report the closest near misses), picks the one that actually adds qualified candidates, logs the decision with its reason (`log_decision`, shown as a card in the run), and screens again.
+
+- **Demo prompt:** `Need 3 weekend baristas in Cyberjaya, must have latte art and Mandarin, RM13/hr`. Nobody within 10 km qualifies, so it widens to 20 km. Nobody has both latte art and Mandarin, so it relaxes Mandarin (the option that qualifies two people), books them, and reports who came closest.
+- **Decline:** on My page a student can tap *Can't make it*. The agent starts a new run, books the next best candidate (never someone who declined), emails them and re-verifies.
+- **With `LLM_API_KEY`:** the model makes these choices itself and can judge fit from a student's own words with `record_fit_judgement` (for example Chloe Ng's "poured hearts and rosettas" counts as latte art). The quote is checked word for word. Without a key, the rule-based planner does the same loop.
+
 ## Architecture
 
 ```
