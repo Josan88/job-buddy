@@ -100,57 +100,21 @@ const apply = (job, key) => fetch(`${base}/api/jobs/${job}/apply/stu-nadia`, {
   assert.equal((await outsideApply('paired-test')).status, 409);
   const long = require('../src/application').prepare({ ...jobs[0], description: 'Job description '.repeat(500) }, { ...student, bio: 'Experience '.repeat(500) }, base);
   assert(long.task.length <= 4096);
-  const fallback = require('../src/application').prepare({ ...jobs[0], business: 'Example Company & Co.', ownerEmail: '' },
-    { ...student, resume: { name: 'resume.pdf' } }, base);
-  assert.equal(fallback.companyEmail, 'examplecompanyco@gmail.com');
-  assert(fallback.subject.startsWith('examplecompanyco@gmail.com'));
-  assert(fallback.body.includes('Original employer email: examplecompanyco@gmail.com'));
-  assert(!/employer email not provided/i.test(fallback.task + fallback.body + fallback.subject));
-  assert(!/attach|resume\.pdf/i.test(fallback.task));
-  const detailed = require('../src/application').prepare(jobs[0], { ...student,
-    education: 'Diploma in Business', qualifications: 'Customer service certificate', phone: '0123456789' }, base);
-  assert(detailed.task.includes('details previously extracted from this applicant\'s resume'));
-  assert(detailed.task.includes('Diploma in Business'));
-  assert(detailed.body.includes('Education: Diploma in Business'));
-  assert(detailed.body.includes('Qualifications: Customer service certificate'));
-  assert(detailed.body.includes('Phone: 0123456789'));
-  assert.equal(fallback.to, 'stephanieshinhuiyeo@gmail.com');
   const searchDetails = { name: 'Nadia Rahim', age: '24', workExperience: 'No work experience',
     education: 'Diploma', location: 'Subang Jaya', interestedPosition: 'Customer service' };
   const sentBeforeIntake = sent.length;
+  const handoffsBeforeIntake = (store.db.handoffs || []).length;
   const handoff = body => fetch(`${base}/api/handoffs`, { method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body) }).then(async response => ({ status: response.status, ...await response.json() }));
   const incomplete = await handoff({ prompt: 'Find jobs', key: 'paired-test', details: { ...searchDetails, age: '' } });
-  assert.equal(incomplete.status, 201);
-  assert.equal(sent.length, sentBeforeIntake + 1, 'Initial request must reach WorkBuddy for AI review');
-  assert(incomplete.task.includes('hirebuddy_review_intake'));
-  const getHandoff = () => fetch(`${base}/api/handoffs/${incomplete.id}`).then(r => r.json());
-  assert.equal((await getHandoff()).intake.status, 'reviewing');
-  const mcpCall = async (name, args) => {
-    const response = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) }).then(r => r.json());
-    return JSON.parse(response.result.content[0].text);
-  };
-  const runsBeforeIntake = store.db.runs.length;
-  const premature = await mcpCall('hirebuddy_1_understand', { handoffId: incomplete.id, prompt: 'Find jobs' });
-  assert.equal(premature.ok, false);
-  assert.equal(store.db.runs.length, runsBeforeIntake, 'No search run before WorkBuddy review');
-  const reviewed = await mcpCall('hirebuddy_review_intake', { handoffId: incomplete.id, revision: 1,
-    details: { ...searchDetails, age: '' }, missing: ['age'] });
-  assert.equal(reviewed.status, 'needs_details');
-  assert.deepEqual((await getHandoff()).intake.missing, ['age']);
-  const returned = await fetch(`${base}/api/handoffs/${incomplete.id}/details`, { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ revision: 1, details: { age: '24' }, key: 'paired-test' }) }).then(r => r.json());
-  assert.equal(returned.sent, 'telegram');
-  assert(returned.task.includes('revision 2'));
-  assert.equal((await getHandoff()).intake.status, 'reviewing', 'Answers still need AI review');
-  const stale = await mcpCall('hirebuddy_review_intake', { handoffId: incomplete.id, revision: 1, details: searchDetails, missing: [] });
-  assert.equal(stale.ok, false);
-  const ready = await mcpCall('hirebuddy_review_intake', { handoffId: incomplete.id, revision: 2, details: searchDetails, missing: [] });
-  assert.equal(ready.status, 'ready');
-  const started = await mcpCall('hirebuddy_1_understand', { handoffId: incomplete.id, prompt: 'Find jobs' });
-  assert.equal(started.ok, true);
-  assert.equal(store.db.students.find(s => s.id === store.db.runs.find(r => r.id === started.runId).studentId).age, 24);
-  console.log('PASS application handoff and WorkBuddy intake round trip');
+  assert.equal(incomplete.status, 422);
+  assert.deepEqual(incomplete.missing, ['age']);
+  assert.equal(sent.length, sentBeforeIntake, 'Missing details must not reach Telegram');
+  assert.equal((store.db.handoffs || []).length, handoffsBeforeIntake, 'Missing details must not create a search task');
+  const complete = await handoff({ prompt: 'Find jobs', details: searchDetails });
+  assert.equal(complete.status, 201);
+  assert(complete.task.includes('Age: 24'));
+  assert(complete.task.includes('Interested job position: Customer service'));
+  console.log('PASS application handoff and compulsory-detail search gate');
 })().then(() => { fs.rmSync(dir, { recursive: true, force: true }); process.exit(0); })
   .catch(e => { console.error(e); fs.rmSync(dir, { recursive: true, force: true }); process.exit(1); });

@@ -295,8 +295,6 @@ $('#tg-test').onclick = async () => {
 // Hand the sentence to WorkBuddy: make a task to paste, then follow the run here once WorkBuddy starts it.
 let intakePrompt = '';
 let intakeDetails = {};
-let intakeHandoff = null;
-let handoffFollowGeneration = 0;
 $('#handoff').onclick = async () => {
   const prompt = $('#prompt').value.trim();
   const err = $('#prompt-error');
@@ -307,29 +305,45 @@ $('#handoff').onclick = async () => {
     return $('#prompt').focus();
   }
   err.hidden = true;
-  if (intakePrompt !== prompt) { intakePrompt = prompt; intakeDetails = {}; intakeHandoff = null; $('#intake-fields').innerHTML = ''; $('#applicant-intake').hidden = true; }
+  if (intakePrompt !== prompt) { intakePrompt = prompt; intakeDetails = {}; $('#intake-fields').innerHTML = ''; }
   document.querySelectorAll('[data-intake-field]').forEach(input => { intakeDetails[input.dataset.intakeField] = input.value.trim(); });
   let studentId;
   try { const me = JSON.parse(localStorage.getItem('hirebuddy.me')); if (me?.role === 'student') studentId = me.id; } catch {}
+  let collected;
+  try {
+    collected = await fetch('/api/job-search/details', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt, studentId, details: intakeDetails }) }).then(r => r.json());
+  } catch {
+    err.hidden = false;
+    err.textContent = 'Could not check your details. Check your connection and try again.';
+    announce(err.textContent);
+    return $('#handoff').focus();
+  }
+  intakeDetails = collected.details;
+  if (!collected.complete) {
+    $('#applicant-intake').hidden = false;
+    $('#intake-fields').innerHTML = collected.missing.map(key => `<p><label for="intake-${key}">${esc(collected.labels[key])}</label><input id="intake-${key}" data-intake-field="${key}" ${key === 'age' ? 'type="number" min="1" max="120"' : 'type="text"'} aria-describedby="intake-help" required></p>`).join('');
+    const help = `Before finding jobs, please provide: ${collected.missing.map(key => collected.labels[key]).join(', ')}. Then press Hand it to WorkBuddy again. No work experience is an accepted answer.`;
+    $('#intake-help').textContent = help;
+    announce(help);
+    $('#intake-fields input').focus();
+    return;
+  }
+  $('#applicant-intake').hidden = true;
   // One hand-off at a time: a second press (or a stray Enter) while this one is under way does nothing.
   if ($('#handoff').getAttribute('aria-disabled') === 'true') return;
   $('#handoff').setAttribute('aria-disabled', 'true');
   progressSound.start();
   setTimeout(() => $('#handoff').removeAttribute('aria-disabled'), 15000);
   if (tgKey()) announce('Sending to WorkBuddy through Telegram.');
-  const url = intakeHandoff ? `/api/handoffs/${intakeHandoff.id}/details` : '/api/handoffs';
-  const h = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, studentId,
-    details: intakeDetails, revision: intakeHandoff?.revision, key: tgKey() || undefined }) }).then(r => r.json()).catch(() => null);
+  const h = await fetch('/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, studentId, details: intakeDetails, key: tgKey() || undefined }) }).then(r => r.json()).catch(() => null);
   if (!h?.task) {
     progressSound.stop();
     $('#handoff').removeAttribute('aria-disabled');
     err.hidden = false;
-    err.textContent = h?.error || 'Error: HireBuddy could not make the task. Check your internet connection and try again.';
+    err.textContent = 'Error: HireBuddy could not make the task. Check your internet connection and try again.';
     return $('#handoff').focus();
   }
-  intakeHandoff = null;
-  $('#applicant-intake').hidden = true;
-  $('#handoff').textContent = tgKey() ? 'Hand it to WorkBuddy on Telegram' : 'Hand it to WorkBuddy';
   $('#handoff-task').value = h.task;
   $('#handoff-panel').hidden = false;
   $('#handoff-copy').onclick = () => navigator.clipboard.writeText(h.task).catch(() => $('#handoff-task').select());
@@ -372,11 +386,9 @@ $('#handoff').onclick = async () => {
 // Follow the run here as soon as WorkBuddy starts it with the person's sentence (for up to 20 minutes).
 // When the task went through Telegram (sentAt), also show what WorkBuddy replies there while we wait.
 async function followHandoff(id, notStarted, sentAt) {
-  const generation = ++handoffFollowGeneration;
   let heard = 0;
   for (let i = 0; i < 600; i++) {
     await new Promise(r => setTimeout(r, 2000));
-    if (generation !== handoffFollowGeneration) return;
     if (sentAt && i % 3 === 2) {
       const fresh = repliesSince(await tgCall(), sentAt);
       showReplies($('#handoff-replies'), $('#handoff-replies-title'), fresh);
@@ -384,22 +396,6 @@ async function followHandoff(id, notStarted, sentAt) {
       heard = fresh.length;
     }
     const st = await fetch(`/api/handoffs/${id}`).then(r => r.json()).catch(() => null);
-    if (generation !== handoffFollowGeneration) return;
-    if (st?.intake?.status === 'needs_details') {
-      progressSound.stop();
-      intakeHandoff = { id, revision: st.intake.revision };
-      intakeDetails = st.intake.answers || {};
-      $('#applicant-intake').hidden = false;
-      $('#intake-fields').innerHTML = st.intake.missing.map(key => `<p><label for="intake-${key}">${esc(st.labels[key])}</label><input id="intake-${key}" data-intake-field="${key}" type="text" value="${esc(intakeDetails[key] || '')}" aria-describedby="intake-help"></p>`).join('');
-      const help = `WorkBuddy needs these details before searching for jobs: ${st.intake.missing.map(key => st.labels[key]).join(', ')}. Enter your answers, then send them back to WorkBuddy. No work experience is a valid answer.`;
-      $('#intake-help').textContent = help;
-      $('#handoff').removeAttribute('aria-disabled');
-      $('#handoff').textContent = 'Send details back to WorkBuddy';
-      $('#handoff-status').textContent = 'WorkBuddy is waiting for your missing details. Job searching has not started.';
-      announce(help);
-      $('#intake-fields input')?.focus();
-      return;
-    }
     if (st?.runId) {
       announce('WorkBuddy has started. Following it here.');
       history.pushState({}, '', `/runs/${st.runId}`);

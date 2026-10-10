@@ -5,7 +5,6 @@ const store = require('./store');
 const agent = require('./agent');
 const { tools } = require('./tools');
 const { steps } = require('./steps');
-const intake = require('./intake');
 
 const PROTOCOL = '2025-06-18';
 const sessions = new Map(); // mcp session id -> run used by granular tools
@@ -14,10 +13,6 @@ const GRANULAR = ['check_minimum_wage', 'publish_job', 'find_candidates', 'scree
   'schedule_interviews', 'send_email', 'verify_hiring_outcome', 'register_student', 'search_jobs', 'apply_to_job', 'verify_applications'];
 
 const HIGH_LEVEL = [
-  { name: 'hirebuddy_review_intake', description: 'WorkBuddy reports its resume/prompt extraction and missing fields BEFORE scraping jobs. JobBuddy collects missing answers. Stop searching while waiting.',
-    inputSchema: { type: 'object', properties: { handoffId: { type: 'string' }, revision: { type: 'integer' },
-      details: { type: 'object', properties: Object.fromEntries(Object.keys(intake.FIELDS).map(key => [key, { type: 'string' }])), additionalProperties: false },
-      missing: { type: 'array', items: { type: 'string', enum: Object.keys(intake.FIELDS) } } }, required: ['handoffId', 'revision', 'details', 'missing'] } },
   {
     name: 'hirebuddy_run',
     description: 'For an EMPLOYER hiring staff: call this once with their words; it checks the wage is legal, publishes the job, screens candidates with quoted evidence, books interviews and emails them, and verifies. For a JOB SEEKER, use the four steps hirebuddy_1_understand to hirebuddy_4_verify instead, and use this only as a backup if those steps fail: one call does the whole seeker job (profile, checks every job including any listings you pass, applies, books 3 interviews, emails them time first, verifies). Never answer a job request from your own web search instead. Pass the user\'s words unchanged as prompt.',
@@ -73,13 +68,6 @@ function listTools(all) {
 const text = (obj, isError = false) => ({ content: [{ type: 'text', text: typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2) }], isError });
 
 async function callTool(name, args, sessionId, baseUrl) {
-  if (name === 'hirebuddy_review_intake') {
-    const ho = (store.db.handoffs || []).find(h => h.id === args.handoffId);
-    if (!ho) return text({ ok: false, error: 'Handoff not found.' }, true);
-    const result = intake.review(ho, args);
-    if (result.ok) store.save();
-    return text(result, !result.ok);
-  }
   if (name === 'hirebuddy_run') {
     const listings = Array.isArray(args.listings) && args.listings.length ? args.listings : null;
     const run = agent.newRun(args.prompt, args.persona || (listings ? 'student' : undefined), 'mcp', { business: args.business, ownerEmail: args.ownerEmail, listings });
@@ -151,7 +139,7 @@ async function handle(req, res, body, baseUrl, allTools = false) {
             protocolVersion: m.params?.protocolVersion || PROTOCOL,
             capabilities: { tools: { listChanged: false } },
             serverInfo: { name: 'hirebuddy', title: 'HireBuddy hiring agent', version: '1.0.0' },
-            instructions: 'For a job seeker: (for website handoffs, first review resume/prompt details with hirebuddy_review_intake and wait for missing answers), then call hirebuddy_1_understand, hirebuddy_2_check_jobs, hirebuddy_3_apply_and_book and hirebuddy_4_verify in order, following each result\'s next field without asking the user, then save the files it returns. For an employer, call hirebuddy_run ONCE with the user\'s words. Never answer a job search with your own report instead: the request is only complete after hirebuddy_4_verify (or hirebuddy_run) returns. For a job seeker, once WorkBuddy has checked all six required applicant details, search real job sites (JobStreet, Indeed, Hiredly, Maukerja) and pass up to 5 listings you found, copied as written, as listings in that same call. It completes the whole job (publish, screen, book interviews, email, verify) autonomously. Then report the outcome, self-checks and links. Never stop halfway or ask the user for the next step.',
+            instructions: 'For a job seeker: (optionally search real job sites first), then call hirebuddy_1_understand, hirebuddy_2_check_jobs, hirebuddy_3_apply_and_book and hirebuddy_4_verify in order, following each result\'s next field without asking the user, then save the files it returns. For an employer, call hirebuddy_run ONCE with the user\'s words. Never answer a job search with your own report instead: the request is only complete after hirebuddy_4_verify (or hirebuddy_run) returns. For a job seeker, if you can browse, first search real job sites (JobStreet, Indeed, Hiredly, Maukerja) and pass up to 5 listings you found, copied as written, as listings in that same call. It completes the whole job (publish, screen, book interviews, email, verify) autonomously. Then report the outcome, self-checks and links. Never stop halfway or ask the user for the next step.',
           } });
           break;
         case 'ping': reply({ result: {} }); break;
