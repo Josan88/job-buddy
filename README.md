@@ -144,6 +144,10 @@ MIT
 
 On Jobs and My details, use Tab to focus a job card and Enter to request an application through WorkBuddy's Telegram connection. Select your job seeker profile on My details and pair the browser using the Telegram hand-off key on Find work first. The public Jobs page falls back to the fictional Nadia demo profile when no profile has been selected.
 
-Application requests instruct WorkBuddy to send only to `stephanieshinhuiyeo@gmail.com`. The original company email is placed first in the subject and retained in the email body and stored application data, together with the job details, applicant profile, availability, accessibility/interview needs, and resume link when available. A successful Telegram hand-off does not confirm email delivery; WorkBuddy reports the actual send result through Telegram.
+Application requests instruct WorkBuddy to send only to `stephanieshinhuiyeo@gmail.com`. The original company email is placed first in the subject and retained in the email body and stored application data, together with the job details, applicant profile, availability, accessibility/interview needs, and resume link when available. A successful Telegram hand-off does not confirm email delivery; WorkBuddy reports the actual send result through Telegram. Failed hand-offs can be retried.
+
+Outside-site jobs in the completed search result also support Tab and Enter. They use the applicant profile belonging to that search. Only listings assessed as worth asking about offer the application action.
+
+Expand **Application debug console** at the bottom of the page after focusing or activating a card. The same events appear in the browser developer console with `[HireBuddy application]`. Server logs include a request ID, response status, recipient and Telegram message length; Telegram logs show acceptance or connection errors. Keys, sessions and application bodies are not logged. A 403 means pair the browser on Find work; a 503 means configure Telegram on the server; a 502 includes the Telegram failure reason. After editing the WorkBuddy skill, copy or reinstall that skill on the WorkBuddy computer so its selected-job instructions are current.
 
 Run `npm run test:application` to check keyboard activation, Telegram hand-off, recipient handling and duplicate protection using a mocked Telegram connection.

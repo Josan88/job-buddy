@@ -28,12 +28,16 @@ async function apply(button) {
 
 cards.forEach(card => {
   const button = card.querySelector('[data-apply-job]');
-  card.addEventListener('focus', () => window.HB.readControl(`${card.innerText} Press Enter to send this application.`));
+  card.addEventListener('focus', () => {
+    window.HB.debug('job card focused', { jobId: button.dataset.applyJob });
+    window.HB.readControl(`${card.innerText} Press Enter to send this application.`);
+  });
   button.addEventListener('click', () => apply(button));
   card.addEventListener('keydown', event => {
     if (event.key !== 'Enter' || event.target !== card || event.repeat) return;
     console.info('[HireBuddy application] Enter pressed on job card', { jobId: button.dataset.applyJob });
     event.preventDefault();
+    window.HB.debug('job card Enter', { jobId: button.dataset.applyJob });
     button.click();
   });
 });

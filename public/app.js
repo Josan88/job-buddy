@@ -331,6 +331,7 @@ async function followHandoff(id, notStarted, sentAt) {
 // ---------------------------------------------------------------------------
 
 function openRun(id, fresh) {
+  window.HB.resultRunId = id;
   $('#composer').hidden = true;
   $('#handoff-panel').hidden = true;
   $('#recent').hidden = true;
@@ -497,11 +498,12 @@ function showResult(e, live) {
       : '';
   const out = outcome.outside || [];
   const others = out.length ? `<h3>Jobs WorkBuddy found on other sites</h3>
-    <p>HireBuddy can't apply or book interviews on other sites, so nothing was sent. Each job worth asking about has an application ready for you to send.</p>
-    <ol class="joblist">${out.map((r, i) => `<li><h4>${r.url ? `<a href="${esc(r.url)}">${esc(r.title)}</a>` : esc(r.title)}${r.employer ? ` at ${esc(r.employer)}` : ''}${r.site ? `, on ${esc(r.site)}` : ''}</h4>
+    <p>Press Tab to focus a job card, then Enter to ask WorkBuddy on Telegram to email your application to the demo inbox.</p>
+    <ol class="joblist">${out.map((r, i) => `<li class="job-card" ${r.draft ? `tabindex="0" data-result-card aria-labelledby="outside-title-${i}" aria-describedby="outside-detail-${i}"` : ''}><h4 id="outside-title-${i}">${r.url ? `<a href="${esc(r.url)}">${esc(r.title)}</a>` : esc(r.title)}${r.employer ? ` at ${esc(r.employer)}` : ''}${r.site ? `, on ${esc(r.site)}` : ''}</h4>
+      <p id="outside-detail-${i}">${esc(r.location || '')} ${esc(r.pay || '')} ${esc(r.hours || '')}</p>
       <p><span class="status-word ${r.verdict === 'not suitable' ? 'bad' : 'good'}">${r.verdict === 'not suitable' ? 'Not suitable' : 'Worth asking'}</span>
       ${esc(r.verdict === 'not suitable' ? r.blockers.join('; ') : r.reasons.join('; '))}.</p>
-      ${r.draft ? `<details><summary>Application ready to send, with ${r.questions.length} question${r.questions.length === 1 ? '' : 's'} for ${esc(r.employer || 'the employer')}</summary>
+      ${r.draft ? `<p><button type="button" data-result-apply="${i}">Apply for ${esc(r.title)} at ${esc(r.employer || 'this company')} through Telegram</button></p><p data-application-status role="status" tabindex="-1"></p><details><summary>Application ready to send, with ${(r.questions || r.asks || []).length} question${(r.questions || r.asks || []).length === 1 ? '' : 's'} for ${esc(r.employer || 'the employer')}</summary>
         <pre id="draft-${i}">${esc(r.draft)}</pre><p><button type="button" class="secondary" data-copy="draft-${i}">Copy the application for ${esc(r.employer || r.title)}</button></p></details>` : ''}</li>`).join('')}</ol>` : '';
   const rest = lines.slice(1).filter(l => !/^\d+\. /.test(l) || !booked.length);
   $('#result-body').innerHTML = `<p><span class="status-word ${e.verified && !refused ? 'good' : 'bad'}">${refused ? 'Refused: pay is below the legal minimum' : e.verified ? 'Checked and verified' : ok ? 'Done' : 'Needs attention'}</span></p>
@@ -509,6 +511,7 @@ function showResult(e, live) {
     ${(outcome.decisions || []).length ? `<h3>Decisions made on the way</h3><ul>${outcome.decisions.map(d => `<li><b>${esc(d.choice)}.</b> ${esc(d.reason)}</li>`).join('')}</ul>` : ''}
     <p class="actions"><button type="button" class="secondary" id="read-aloud">Read aloud</button>${(e.links || []).map(l => `<a class="btn secondary" href="${esc(l.url)}">${esc(l.label)}</a>`).join('')}</p>`;
   $('#read-aloud').onclick = ev => window.HB.speak((e.summary || '').replace(/https?:\/\/\S+/g, 'the link'), ev.currentTarget);
+  window.HB.bindResultApplications($('#result-body'), window.HB.resultRunId);
   if (!('speechSynthesis' in window)) $('#read-aloud').remove();
   document.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
     try { await navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent); announce('Copied the application.'); b.textContent = 'Copied'; }

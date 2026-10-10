@@ -18,20 +18,68 @@ document.querySelectorAll('details.menu').forEach(m => {
 });
 
 window.HB = {
-  async sendApplication(jobId, studentId) {
+  debug(stage, details = {}) {
+    const line = `${new Date().toLocaleTimeString()} ${stage} ${JSON.stringify(details)}`;
+    console.info('[HireBuddy application]', stage, details);
+    let output = document.getElementById('application-debug-output');
+    if (!output) {
+      const panel = document.createElement('details');
+      panel.id = 'application-debug';
+      panel.className = 'panel';
+      const title = document.createElement('summary');
+      title.textContent = 'Application debug console';
+      output = document.createElement('pre');
+      output.id = 'application-debug-output';
+      output.style.whiteSpace = 'pre-wrap';
+      output.style.overflowWrap = 'anywhere';
+      panel.append(title, output);
+      document.querySelector('main').appendChild(panel);
+    }
+    output.textContent = (output.textContent + line + '\n').split('\n').slice(-60).join('\n');
+  },
+  async sendApplication(jobId, studentId, endpoint) {
     let key = '';
     try { key = localStorage.getItem('hirebuddy.telegramKey') || ''; } catch {}
+    const url = endpoint || `/api/jobs/${encodeURIComponent(jobId)}/apply/${encodeURIComponent(studentId)}`;
+    window.HB.debug('request', { url, paired: !!key });
     try {
-      const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/apply/${encodeURIComponent(studentId)}`, {
+      const response = await fetch(url, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key }),
       });
       const result = await response.json();
-      console.info('[HireBuddy application] HTTP response', { status: response.status, result });
+      window.HB.debug('response', { status: response.status, ok: !!result.ok, sent: result.sent, error: result.error, requestId: result.requestId });
       return result;
     } catch (error) {
-      console.error('[HireBuddy application] request failed', error);
+      window.HB.debug('network failure', { error: error.message });
       return { ok: false, error: 'The application request could not be sent. Check your connection and try again.' };
     }
+  },
+  bindResultApplications(root, runId) {
+    root.querySelectorAll('[data-result-apply]').forEach(button => {
+      const card = button.closest('[data-result-card]');
+      card.addEventListener('focus', () => {
+        window.HB.debug('result card focused', { runId, listing: button.dataset.resultApply });
+        window.HB.readControl(`${card.innerText}. Press Enter to request an application.`);
+      });
+      card.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' || event.target !== card || event.repeat) return;
+        event.preventDefault();
+        window.HB.debug('result card Enter', { runId, listing: button.dataset.resultApply });
+        button.click();
+      });
+      button.onclick = async () => {
+        if (button.disabled) return;
+        button.disabled = true;
+        window.HB.announce('Sending application request to Telegram.');
+        const result = await window.HB.sendApplication(null, null,
+          `/api/runs/${encodeURIComponent(runId)}/listings/${button.dataset.resultApply}/apply`);
+        const status = card.querySelector('[data-application-status]');
+        status.textContent = result.message || result.error || 'Application request failed.';
+        status.focus();
+        window.HB.announce(status.textContent);
+        if (!result.ok) button.disabled = false;
+      };
+    });
   },
   esc: s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
   // Polite announcement for screen readers through the page's live region.

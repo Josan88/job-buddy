@@ -29,6 +29,10 @@ function baseUrl(req) {
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function json(res, status, data) {
+  if (res.applicationRequestId) {
+    data.requestId = res.applicationRequestId;
+    console.info('[HireBuddy application]', JSON.stringify({ requestId: data.requestId, stage: 'response', status, sent: data.sent, error: data.error }));
+  }
   res.writeHead(status, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
   res.end(JSON.stringify(data));
 }
@@ -352,7 +356,36 @@ async function route(req, res) {
     return json(res, 200, { ok: true, status: iv.status, runId: run.id, url: `${base}/runs/${run.id}` });
   }
   if (p === '/api/emails') return json(res, 200, store.db.emails.slice(-100).reverse());
+  if ((m = p.match(/^\/api\/runs\/([\w-]+)\/listings\/(\d+)\/apply$/)) && req.method === 'POST') {
+    res.applicationRequestId = store.id('request');
+    console.info('[HireBuddy application]', JSON.stringify({ requestId: res.applicationRequestId, stage: 'received', runId: m[1], listing: m[2] }));
+    const body = JSON.parse(await readBody(req) || '{}');
+    if (!telegram.configured()) return json(res, 503, { ok: false, error: 'Telegram is not set up. Configure Telegram before sending an application.' });
+    if (!telegram.keyOk(body.key)) return json(res, 403, { ok: false, error: 'Pair this browser with Telegram on Find work before sending an application.' });
+    const run = store.db.runs.find(r => r.id === m[1]);
+    const listing = run?.outside?.[Number(m[2])];
+    const student = store.db.students.find(s => s.id === run?.studentId);
+    if (!listing || !student) return json(res, 404, { ok: false, error: 'Listing or applicant profile not found for this result.' });
+    if (listing.verdict === 'not suitable') return json(res, 409, { ok: false, error: 'This listing does not suit your needs.' });
+    const requestId = `${run.id}:outside:${m[2]}`;
+    if (listing.applicationHandoff || pendingApplications.has(requestId)) return json(res, 409, { ok: false, error: 'This application has already been requested.' });
+    pendingApplications.add(requestId);
+    try {
+      const data = application.prepare({ id: requestId, title: listing.title, business: listing.employer || 'Hiring team',
+        ownerEmail: listing.companyEmail, url: listing.url, description: listing.description,
+        area: listing.location, pay: listing.pay, hours: listing.hours, questions: listing.asks }, student, base);
+      console.info('[HireBuddy application]', JSON.stringify({ requestId: res.applicationRequestId, stage: 'sending Telegram', recipient: data.to, characters: data.task.length }));
+      await telegram.send(data.task);
+      listing.applicationHandoff = { at: new Date().toISOString(), status: 'sent to Telegram', applicationData: data };
+      store.save();
+      return json(res, 200, { ok: true, sent: 'telegram', message: `Application request for ${listing.title} sent to WorkBuddy on Telegram, addressed only to ${mail.APPLICATION_INBOX}. Email delivery is not yet confirmed.` });
+    } catch (e) {
+      return json(res, 502, { ok: false, error: `Could not send the application request to Telegram: ${e.message}` });
+    } finally { pendingApplications.delete(requestId); }
+  }
   if ((m = p.match(/^\/api\/jobs\/([\w-]+)\/apply\/([\w-]+)$/)) && req.method === 'POST') {
+    res.applicationRequestId = store.id('request');
+    console.info('[HireBuddy application]', JSON.stringify({ requestId: res.applicationRequestId, stage: 'received', jobId: m[1], studentId: m[2] }));
     const body = JSON.parse(await readBody(req) || '{}');
     console.log('[HireBuddy application] Telegram handoff request', { jobId: m[1], studentId: m[2], paired: telegram.keyOk(body.key) });
     if (!telegram.configured()) return json(res, 503, { ok: false, error: 'Telegram is not set up. Configure Telegram before sending an application.' });
@@ -369,9 +402,10 @@ async function route(req, res) {
     if (!wage.ok || fit.fit === 'not suitable') return json(res, 409, { ok: false, error: !wage.ok ? wage.message : `This job does not suit your needs: ${fit.blockers.join('; ')}.` });
     const requestId = `${j.id}:${s.id}`;
     if (pendingApplications.has(requestId)) return json(res, 409, { ok: false, error: 'This application is already being sent to Telegram.' });
-    const data = application.prepare(j, s, base);
     pendingApplications.add(requestId);
     try {
+      const data = application.prepare(j, s, base);
+      console.info('[HireBuddy application]', JSON.stringify({ requestId: res.applicationRequestId, stage: 'sending Telegram', recipient: data.to, characters: data.task.length }));
       await telegram.send(data.task);
       store.db.applications.push({ id: store.id('app'), jobId: j.id, studentId: s.id,
         coverNote: data.body, applicationData: data, at: new Date().toISOString(),

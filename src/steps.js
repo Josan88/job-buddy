@@ -62,7 +62,7 @@ steps.hirebuddy_1_understand = {
     properties: {
       prompt: { type: 'string', description: 'The user\'s words, unchanged' },
       daily: { type: 'boolean', description: 'true for the scheduled background check: look only for NEW jobs and book up to 3 new interviews; a day with nothing new is a normal result' },
-      listings: { type: 'array', maxItems: 20, description: 'Optional: jobs you found on real job sites, copied as written (title, employer, site, url, pay, location, hours, description). Leave out anything you did not see.', items: { type: 'object' } },
+      listings: { type: 'array', maxItems: 20, description: 'Optional: jobs you found on real job sites, copied as written (title, employer, companyEmail, site, url, pay, location, hours, description). Leave out anything you did not see.', items: { type: 'object' } },
     },
     required: ['prompt'],
   },

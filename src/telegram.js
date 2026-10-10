@@ -59,14 +59,20 @@ const sendOnce = async text => (await client()).sendMessage(BOT, { message: text
 // One send at a time and at most one every 10 seconds, like the bridge: a double press must not start two runs.
 let lastSend = 0;
 async function send(text) {
+  console.info('[HireBuddy Telegram]', JSON.stringify({ stage: 'send requested', configured: configured(), characters: text.length, bot: BOT || null }));
+  if (!configured()) throw new Error('Telegram credentials, bot, or hand-off key are missing.');
+  if (text.length > 4096) throw new Error('Telegram message exceeds 4096 characters.');
   if (Date.now() - lastSend < 10000) throw new Error('Another message was sent to WorkBuddy a moment ago. Wait 10 seconds and try again.');
   lastSend = Date.now();
   try {
-    await within(20000, sendOnce(text));
+    const message = await within(20000, sendOnce(text));
+    console.info('[HireBuddy Telegram]', JSON.stringify({ stage: 'message accepted', messageId: message.id }));
   } catch (e) {
     // After the free tier sleeps the connection can be stale: reconnect once and retry.
     reconnect();
-    await within(20000, sendOnce(text));
+    console.warn('[HireBuddy Telegram]', JSON.stringify({ stage: 'reconnecting after failure', error: e.message }));
+    const message = await within(20000, sendOnce(text));
+    console.info('[HireBuddy Telegram]', JSON.stringify({ stage: 'message accepted after reconnect', messageId: message.id }));
   }
   state.lastSent = new Date().toISOString();
 }
