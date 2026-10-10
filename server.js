@@ -75,11 +75,11 @@ function page(title, inner, { current = '', scripts = '', description = 'HireBud
 </div></header>
 <div id="announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 <details class="panel voice-guide" open><summary>Voice command guide</summary>
-<p>Press Space, say a button, navigation tab, or section name, then press Enter. The matching item receives focus; press Enter again to select it.</p>
-<p>Say “What can I say?” or “Help” to hear the controls and sections available on the current page. Say “Stop” to stop speech.</p></details>
+<p>Press Space, then say a button, navigation tab, option, or section name. The matching item receives focus; press Enter to select a button, tab, or option.</p>
+<p>Say “What can I say?” or “Help” to hear how voice commands work and the navigation tabs, buttons, options, and sections available on the current page. Say “Stop” to stop speech.</p></details>
 <main id="main" tabindex="-1">${inner}</main>
 <footer><p>Built to work with screen readers (NVDA, JAWS, VoiceOver, TalkBack), with a keyboard alone, and at large text sizes. People and employers in this demo are fictional.</p></footer>
-<script src="/common.js?v=20261011-8"></script>${scripts}
+<script src="/common.js?v=20261011-9"></script>${scripts}
 </body></html>`;
 }
 

@@ -224,8 +224,10 @@ document.addEventListener('focusin', event => {
   window.HB.readControl(`${name}. Navigation tab. Press Enter to select.`);
 });
 
-// Voice commands: press Alt+V (or the "Voice command" button), say a button's name, such as
-// "Hand it to WorkBuddy", "first example" or "read aloud", then press Enter. "What can I say" lists the buttons on screen.
+// Voice commands: press Space Bar (or the "Voice command" button), then say the name of a
+// visible navigation tab, button, option, expandable item, or section. The matching item is
+// focused so that the user can confirm controls with Enter. "What can I say" describes the
+// workflow and lists the choices that are actually available on the current page.
 // Without speech recognition in the browser, a box asks for the button's name instead.
 (function () {
   const btn = document.getElementById('voice-command');
@@ -237,7 +239,15 @@ document.addEventListener('focusin', event => {
   const targets = () => {
     const controls = [...document.querySelectorAll('main button, main a.btn, main summary, main input[type=radio]'), ...document.querySelectorAll('header nav a, header nav summary')]
     .filter(el => el !== btn && visible(el))
-    .map(el => ({ el, name: el.matches('input') ? norm(el.closest('label')?.textContent) : nameOf(el), kind: el.closest('header nav') ? 'navigation tab' : 'control' }));
+    .map(el => ({
+      el,
+      name: el.matches('input') ? norm(el.closest('label')?.textContent) : nameOf(el),
+      kind: el.closest('header nav') ? 'navigation tab'
+        : el.matches('button, a.btn') ? 'button'
+        : el.matches('input[type=radio]') ? 'option'
+        : el.matches('summary') ? 'expandable item'
+        : 'control'
+    }));
     const sections = [...document.querySelectorAll('main h1, main h2')].filter(visible).map(el => {
       if (!el.hasAttribute('tabindex')) el.tabIndex = -1;
       return { el, name: norm(el.textContent), kind: 'section' };
@@ -245,18 +255,31 @@ document.addEventListener('focusin', event => {
     return [...controls, ...sections].filter(t => t.name);
   }
   const say = text => { console.info('[HireBuddy voice] feedback', text); window.HB.announce(text); window.HB.readControl(text); };
-  const short = n => n.split(' ').slice(0, 6).join(' ');
+  const short = n => n.split(' ').slice(0, 8).join(' ');
+  const spokenList = names => {
+    const unique = [...new Set(names.filter(Boolean))];
+    if (!unique.length) return '';
+    if (unique.length === 1) return unique[0];
+    return `${unique.slice(0, -1).join(', ')}, or ${unique.at(-1)}`;
+  };
   const listing = () => {
-    const names = targets().map(t => t.name.startsWith('example ') ? null : short(t.name)).filter(Boolean);
-    const ex = targets().filter(t => t.name.startsWith('example ')).length;
-    const sections = targets().filter(t => t.kind === 'section').map(t => t.name);
-    return `You can say a control name such as ${[...new Set(names)].slice(0, 10).join(', ').replace(/\bi m\b/g, "I'm")}${ex ? `, or first example up to example ${ex}` : ''}.${sections.length ? ` You can also say a section name: ${sections.join(', ')}.` : ''}`;
+    const available = targets();
+    const tabs = available.filter(t => t.kind === 'navigation tab').map(t => short(t.name));
+    const controls = available.filter(t => !['navigation tab', 'section'].includes(t.kind) && !t.name.startsWith('example '));
+    const sections = available.filter(t => t.kind === 'section').map(t => short(t.name));
+    const examples = available.filter(t => t.name.startsWith('example ')).length;
+    const groups = [];
+    if (tabs.length) groups.push(`Navigation tabs are ${spokenList(tabs)}`);
+    if (controls.length) groups.push(`Buttons and options are ${spokenList(controls.slice(0, 12).map(t => short(t.name)))}`);
+    if (examples) groups.push(`For job examples, say first example through example ${examples}`);
+    if (sections.length) groups.push(`Sections are ${spokenList(sections)}`);
+    return `Press Space to start listening. Say the name of a navigation tab, button, option, or section. I will move focus to it. For a tab or button, press Enter to select it. ${groups.join('. ')}. Say Help or What can I say to hear this guide again. Say Stop to stop speaking.`.replace(/\bi m\b/g, "I'm");
   };
 
   function act(heard) {
     const h = norm(heard).replace(/^(press|click|choose|select|open|go to|the)\s+/, '').replace(/\s+button$/, '');
     console.info('[HireBuddy voice] command', { heard, normalized: h });
-    if (!h) return say("I didn't hear a button. Press Alt V to try again.");
+    if (!h) return say("I didn't hear a command. Press Space to try again, or say Help for a guide.");
     if (/what can i say|^help$|^options$/.test(h)) return say(listing());
     if (/^(stop|quiet|be quiet|cancel)$/.test(h)) { if ('speechSynthesis' in window) speechSynthesis.cancel(); return; }
     const all = targets();
@@ -275,12 +298,12 @@ document.addEventListener('focusin', event => {
       if (!sc) { const tw = t.name.split(' '); const hit = words.filter(w => tw.includes(w)).length; sc = words.length ? hit / words.length * (hit >= Math.min(2, words.length) ? 40 : 0) : 0; }
       if (sc > score) { score = sc; best = t; }
     }
-    if (!best) { console.warn('[HireBuddy voice] no target matched', { heard, normalized: h }); return say(`I couldn't find a button called ${heard}. ${listing()}`); }
+    if (!best) { console.warn('[HireBuddy voice] no target matched', { heard, normalized: h }); return say(`I couldn't find an item called ${heard}. Say Help to hear the choices on this page.`); }
     console.info('[HireBuddy voice] activating target', { heard, target: best.name, score });
     best.el.focus();
     say(best.kind === 'section'
       ? `Focused ${best.name}. Section selected.`
-      : `Focused ${best.name}. ${best.kind === 'navigation tab' ? 'Navigation tab. ' : best.el.matches('button') ? 'Button. ' : ''}Press Enter to select.`);
+      : `Focused ${best.name}. ${best.kind.charAt(0).toUpperCase() + best.kind.slice(1)}. Press Enter to select.`);
   }
 
   let stop = null;
@@ -288,14 +311,14 @@ document.addEventListener('focusin', event => {
     console.info('[HireBuddy voice] start requested');
     if (stop) return stop();
     const reset = () => { stop = null; if (btn) { btn.disabled = false; btn.textContent = 'Voice command'; } };
-    stop = window.HB.listen('en-GB', heard => { reset(); if (heard) act(heard); else say("I didn't hear a button. Press Alt V to try again."); });
+    stop = window.HB.listen('en-GB', heard => { reset(); if (heard) act(heard); else say("I didn't hear a command. Press Space to try again, or say Help for a guide."); });
     if (!stop) {
-      const typed = window.prompt('Type the name of the button you want, for example Hand it to WorkBuddy. Type help to hear the buttons.');
+      const typed = window.prompt('Type the name of a navigation tab, button, option, or section. Type help to hear what is available on this page.');
       if (typed) act(typed);
       return;
     }
     if (btn) btn.textContent = 'Listening. Press Enter to stop';
-    say('Listening. Say a button, then press Enter.');
+    say('Listening. Say a navigation tab, button, option, or section name.');
   }
 
   if (btn) btn.addEventListener('click', start);
