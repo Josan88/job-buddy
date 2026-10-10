@@ -33,6 +33,7 @@ function setPersona(p) {
   persona = p;
   document.querySelectorAll('input[name="persona"]').forEach(r => { r.checked = r.value === p; });
   $('#go').textContent = p === 'student' ? 'Find me work' : 'Hire for me';
+  $('#handoff').hidden = p !== 'student';
   $('#examples').innerHTML = EXAMPLES[p].map((e, i) => `<li><button type="button" data-i="${i}"><span><b>Use this example:</b> ${esc(e)}</span></button></li>`).join('');
   $('#examples').querySelectorAll('button').forEach(b => b.onclick = () => {
     $('#prompt').value = EXAMPLES[p][b.dataset.i];
@@ -86,10 +87,43 @@ $('#ask').onsubmit = async e => {
   openRun(r.id, true);
 };
 
+// Hand the sentence to WorkBuddy: make a task to paste, then follow the run here once WorkBuddy starts it.
+$('#handoff').onclick = async () => {
+  const prompt = $('#prompt').value.trim();
+  const err = $('#prompt-error');
+  if (!prompt) {
+    err.hidden = false;
+    err.textContent = 'Error: write one sentence about the work you want, or pick an example below.';
+    $('#prompt').setAttribute('aria-invalid', 'true');
+    return $('#prompt').focus();
+  }
+  err.hidden = true;
+  const h = await fetch('/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }) }).then(r => r.json());
+  $('#handoff-task').value = h.task;
+  $('#handoff-panel').hidden = false;
+  $('#handoff-title').focus();
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(h.task); announce('Copied. Now paste it into a new WorkBuddy task and press Enter.'); $('#handoff-copy').textContent = 'Copied'; }
+    catch { $('#handoff-task').select(); announce('Could not copy automatically. The task is selected: press Control C to copy it.'); }
+  };
+  $('#handoff-copy').onclick = copy;
+  for (let i = 0; i < 600; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    const st = await fetch(`/api/handoffs/${h.id}`).then(r => r.json()).catch(() => null);
+    if (st?.runId) {
+      announce('WorkBuddy has started. Following it here.');
+      history.pushState({}, '', `/runs/${st.runId}`);
+      return openRun(st.runId, false);
+    }
+  }
+  $('#handoff-status').textContent = 'WorkBuddy has not started this task yet. Paste the task into WorkBuddy, then reload this page.';
+};
+
 // ---------------------------------------------------------------------------
 
 function openRun(id, fresh) {
   $('#composer').hidden = true;
+  $('#handoff-panel').hidden = true;
   $('#recent').hidden = true;
   $('#runview').hidden = false;
   document.title = 'Working on it · HireBuddy';

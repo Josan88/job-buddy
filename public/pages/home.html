@@ -22,6 +22,7 @@
 
     <div class="actions">
       <button id="go" type="submit">Find me work</button>
+      <button id="handoff" type="button" class="secondary">Hand it to WorkBuddy</button>
       <button id="speak" type="button" class="secondary" hidden>Speak instead</button>
     </div>
 
@@ -29,6 +30,20 @@
     <ul id="examples" class="examples" aria-labelledby="examples-title"></ul>
   </form>
   <p class="notice" id="mode"></p>
+</section>
+
+<section id="handoff-panel" class="panel" aria-labelledby="handoff-title" hidden>
+  <h2 id="handoff-title" tabindex="-1">Your task for WorkBuddy is ready</h2>
+  <p>WorkBuddy will do the job on your computer: search job sites, apply through HireBuddy, book interviews and save the results in your Documents folder. HireBuddy can't start WorkBuddy for you, so you start it:</p>
+  <ol>
+    <li>Press <b>Copy the task</b> below.</li>
+    <li>Switch to WorkBuddy, start a new task, paste it and press Enter.</li>
+    <li>Come back here to follow each step, or listen in WorkBuddy.</li>
+  </ol>
+  <label for="handoff-task">Task for WorkBuddy</label>
+  <textarea id="handoff-task" readonly rows="5"></textarea>
+  <p class="actions"><button type="button" id="handoff-copy">Copy the task</button></p>
+  <p id="handoff-status" role="status">Waiting for WorkBuddy to start.</p>
 </section>
 
 <section id="runview" aria-labelledby="run-title" hidden>

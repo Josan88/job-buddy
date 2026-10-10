@@ -61,13 +61,18 @@ steps.hirebuddy_1_understand = {
     type: 'object',
     properties: {
       prompt: { type: 'string', description: 'The user\'s words, unchanged' },
+      handoff: { type: 'string', description: 'The HireBuddy handoff code (ho-...) if the request contains one' },
       listings: { type: 'array', maxItems: 20, description: 'Optional: jobs you found on real job sites, copied as written (title, employer, site, url, pay, location, hours, description). Leave out anything you did not see.', items: { type: 'object' } },
     },
     required: ['prompt'],
   },
   async run(args, baseUrl) {
     const listings = Array.isArray(args.listings) && args.listings.length ? args.listings : null;
-    const run = agent.newRun(String(args.prompt || '').slice(0, 2000), 'student', 'workbuddy', { listings });
+    // Started from the HireBuddy website: use the sentence the person typed there, and let the site follow this run.
+    const code = String(args.handoff || '').match(/ho-[a-z0-9]+/)?.[0] || String(args.prompt || '').match(/\bho-[a-z0-9]{6}\b/)?.[0];
+    const ho = code && (store.db.handoffs || []).find(x => x.id === code && !x.runId);
+    const run = agent.newRun((ho ? ho.prompt : String(args.prompt || '')).slice(0, 2000), 'student', 'workbuddy', { listings });
+    if (ho) { ho.runId = run.id; run.handoffId = ho.id; }
     run.mode = 'WorkBuddy runs the steps';
     run.goal = GOAL;
     const ctx = agent.makeCtx(run, baseUrl);

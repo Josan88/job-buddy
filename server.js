@@ -137,6 +137,25 @@ async function route(req, res) {
   if (p === '/health') return json(res, 200, { ok: true, mode: llm.enabled() ? `llm:${llm.MODEL}` : 'autopilot', jobs: store.db.jobs.length, students: store.db.students.length });
   if (p === '/api/config') return json(res, 200, { llm: llm.enabled(), model: llm.enabled() ? llm.MODEL : null, email: !!process.env.RESEND_API_KEY });
 
+  // Hand Nadia's sentence to WorkBuddy. The website never starts anything on a computer: it only makes
+  // a task for the person to paste into their own WorkBuddy, then follows that run live when it starts.
+  if (p === '/api/handoffs' && req.method === 'POST') {
+    const body = JSON.parse(await readBody(req) || '{}');
+    const prompt = String(body.prompt || '').trim().slice(0, 2000);
+    if (!prompt) return json(res, 400, { error: 'prompt required' });
+    const ho = { id: `ho-${Math.random().toString(36).slice(2, 8)}`, prompt, createdAt: new Date().toISOString(), runId: null };
+    store.db.handoffs = (store.db.handoffs || []).concat(ho).slice(-200);
+    store.save();
+    const task = `Use the HireBuddy skill to find me work. HireBuddy handoff code: ${ho.id}. My request: "${prompt}" Check JobStreet and Indeed too.`;
+    return json(res, 201, { id: ho.id, task });
+  }
+  const hm = p.match(/^\/api\/handoffs\/(ho-[a-z0-9]+)$/);
+  if (hm) {
+    const ho = (store.db.handoffs || []).find(h => h.id === hm[1]);
+    if (!ho) return json(res, 404, { error: 'not found' });
+    const run = ho.runId && store.db.runs.find(r => r.id === ho.runId);
+    return json(res, 200, { id: ho.id, status: run ? run.status : 'waiting', runId: ho.runId });
+  }
   if (p === '/api/runs' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
     const prompt = String(body.prompt || '').trim().slice(0, 2000);
@@ -160,7 +179,7 @@ async function route(req, res) {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive', 'x-accel-buffering': 'no' });
     const send = e => res.write(`data: ${JSON.stringify(e)}\n\n`);
     for (const e of run.events) send(e);
-    if (!agent.live.has(run.id)) { send({ type: 'end' }); return res.end(); }
+    if (!agent.live.has(run.id) && run.status !== 'running') { send({ type: 'end' }); return res.end(); }
     const fn = e => { send(e); if (e.type === 'final') { send({ type: 'end' }); cleanup(); res.end(); } };
     const ping = setInterval(() => res.write(': ping\n\n'), 15000);
     const cleanup = () => { clearInterval(ping); agent.bus.off(run.id, fn); };
