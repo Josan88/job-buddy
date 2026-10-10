@@ -33,6 +33,12 @@
       <input id="tg-key" type="password" autocomplete="off" aria-describedby="tg-error">
       <p id="tg-error" class="panel bad" hidden></p>
       <p class="actions"><button type="button" id="tg-save">Pair this browser</button> <button type="button" id="tg-forget" class="secondary" hidden>Unpair</button></p>
+      <div id="tg-tools" hidden>
+        <p class="actions"><button type="button" id="tg-check" class="secondary">Check Telegram</button> <button type="button" id="tg-test" class="secondary">Send a test message</button></p>
+        <p id="tg-status" role="status"></p>
+        <h3 id="tg-replies-title" hidden>WorkBuddy's latest replies</h3>
+        <ol id="tg-replies" class="replies" aria-labelledby="tg-replies-title"></ol>
+      </div>
     </details>
 
     <h2 id="examples-title">Or start from an example</h2>
@@ -48,6 +54,8 @@
   <textarea id="handoff-task" readonly rows="5"></textarea>
   <p class="actions"><button type="button" id="handoff-copy">Copy the task</button></p>
   <p id="handoff-status" role="status">Waiting for WorkBuddy to start.</p>
+  <h3 id="handoff-replies-title" hidden>WorkBuddy's replies on Telegram</h3>
+  <ol id="handoff-replies" class="replies" aria-labelledby="handoff-replies-title"></ol>
 </section>
 
 <section id="runview" aria-labelledby="run-title" hidden>

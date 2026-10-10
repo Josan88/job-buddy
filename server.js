@@ -137,13 +137,25 @@ async function route(req, res) {
 
   // ---- API ----
   if (p === '/robots.txt') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('User-agent: *\nAllow: /\nDisallow: /reset\n'); }
-  if (p === '/health') return json(res, 200, { ok: true, mode: llm.status(), jobs: store.db.jobs.length, students: store.db.students.length, version: (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || 'local' });
+  if (p === '/health') return json(res, 200, { ok: true, mode: llm.status(), jobs: store.db.jobs.length, students: store.db.students.length, telegram: telegram.health(), version: (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || 'local' });
   if (p === '/api/config') return json(res, 200, { llm: llm.enabled(), model: llm.enabled() ? llm.MODEL : null, email: !!process.env.RESEND_API_KEY, telegram: telegram.configured() });
   // Pairs a browser for sending hand-offs to WorkBuddy through Telegram (see src/telegram.js).
   if (p === '/api/telegram/check' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
     if (!telegram.configured()) return json(res, 200, { ok: false, error: 'Telegram is not set up on this HireBuddy.' });
     return json(res, 200, telegram.keyOk(body.key) ? { ok: true, bot: telegram.BOT } : { ok: false, error: 'That key is not right.' });
+  }
+  // For a paired browser only: is HireBuddy connected to Telegram, and what has WorkBuddy replied?
+  // "test" also sends WorkBuddy a message asking it to reply OK.
+  const tm = p.match(/^\/api\/telegram\/(status|test)$/);
+  if (tm && req.method === 'POST') {
+    const body = JSON.parse(await readBody(req) || '{}');
+    if (!telegram.keyOk(body.key)) return json(res, 403, { error: 'This browser is not paired.' });
+    if (tm[1] === 'test') {
+      try { await telegram.send('HireBuddy connection test. Please reply with just: OK'); }
+      catch (e) { return json(res, 200, { ...await telegram.status(), sendError: e.message }); }
+    }
+    return json(res, 200, await telegram.status());
   }
 
   // Hand Nadia's sentence to WorkBuddy. The website makes a task for the person's own WorkBuddy and follows
@@ -373,4 +385,4 @@ async function route(req, res) {
 
 http.createServer((req, res) => {
   route(req, res).catch(e => { console.error(e); if (!res.headersSent) json(res, 500, { error: e.message }); });
-}).listen(PORT, () => { console.log(`HireBuddy on :${PORT} (${llm.status()})`); llm.probe(); });
+}).listen(PORT, () => { console.log(`HireBuddy on :${PORT} (${llm.status()})`); llm.probe(); telegram.start(); });
