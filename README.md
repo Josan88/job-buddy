@@ -1,6 +1,6 @@
 # HireBuddy
 
-**Say the work you want in one sentence. HireBuddy finds jobs that suit you, applies, books interviews and checks everything.**
+**Say the work you want in one sentence. HireBuddy finds jobs that suit you, applies, checks everything, and allows to send email.**
 
 HireBuddy is an autonomous job agent built first for **blind and low-vision job seekers in Malaysia**. It runs inside **WorkBuddy** (as an MCP server and a Skill) and as a web app that works fully with a screen reader and a keyboard alone.
 
