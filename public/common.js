@@ -18,6 +18,18 @@ document.querySelectorAll('details.menu').forEach(m => {
 });
 
 window.HB = {
+  async sendApplication(jobId, studentId) {
+    let key = '';
+    try { key = localStorage.getItem('hirebuddy.telegramKey') || ''; } catch {}
+    try {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/apply/${encodeURIComponent(studentId)}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key }),
+      });
+      return await response.json();
+    } catch {
+      return { ok: false, error: 'The application request could not be sent. Check your connection and try again.' };
+    }
+  },
   esc: s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
   // Polite announcement for screen readers through the page's live region.
   announce(text) {
@@ -37,10 +49,30 @@ window.HB = {
   // Read newly focused controls for people using the site's built-in speech rather than a screen reader.
   readFocus(text) {
     if (!('speechSynthesis' in window)) return;
-    const u = new SpeechSynthesisUtterance(String(text || '').replace(/\s+/g, ' ').trim());
-    u.lang = 'en-GB'; u.rate = 1;
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    const chunks = clean.match(/.{1,180}(?:[.!?](?=\s|$)|\s|$)/g) || [clean];
     speechSynthesis.resume();
-    speechSynthesis.speak(u);
+    chunks.filter(Boolean).forEach(chunk => {
+      const u = new SpeechSynthesisUtterance(chunk.trim());
+      u.lang = 'en-GB'; u.rate = 1;
+      speechSynthesis.speak(u);
+    });
+  },
+  readControl(text) {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const speak = () => {
+      const u = new SpeechSynthesisUtterance(String(text || '').replace(/\s+/g, ' ').trim());
+      u.lang = 'en-GB'; u.rate = 1;
+      speechSynthesis.resume();
+      speechSynthesis.speak(u);
+    };
+    if (speechSynthesis.getVoices().length) speak();
+    else speechSynthesis.addEventListener('voiceschanged', speak, { once: true });
+  },
+  readPage() {
+    const main = document.querySelector('main');
+    if (main) window.HB.readFocus(main.innerText);
   },
   // Listen until the person presses Enter (or the button again). Escape cancels. Calls done(text), with ''
   // when nothing was heard or it was cancelled. Returns a stop function, or null without speech recognition.
@@ -69,13 +101,18 @@ window.HB = {
   },
 };
 
-// Start every page with its heading and introduction. Browsers that permit speech on load read it
-// immediately; otherwise the native screen reader still receives the same semantic page content.
+// Read all visible main content from top to bottom when the page loads.
 window.addEventListener('load', () => {
-  const main = document.querySelector('main');
-  const title = main?.querySelector('h1')?.textContent;
-  const intro = main?.querySelector('h1 + p, .lede, #job-help')?.textContent;
-  if (title) window.HB.readFocus(`${title}. ${intro || ''}`);
+  window.HB.readPage();
+});
+
+// Every button announces itself when reached with Tab, including dynamically added buttons.
+document.addEventListener('focusin', event => {
+  const button = event.target.closest?.('button');
+  if (!button) return;
+  const name = button.getAttribute('aria-label') || button.textContent.trim() || 'Unnamed';
+  const context = button.dataset.label ? `${button.dataset.label}. ` : '';
+  window.HB.readControl(`${context}${name}. Button. Press Enter to activate.`);
 });
 
 // Voice commands: press Alt+V (or the "Voice command" button), say a button's name, such as

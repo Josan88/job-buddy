@@ -6,7 +6,7 @@ const path = require('path');
 
 const PORT = 3999;
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hirebuddy-'));
-const env = { ...process.env, PORT, DATA_DIR: dir, LLM_API_KEY: '', PUBLIC_URL: '', RENDER_EXTERNAL_URL: '' };
+const env = { ...process.env, PORT, DATA_DIR: dir, LLM_API_KEY: '', PUBLIC_URL: '', RENDER_EXTERNAL_URL: '', TELEGRAM_SESSION: '', BREVO_API_KEY: '', RESEND_API_KEY: '' };
 const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], { env, stdio: 'inherit' });
 const base = `http://localhost:${PORT}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -58,8 +58,7 @@ const cases = [
     if (suitable) { cardStudent = person; cardJob = suitable; break; }
   }
   const cardApply = cardJob && await fetch(`${base}/api/jobs/${cardJob.jobId}/apply/${cardStudent.id}`, { method: 'POST' }).then(r => r.json());
-  const cardMail = (await fetch(`${base}/api/emails`).then(r => r.json())).find(e => e.kind === 'application' && e.body.includes(`Original employer email:`));
-  const cardOk = cardApply?.ok && cardMail?.to === 'stephanieshinhuiyeo@gmail.com' && cardMail.subject.startsWith(`${cardJob && cardMail.body.match(/Original employer email: ([^\n]+)/)?.[1]} —`);
+  const cardOk = cardApply?.ok === false && /Telegram is not set up/.test(cardApply?.error);
   if (!cardOk) fail++;
   console.log(`${cardOk ? 'PASS' : 'FAIL'} keyboard job-card application: ${cardApply?.message || cardApply?.error || 'no suitable job found'}`);
   // Aina declines her MIXUE-style interview: the agent must book the next best person, never Aina again.
