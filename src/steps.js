@@ -61,7 +61,6 @@ steps.hirebuddy_1_understand = {
     type: 'object',
     properties: {
       prompt: { type: 'string', description: 'The user\'s words, unchanged' },
-      handoffId: { type: 'string', description: 'Website handoff ID, after WorkBuddy has reviewed its intake as ready' },
       applicantDetails: { type: 'object', description: 'Optional facts extracted from this applicant’s resume or explicitly supplied by the user. Never invent missing details.',
         properties: { phone: { type: 'string' }, education: { type: 'string' }, qualifications: { type: 'string' },
           age: { type: 'number' }, workExperience: { type: 'string' }, interestedPosition: { type: 'string' } }, additionalProperties: false },
@@ -76,14 +75,8 @@ steps.hirebuddy_1_understand = {
     // The task carries no code, so match the newest unclaimed hand-off (last 30 minutes) whose sentence is in the request.
     const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     const said = norm(args.prompt);
-    const ho = args.handoffId ? (store.db.handoffs || []).find(x => x.id === args.handoffId)
-      : said && (store.db.handoffs || []).slice().reverse().find(x => !x.runId && Date.now() - Date.parse(x.createdAt) < 30 * 60e3 && norm(x.prompt) && said.includes(norm(x.prompt)));
-    if (args.handoffId && !ho) return bad('Handoff not found.', 'Read the correct handoff before starting.');
-    if (ho?.runId) return bad('This handoff already started.', `Follow runId "${ho.runId}".`);
-    if (ho?.intake && ho.intake.status !== 'ready') return bad('WorkBuddy must review the required applicant details before starting.',
-      `Extract the resume or prompt facts and call hirebuddy_review_intake with handoffId "${ho.id}" and revision ${ho.intake.revision}. If fields are missing, wait for JobBuddy to return the answers; do not scrape jobs.`);
-    const reviewedPrompt = ho?.intake ? `${Object.entries(ho.intake.details).map(([key, value]) => `${require('./intake').FIELDS[key]}: ${value}`).join('\n')}\n${ho.prompt}` : ho?.prompt;
-    const run = agent.newRun((reviewedPrompt || String(args.prompt || '')).slice(0, 2000), 'student', 'workbuddy', { listings });
+    const ho = said && (store.db.handoffs || []).slice().reverse().find(x => !x.runId && Date.now() - Date.parse(x.createdAt) < 30 * 60e3 && norm(x.prompt) && said.includes(norm(x.prompt)));
+    const run = agent.newRun((ho ? ho.prompt : String(args.prompt || '')).slice(0, 2000), 'student', 'workbuddy', { listings });
     if (ho) { ho.runId = run.id; run.handoffId = ho.id; }
     run.mode = 'WorkBuddy runs the steps';
     run.goal = GOAL;
@@ -97,11 +90,6 @@ steps.hirebuddy_1_understand = {
       { title: 'WorkBuddy: get the files to save on your computer', tool: 'finish' },
     ] });
     const p = parse.student(run.prompt);
-    if (ho?.intake) {
-      p.name = ho.intake.details.name;
-      p.area = ho.intake.details.location;
-      args = { ...args, applicantDetails: { ...args.applicantDetails, ...ho.intake.details, age: Number(ho.intake.details.age) } };
-    }
     const reg = await agent.callTool(ctx, 'register_student', { name: p.name, email: p.email || undefined, area: p.area, campus: p.campus || undefined, skills: p.skills,
       availability: p.availability, expectedRate: p.expectedRate || undefined, bio: p.bio, needs: p.needs || undefined,
       phone: args.applicantDetails?.phone, education: args.applicantDetails?.education, qualifications: args.applicantDetails?.qualifications,

@@ -142,8 +142,6 @@ MIT
 
 ## Keyboard applications through Telegram
 
-For job-search requests, WorkBuddy reads the supplied resume (when available), otherwise the prompt, and checks name, age, work experience, education, location and interested job position before scraping jobs. It calls `hirebuddy_review_intake` to request missing fields. JobBuddy displays those questions and sends the answers back under the same handoff ID for WorkBuddy to review again. JobBuddy does not extract or judge the details itself. Search starts only after WorkBuddy reports the intake as ready. Update the installed WorkBuddy skill and reconnect its MCP tools to enable this round trip.
-
 On Jobs and My details, use Tab to focus a job card and Enter to request an application through WorkBuddy's Telegram connection. Select your job seeker profile on My details and pair the browser using the Telegram hand-off key on Find work first. The public Jobs page falls back to the fictional Nadia demo profile when no profile has been selected.
 
 Application requests instruct WorkBuddy to send only to `stephanieshinhuiyeo@gmail.com`. The original company email is placed first in the subject and retained in the email body and stored application data, together with the job details, applicant profile, availability, accessibility/interview needs. When no company email exists, a demo address is generated from the company name, for example `Example Company` becomes `examplecompany@gmail.com`. Resume attachments are not requested. A successful Telegram hand-off does not confirm email delivery; WorkBuddy reports the actual send result through Telegram. Failed hand-offs can be retried.
