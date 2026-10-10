@@ -9,7 +9,7 @@ HireBuddy is an autonomous hiring agent for Malaysian small businesses and the s
 From that one line, with no further guidance, HireBuddy:
 
 1. **Plans** the job as a checklist, where each step names the tool that completes it.
-2. **Checks the pay is legal** under Malaysia's Minimum Wages Order 2024 (RM8.17/hour). If it isn't, the agent refuses to publish.
+2. **Checks the pay is legal** under Malaysia's Minimum Wages Order 2024 (RM8.72/hour). If it isn't, the agent refuses to publish.
 3. **Publishes a live job page** with an apply form, then fetches the page back to prove it is up.
 4. **Finds candidates** in the student talent pool by distance, plus anyone who applied on the page.
 5. **Screens and ranks** every candidate out of 100. Every skill point quotes the candidate's own words.

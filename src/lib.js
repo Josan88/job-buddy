@@ -92,18 +92,20 @@ function fmtMyt(date) {
 
 // ---- Wages ------------------------------------------------------------------
 
-// Minimum Wages Order 2024 (in force from 1 Feb 2025): RM1,700 a month, RM8.17 an hour.
-const MIN_WAGE = { hour: 8.17, month: 1700, day: 65.38, source: 'Minimum Wages Order 2024 (Malaysia), effective 1 Feb 2025' };
+// Minimum Wages Order 2024, P.U.(A) 376: RM1,700 a month, RM8.72 an hour (1700 x 12 / 52 / 45),
+// RM65.38 a day for a 6-day week. Applies to all employers from 1 Aug 2025.
+const MIN_WAGE = { hour: 8.72, month: 1700, day: 65.38, source: 'Minimum Wages Order 2024, P.U.(A) 376 (Malaysia), all employers from 1 Aug 2025' };
 
 function checkWage(pay, payUnit = 'hour') {
   const unit = ['hour', 'day', 'month'].includes(payUnit) ? payUnit : 'hour';
   const floor = MIN_WAGE[unit];
   const ok = Number(pay) >= floor;
+  const rm = n => (Number.isInteger(Number(n)) ? String(Number(n)) : Number(n).toFixed(2));
   return {
     ok, pay: Number(pay), unit, minimum: floor, source: MIN_WAGE.source,
     message: ok
-      ? `RM${pay}/${unit} meets the legal minimum of RM${floor}/${unit}.`
-      : `RM${pay}/${unit} is below the legal minimum of RM${floor}/${unit}.`,
+      ? `RM${rm(pay)}/${unit} meets the legal minimum of RM${rm(floor)}/${unit}.`
+      : `RM${rm(pay)}/${unit} is below the legal minimum of RM${rm(floor)}/${unit}.`,
   };
 }
 

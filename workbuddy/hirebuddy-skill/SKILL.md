@@ -27,7 +27,7 @@ Set `HIREBUDDY_URL` if the app is not at the default address.
 2. The self-check list (every PASS/FAIL line). Say plainly if anything failed.
 3. The links: job page, calendar invites, emails, and the full run log.
 
-Do not re-ask the user for details. HireBuddy picks sensible defaults and states them. If the pay is below Malaysia's minimum wage (RM8.17/hour), HireBuddy refuses to publish. Relay that, and the minimum, to the user.
+Do not re-ask the user for details. HireBuddy picks sensible defaults and states them. If the pay is below Malaysia's minimum wage (RM8.72/hour), HireBuddy refuses to publish. Relay that, and the minimum, to the user.
 
 ## Step-by-step mode
 When you want to drive the plan yourself, the MCP server also exposes `hirebuddy_check_minimum_wage`, `hirebuddy_publish_job`, `hirebuddy_find_candidates`, `hirebuddy_screen_candidates`, `hirebuddy_verify_screening`, `hirebuddy_schedule_interviews`, `hirebuddy_send_email` and `hirebuddy_verify_hiring_outcome`. For students it exposes `hirebuddy_register_student`, `hirebuddy_search_jobs`, `hirebuddy_apply_to_job` and `hirebuddy_verify_applications`. Always finish with the matching verify tool.
