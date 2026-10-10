@@ -44,7 +44,7 @@ window.HB = {
     if (!('speechSynthesis' in window)) return;
     if (speechSynthesis.speaking) { speechSynthesis.cancel(); if (button) button.textContent = 'Read aloud'; return; }
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'en-GB'; u.rate = 1;
+    u.lang = 'en-GB'; u.rate = 0.75;
     u.onend = () => { if (button) button.textContent = 'Read aloud'; };
     speechSynthesis.speak(u);
     if (button) button.textContent = 'Stop reading';
@@ -58,7 +58,7 @@ window.HB = {
     speechSynthesis.resume();
     chunks.filter(Boolean).forEach(chunk => {
       const u = new SpeechSynthesisUtterance(chunk.trim());
-      u.lang = 'en-GB'; u.rate = 1;
+      u.lang = 'en-GB'; u.rate = 0.75;
       u.onstart = () => { window.HB._speechStarted = true; console.info('[HireBuddy speech] started', chunk.trim()); };
       u.onend = () => console.info('[HireBuddy speech] ended', chunk.trim());
       u.onerror = event => console.error('[HireBuddy speech] error', event.error, chunk.trim());
@@ -73,7 +73,7 @@ window.HB = {
       if (spoken) return;
       spoken = true;
       const u = new SpeechSynthesisUtterance(String(text || '').replace(/\s+/g, ' ').trim());
-      u.lang = 'en-GB'; u.rate = 1;
+      u.lang = 'en-GB'; u.rate = 0.75;
       const voices = speechSynthesis.getVoices();
       u.voice = voices.find(v => /^en(-|_)/i.test(v.lang)) || voices[0] || null;
       u.onstart = () => { window.HB._speechStarted = true; console.info('[HireBuddy speech] control started', { source, text: u.text, voice: u.voice?.name }); };
@@ -185,7 +185,7 @@ document.addEventListener('focusin', event => {
     const ord = h.match(/\b(first|second|third|fourth|one|two|three|four|[1-4])\b/);
     if (/example/.test(h) && ord) {
       const ex = all.filter(t => t.name.startsWith('example '))[ORDINALS[ord[1]]];
-      if (ex) { ex.el.click(); return; }
+      if (ex) { ex.el.focus(); say(`Focused ${ex.name}. ${ex.el.matches('button') ? 'Button. ' : ''}Press Enter to select.`); return; }
     }
     // Best match: the button whose name contains what was said, else the most words in common.
     const words = h.split(' ').filter(w => w.length > 1);
@@ -198,7 +198,7 @@ document.addEventListener('focusin', event => {
     if (!best) { console.warn('[HireBuddy voice] no target matched', { heard, normalized: h }); return say(`I couldn't find a button called ${heard}. ${listing()}`); }
     console.info('[HireBuddy voice] activating target', { heard, target: best.name, score });
     best.el.focus();
-    best.el.click();
+    say(`Focused ${best.name}. ${best.el.matches('button') ? 'Button. ' : ''}Press Enter to select.`);
   }
 
   let stop = null;
