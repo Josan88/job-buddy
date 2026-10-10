@@ -10,7 +10,20 @@ const llm = require('./src/llm');
 const telegram = require('./src/telegram');
 const mail = require('./src/mail');
 const application = require('./src/application');
+const outside = require('./src/outside');
 const pendingApplications = new Set();
+
+function refreshExternalScores(run) {
+  if (!run?.options?.listings?.length || !run.studentId) return;
+  const student = store.db.students.find(s => s.id === run.studentId);
+  if (!student) return;
+  const fresh = outside.assessAll(run.options.listings, student);
+  run.outside = (run.outside || fresh).map((listing, i) => ({ ...listing, score: fresh[i]?.score ?? listing.score }));
+  for (const event of run.events || []) {
+    if (event.type !== 'tool_result' || event.tool !== 'check_outside_listings' || !Array.isArray(event.result?.results)) continue;
+    event.result.results = event.result.results.map((listing, i) => ({ ...listing, score: fresh[i]?.score ?? listing.score }));
+  }
+}
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC = path.join(__dirname, 'public');
@@ -214,11 +227,13 @@ async function route(req, res) {
   let m;
   if ((m = p.match(/^\/api\/runs\/([\w-]+)$/))) {
     const run = store.db.runs.find(r => r.id === m[1]);
+    refreshExternalScores(run);
     return run ? json(res, 200, { ...run, links: agent.links(run, base) }) : json(res, 404, { error: 'not found' });
   }
   if ((m = p.match(/^\/api\/runs\/([\w-]+)\/stream$/))) {
     const run = store.db.runs.find(r => r.id === m[1]);
     if (!run) return json(res, 404, { error: 'not found' });
+    refreshExternalScores(run);
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive', 'x-accel-buffering': 'no' });
     const send = e => res.write(`data: ${JSON.stringify(e)}\n\n`);
     for (const e of run.events) send(e);
