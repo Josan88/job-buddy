@@ -100,6 +100,54 @@ async function sendViaBridge(handoff) {
   } catch { return null; } finally { clearTimeout(slow); }
 }
 
+// WorkBuddy can be reached through Telegram when the person has connected it to their own Telegram bot
+// (WorkBuddy: Assistant, Channels, Telegram). Each person has their own bot, so its username lives only in
+// this browser. HireBuddy can't message that bot itself (Telegram bots never see other bots' messages), so it
+// opens the chat with the task typed in and the person presses Send.
+const TG_KEY = 'hirebuddy.workbuddyBot';
+function tgBot() { try { return localStorage.getItem(TG_KEY) || ''; } catch (e) { return ''; } }
+function tgShowSaved() {
+  const bot = tgBot();
+  $('#tg-bot').value = bot;
+  $('#tg-forget').hidden = !bot;
+  $('#tg-title').textContent = bot ? `Sending through Telegram, to @${bot}` : 'Send through Telegram';
+}
+let handoffTask = null;
+function sendViaTelegram(bot, task) {
+  $('#handoff-tg-link').href = `https://t.me/${bot}?text=${encodeURIComponent(task)}`;
+  $('#handoff-how').hidden = true;
+  $('#handoff-tg').hidden = false;
+  // The tg: address opens the Telegram app without leaving this page, which keeps following the run.
+  location.href = `tg://resolve?domain=${bot}&text=${encodeURIComponent(task)}`;
+  $('#handoff-title').textContent = 'Press Send in Telegram';
+  $('#handoff-title').focus();
+  announce('Telegram is opening your WorkBuddy chat with the task typed in. Press Send there. I will tell you each step here.');
+}
+$('#tg-form').onsubmit = e => {
+  e.preventDefault();
+  const bot = $('#tg-bot').value.trim().replace(/^(https?:\/\/)?(t\.me\/|telegram\.me\/)?@?/i, '').replace(/[/?].*$/, '');
+  const err = $('#tg-error');
+  if (!/^[A-Za-z][A-Za-z0-9_]{3,30}bot$/i.test(bot)) {
+    err.hidden = false;
+    err.textContent = 'Error: a bot username is 5 to 32 letters, numbers or underscores and ends in "bot", for example nadia_workbuddy_bot.';
+    $('#tg-bot').setAttribute('aria-invalid', 'true');
+    return $('#tg-bot').focus();
+  }
+  err.hidden = true;
+  $('#tg-bot').removeAttribute('aria-invalid');
+  try { localStorage.setItem(TG_KEY, bot); } catch (e) {}
+  tgShowSaved();
+  if (handoffTask) sendViaTelegram(bot, handoffTask);
+  else announce(`Saved. Hand it to WorkBuddy will open @${bot} in Telegram.`);
+};
+$('#tg-forget').onclick = () => {
+  try { localStorage.removeItem(TG_KEY); } catch (e) {}
+  tgShowSaved();
+  $('#tg-bot').focus();
+  announce('Telegram is off. Hand it to WorkBuddy copies the task for you to paste.');
+};
+tgShowSaved();
+
 // Hand the sentence to WorkBuddy: make a task to paste, then follow the run here once WorkBuddy starts it.
 $('#handoff').onclick = async () => {
   const prompt = $('#prompt').value.trim();
@@ -123,12 +171,18 @@ $('#handoff').onclick = async () => {
     catch { $('#handoff-title').textContent = 'Press Control C to copy, then paste it into WorkBuddy'; $('#handoff-task').select(); return false; }
   };
   const copied = await copy();
+  handoffTask = h.task;
   $('#handoff-panel').hidden = false;
+  $('#handoff-how').hidden = false;
+  $('#handoff-tg').hidden = true;
   $('#handoff-copy').onclick = copy;
-  // With the HireBuddy bridge running on this computer, it pastes the task into WorkBuddy after a Yes/No
-  // box. Without it (or if the person says No), the copy-and-paste steps below still work.
-  const viaBridge = await sendViaBridge(h.id);
-  if (viaBridge === 'sent') {
+  // Telegram first when this browser knows the person's WorkBuddy bot. Otherwise the HireBuddy bridge on this
+  // computer pastes the task into WorkBuddy after a Yes/No box, and without it (or if the person says No),
+  // the copy-and-paste steps still work.
+  const bot = tgBot();
+  const viaBridge = bot ? null : await sendViaBridge(h.id);
+  if (bot) sendViaTelegram(bot, h.task);
+  else if (viaBridge === 'sent') {
     $('#handoff-title').textContent = 'Sent to WorkBuddy';
     $('#handoff-status').textContent = 'WorkBuddy has the task. This page follows each step.';
     $('#handoff-title').focus();
@@ -146,7 +200,7 @@ $('#handoff').onclick = async () => {
       return openRun(st.runId, false);
     }
   }
-  $('#handoff-status').textContent = 'WorkBuddy has not started this task yet. Paste the task into WorkBuddy, then reload this page.';
+  $('#handoff-status').textContent = tgBot() ? 'WorkBuddy has not started this task yet. Check that WorkBuddy is open on your computer, send the task in Telegram, then reload this page.' : 'WorkBuddy has not started this task yet. Paste the task into WorkBuddy, then reload this page.';
 };
 
 // ---------------------------------------------------------------------------

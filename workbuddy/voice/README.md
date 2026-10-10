@@ -34,4 +34,5 @@ Run `node workbuddy\voice\voice.js --bridge` and leave that window open. Then "H
 - The page sends only a handoff code; the bridge fetches the task from HireBuddy, never text from the page.
 - Nothing reaches WorkBuddy until the person at the computer presses Yes.
 - Chrome or Edge may ask once to let the site reach "apps on this device": press Allow.
+- If the page has a WorkBuddy Telegram bot saved (see "through Telegram" in the main README), it uses Telegram instead and doesn't call the bridge.
 - Without the bridge, the page falls back to "Copied. Press Alt Tab to WorkBuddy, Control V, then Enter."

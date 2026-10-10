@@ -48,4 +48,7 @@ The user may be listening with a screen reader. Short plain sentences, most impo
 3. Any decision made on the way, including yours, in one sentence each.
 4. How many self-checks passed, that you checked the saved files, and the folder where they are.
 
+### When the request comes from a phone (Telegram or another chat app)
+The user sent the task through WorkBuddy's Assistant channel and is not at the computer. Run the same plan without stopping, and still save the files. Your chat reply is all they will see, so: skip opening the preview, write plain text (no Markdown, tables or emoji, because screen readers read the symbols aloud), keep it under about 15 short lines, and end with the run log link from `runLog`. Each interview is already in their email with a calendar invite, so say so. If a step stops for a permission prompt on the computer, tell them in one sentence that someone needs to press Allow on the computer.
+
 HireBuddy never applies to a job paying below Malaysia's minimum wage (RM8.72 an hour), below the user's own floor, or with tasks that need sight, and it refuses to publish an underpaid job for an employer. Relay that to the user.

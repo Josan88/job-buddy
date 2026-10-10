@@ -248,7 +248,7 @@ steps.hirebuddy_4_verify = {
       next: check.pass && run.daily
         ? `Daily check done. Save every file in saveToComputer into the user's Documents folder, replacing the old ones. Then tell the user in one or two short sentences only what is new today (or that nothing new suits them yet). Do not ask anything.`
         : check.pass
-        ? `Save every file in saveToComputer into the user's Documents folder (write each file's content exactly as given), and open Results.html in your preview if you can. Then give the user the summary in short plain sentences for a screen reader: interviews first, one line each, then the jobs from other sites (drafted, not sent), then "${check.passed} of ${check.total} checks passed" and where the files are. Do not ask anything else.`
+        ? `Save every file in saveToComputer into the user's Documents folder (write each file's content exactly as given), and open Results.html in your preview if you can. Then give the user the summary in short plain sentences for a screen reader: interviews first, one line each, then the jobs from other sites (drafted, not sent), then "${check.passed} of ${check.total} checks passed" and where the files are. If the user is messaging you from a chat app such as Telegram, they are not at the computer: still save the files but skip the preview, write plain text with no Markdown, and end with the run log link ${baseUrl}/runs/${run.id} instead of the folder. Do not ask anything else.`
         : 'Tell the user which checks failed, in one sentence each.',
     };
   },
