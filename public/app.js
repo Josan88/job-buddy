@@ -100,12 +100,15 @@ $('#handoff').onclick = async () => {
   err.hidden = true;
   const h = await fetch('/api/handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }) }).then(r => r.json());
   $('#handoff-task').value = h.task;
-  $('#handoff-panel').hidden = false;
-  $('#handoff-title').focus();
+  // Copy straight away, in the same key press: a screen reader user shouldn't have to find a second button.
   const copy = async () => {
-    try { await navigator.clipboard.writeText(h.task); announce('Copied. Now paste it into a new WorkBuddy task and press Enter.'); $('#handoff-copy').textContent = 'Copied'; }
-    catch { $('#handoff-task').select(); announce('Could not copy automatically. The task is selected: press Control C to copy it.'); }
+    try { await navigator.clipboard.writeText(h.task); $('#handoff-title').textContent = 'Copied. Paste it into WorkBuddy'; $('#handoff-copy').textContent = 'Copy again'; return true; }
+    catch { $('#handoff-title').textContent = 'Press Control C to copy, then paste it into WorkBuddy'; $('#handoff-task').select(); return false; }
   };
+  const copied = await copy();
+  $('#handoff-panel').hidden = false;
+  if (copied) $('#handoff-title').focus(); else $('#handoff-task').focus();
+  announce(copied ? 'Copied. Press Alt Tab to WorkBuddy, Control V, then Enter.' : 'Press Control C to copy the selected task, then paste it into WorkBuddy.');
   $('#handoff-copy').onclick = copy;
   for (let i = 0; i < 600; i++) {
     await new Promise(r => setTimeout(r, 2000));
