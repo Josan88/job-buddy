@@ -115,6 +115,21 @@ const apply = (job, key) => fetch(`${base}/api/jobs/${job}/apply/stu-nadia`, {
   assert(detailed.body.includes('Qualifications: Customer service certificate'));
   assert(detailed.body.includes('Phone: 0123456789'));
   assert.equal(fallback.to, 'stephanieshinhuiyeo@gmail.com');
-  console.log('PASS application Telegram handoff, recipient, preserved data, pairing, retry and duplicate protection');
+  const searchDetails = { name: 'Nadia Rahim', age: '24', workExperience: 'No work experience',
+    education: 'Diploma', location: 'Subang Jaya', interestedPosition: 'Customer service' };
+  const sentBeforeIntake = sent.length;
+  const handoffsBeforeIntake = (store.db.handoffs || []).length;
+  const handoff = body => fetch(`${base}/api/handoffs`, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body) }).then(async response => ({ status: response.status, ...await response.json() }));
+  const incomplete = await handoff({ prompt: 'Find jobs', key: 'paired-test', details: { ...searchDetails, age: '' } });
+  assert.equal(incomplete.status, 422);
+  assert.deepEqual(incomplete.missing, ['age']);
+  assert.equal(sent.length, sentBeforeIntake, 'Missing details must not reach Telegram');
+  assert.equal((store.db.handoffs || []).length, handoffsBeforeIntake, 'Missing details must not create a search task');
+  const complete = await handoff({ prompt: 'Find jobs', details: searchDetails });
+  assert.equal(complete.status, 201);
+  assert(complete.task.includes('Age: 24'));
+  assert(complete.task.includes('Interested job position: Customer service'));
+  console.log('PASS application handoff and compulsory-detail search gate');
 })().then(() => { fs.rmSync(dir, { recursive: true, force: true }); process.exit(0); })
   .catch(e => { console.error(e); fs.rmSync(dir, { recursive: true, force: true }); process.exit(1); });

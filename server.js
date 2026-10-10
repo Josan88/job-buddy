@@ -10,6 +10,7 @@ const llm = require('./src/llm');
 const telegram = require('./src/telegram');
 const mail = require('./src/mail');
 const application = require('./src/application');
+const intake = require('./src/intake');
 const pendingApplications = new Set();
 
 const PORT = Number(process.env.PORT || 3000);
@@ -178,10 +179,19 @@ async function route(req, res) {
   // that run live when it starts. A browser paired through Telegram has the server send it; otherwise the
   // person pastes it.
   const handoffTask = ho => `Use the HireBuddy skill to find me work. My request: "${ho.prompt}"`;
+  if (p === '/api/job-search/details' && req.method === 'POST') {
+    const body = JSON.parse(await readBody(req) || '{}');
+    const profile = store.db.students.find(s => s.id === body.studentId);
+    return json(res, 200, intake.collect(String(body.prompt || '').slice(0, 2000), profile, body.details));
+  }
   if (p === '/api/handoffs' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
-    const prompt = String(body.prompt || '').trim().slice(0, 2000);
+    let prompt = String(body.prompt || '').trim().slice(0, 2000);
     if (!prompt) return json(res, 400, { error: 'prompt required' });
+    const profile = store.db.students.find(s => s.id === body.studentId);
+    const collected = intake.collect(prompt, profile, body.details);
+    if (!collected.complete) return json(res, 422, { error: 'Please provide the missing applicant details before searching for jobs.', ...collected });
+    prompt = intake.append(prompt, collected.details);
     const ho = { id: `ho-${Math.random().toString(36).slice(2, 8)}`, prompt, createdAt: new Date().toISOString(), runId: null };
     store.db.handoffs = (store.db.handoffs || []).concat(ho).slice(-200);
     store.save();

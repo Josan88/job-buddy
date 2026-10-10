@@ -16,6 +16,8 @@ When a Telegram task starts with `HireBuddy selected-job application request`, t
 - An employer wants to hire: "Need a weekend barista for MIXUE in Subang, RM12/hr, start next week"
 
 ## Plan for a job seeker (do all of it, in order)
+Before web scraping or searching job sites, verify that name, age, work experience, education, location, and interested job position are known from the user's resume or prompt. The JobBuddy website collects missing fields before its search handoff and includes them as `Collected applicant details`; use those facts without asking again. Save known age, workExperience, education and interestedPosition via applicantDetails in hirebuddy_1_understand so JobBuddy can reuse previously extracted resume details. If a request reaches you without all six, do not begin web scraping: return the missing fields to JobBuddy for the user to complete, then proceed only with the updated collected details. An explicit “No work experience” is valid; never infer age or invent missing facts.
+
 Communicate directly and concisely, using one short sentence whenever possible;
 First, ask the user where their `resume.docx` is located. Open the
 file and extract their resume details. Then ask for their job
