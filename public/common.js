@@ -1,4 +1,4 @@
-// Shared by every page: text size control (remembered) and the person's name in the header.
+// Shared by every page: text size control (remembered).
 (function () {
   const root = document.documentElement;
   const buttons = document.querySelectorAll('.textsize button');
@@ -9,29 +9,13 @@
     sync();
   }));
   sync();
-  try {
-    const me = JSON.parse(localStorage.getItem('hirebuddy.me'));
-    const link = document.getElementById('me-link');
-    if (me && link) link.textContent = `My page (${me.name.split(' ')[0]})`;
-  } catch (e) {}
-  // "Speak out loud": the page says its updates through the computer's voice, for people without a
-  // screen reader (and for the room in a demo). On by default; screen reader users can turn it off.
-  const t = document.getElementById('speak-toggle');
-  let on = true;
-  try { on = localStorage.getItem('hirebuddy.speak') !== 'off'; } catch (e) {}
-  if (!('speechSynthesis' in window)) { on = false; if (t) t.remove(); }
-  window.HB_SPEAK = on;
-  if (t) {
-    t.setAttribute('aria-pressed', String(on));
-    t.addEventListener('click', () => {
-      window.HB_SPEAK = !window.HB_SPEAK;
-      t.setAttribute('aria-pressed', String(window.HB_SPEAK));
-      try { localStorage.setItem('hirebuddy.speak', window.HB_SPEAK ? 'on' : 'off'); } catch (e) {}
-      speechSynthesis.cancel();
-      if (window.HB_SPEAK) speechSynthesis.speak(Object.assign(new SpeechSynthesisUtterance('Speaking out loud is on.'), { lang: 'en-GB' }));
-    });
-  }
 })();
+
+// The demo menu closes with Escape (focus back on it) or a click elsewhere.
+document.querySelectorAll('details.menu').forEach(m => {
+  m.addEventListener('keydown', e => { if (e.key === 'Escape' && m.open) { m.open = false; m.querySelector('summary').focus(); } });
+  document.addEventListener('click', e => { if (m.open && !m.contains(e.target)) m.open = false; });
+});
 
 window.HB = {
   esc: s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
@@ -39,11 +23,6 @@ window.HB = {
   announce(text) {
     const r = document.getElementById('announcer');
     if (r) { r.textContent = ''; setTimeout(() => { r.textContent = text; }, 60); }
-    if (window.HB_SPEAK && text) {
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'en-GB'; u.rate = 1.05;
-      speechSynthesis.speak(u);
-    }
   },
   // Optional voice output for low-vision users who don't run a screen reader.
   speak(text, button) {
@@ -55,35 +34,48 @@ window.HB = {
     speechSynthesis.speak(u);
     if (button) button.textContent = 'Stop reading';
   },
+  // Listen until the person presses Enter (or the button again). Escape cancels. Calls done(text), with ''
+  // when nothing was heard or it was cancelled. Returns a stop function, or null without speech recognition.
+  listen(lang, done) {
+    const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Rec) return null;
+    const rec = new Rec();
+    rec.lang = lang; rec.continuous = true; rec.interimResults = false;
+    let text = '', cancelled = false, error = '';
+    rec.onresult = e => { text = [...e.results].map(r => r[0].transcript).join(' ').trim(); };
+    rec.onerror = e => { error = e.error; };
+    const key = e => {
+      if (e.key !== 'Enter' && e.key !== 'Escape') return;
+      e.preventDefault(); e.stopPropagation();
+      cancelled = e.key === 'Escape';
+      rec.stop();
+    };
+    document.addEventListener('keydown', key, true);
+    rec.onend = () => {
+      document.removeEventListener('keydown', key, true);
+      if (error === 'not-allowed' || error === 'service-not-allowed') window.HB.announce('The browser blocked the microphone. Allow it in the address bar, then try again.');
+      done(cancelled ? '' : text);
+    };
+    try { rec.start(); } catch (e) { rec.onend(); }
+    return () => rec.stop();
+  },
 };
 
-// Voice commands: press Alt+V (or the "Voice command" button), then say a button's name, such as
-// "Find me work", "first example" or "read aloud". "What can I say" lists the buttons on screen.
+// Voice commands: press Alt+V (or the "Voice command" button), say a button's name, such as
+// "Hand it to WorkBuddy", "first example" or "read aloud", then press Enter. "What can I say" lists the buttons on screen.
 // Without speech recognition in the browser, a box asks for the button's name instead.
 (function () {
   const btn = document.getElementById('voice-command');
-  const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
   const norm = t => String(t || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
   const ORDINALS = { first: 0, one: 0, '1': 0, second: 1, two: 1, '2': 1, third: 2, three: 2, '3': 2, fourth: 3, four: 3, '4': 3 };
   const visible = el => !el.disabled && !el.closest('[hidden]') && el.getClientRects().length > 0;
   const nameOf = el => norm(el.getAttribute('aria-label') || el.textContent).replace(/^use this example /, 'example ');
   // Buttons on the page first, then the menu; the text-size buttons are left out.
-  const targets = () => [...document.querySelectorAll('main button, main a.btn, main summary, main input[type=radio]'), ...document.querySelectorAll('header nav a, #speak-toggle')]
+  const targets = () => [...document.querySelectorAll('main button, main a.btn, main summary, main input[type=radio]'), ...document.querySelectorAll('header nav a')]
     .filter(el => el !== btn && visible(el))
     .map(el => ({ el, name: el.matches('input') ? norm(el.closest('label')?.textContent) : nameOf(el) }))
     .filter(t => t.name);
-  const say = (text, then) => {
-    if (window.HB_SPEAK && 'speechSynthesis' in window) {
-      speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'en-GB'; u.rate = 1.05;
-      if (then) u.onend = u.onerror = then;
-      speechSynthesis.speak(u);
-    } else {
-      window.HB.announce(text);
-      if (then) setTimeout(then, 1200 + text.length * 40);
-    }
-  };
+  const say = text => window.HB.announce(text);
   const short = n => n.split(' ').slice(0, 6).join(' ');
   const listing = () => {
     const names = targets().map(t => t.name.startsWith('example ') ? null : short(t.name)).filter(Boolean);
@@ -116,22 +108,18 @@ window.HB = {
     best.el.click();
   }
 
+  let stop = null;
   function start() {
-    if (!Rec) {
-      const typed = window.prompt('Type the name of the button you want, for example Find me work. Type help to hear the buttons.');
+    if (stop) return stop();
+    const reset = () => { stop = null; if (btn) { btn.disabled = false; btn.textContent = 'Voice command'; } };
+    stop = window.HB.listen('en-GB', heard => { reset(); if (heard) act(heard); else say("I didn't hear a button. Press Alt V to try again."); });
+    if (!stop) {
+      const typed = window.prompt('Type the name of the button you want, for example Hand it to WorkBuddy. Type help to hear the buttons.');
       if (typed) act(typed);
       return;
     }
-    if (btn) { btn.disabled = true; btn.textContent = 'Listening…'; }
-    say('Say a button.', () => {
-      const rec = new Rec();
-      rec.lang = 'en-GB'; rec.interimResults = false; rec.maxAlternatives = 1;
-      let got = false;
-      rec.onresult = e => { got = true; act(e.results[0][0].transcript); };
-      rec.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { got = true; say('The browser blocked the microphone. Allow it in the address bar, then try again.'); } };
-      rec.onend = () => { if (btn) { btn.disabled = false; btn.textContent = 'Voice command'; } if (!got) say("I didn't hear anything. Press Alt V to try again."); };
-      try { rec.start(); } catch (e) { rec.onend(); }
-    });
+    if (btn) btn.textContent = 'Listening. Press Enter to stop';
+    say('Listening. Say a button, then press Enter.');
   }
 
   if (btn) btn.addEventListener('click', start);

@@ -30,7 +30,7 @@ From that one sentence, with no further questions, HireBuddy:
 - Keyboard only throughout, with a thick yellow focus ring. Buttons are at least 48 pixels high.
 - AAA-contrast colours, Atkinson Hyperlegible (the Braille Institute's typeface for low vision), a remembered text-size control (up to 150%), dark mode, reduced motion respected.
 - Status always in words ("Suits you", "Not suitable", "Passed"), never colour alone. Tables have captions and header cells.
-- "Read aloud" speaks the result for people who don't use a screen reader; "Speak instead" takes the sentence by voice where the browser supports it.
+- "Read aloud" speaks the result for people who don't use a screen reader; "Speak instead" takes the sentence by voice where the browser supports it (press Enter to stop).
 - Automated check: axe-core reports 0 WCAG 2.2 AA violations on every page, in light and dark mode, on desktop and phone widths.
 
 ## Try it
@@ -38,7 +38,8 @@ From that one sentence, with no further questions, HireBuddy:
 **Live app: https://hirebuddy-k543.onrender.com** (free tier, so the first load after idle can take about a minute)
 
 - **Web app:** type a sentence on the home page, or pick an example.
-- **My page (`/me`):** pick who you are, with no password. A job seeker hears their interviews first (when, how to join), can accept or say they can't make it, then sees jobs that suit them and why others don't. An employer sees their jobs and booked interviews.
+- **My details (`/me`):** pick who you are, with no password (switch person from the Demo menu). A job seeker hears their interviews first (when, how to join), can accept or say they can't make it, edits how they describe themselves, uploads a resume, then sees jobs that suit them and why others don't. An employer sees their jobs and booked interviews.
+- **Demo menu:** Jobs, Emails and How it works are demo pages, folded into the menu in the header.
 - **From WorkBuddy:** see [WorkBuddy setup](#workbuddy-setup).
 - **From a terminal:** `node workbuddy/hirebuddy-skill/scripts/hirebuddy.js "<your sentence>"`
 

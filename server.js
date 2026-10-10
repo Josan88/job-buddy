@@ -11,6 +11,9 @@ const telegram = require('./src/telegram');
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC = path.join(__dirname, 'public');
+const RESUMES = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'resumes');
+const RESUME_MAX = 5 * 1024 * 1024;
+const RESUME_TYPES = { 'application/pdf': 'pdf', 'application/msword': 'doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx', 'text/plain': 'txt' };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
 
 function baseUrl(req) {
@@ -41,9 +44,12 @@ function readBody(req) {
 
 // One shell for every page: skip link, labelled landmarks, the current page marked for screen readers,
 // and a text-size control that is applied before first paint.
-const NAV = [['/', 'Find work'], ['/me', 'My page'], ['/jobs', 'Jobs'], ['/outbox', 'Emails'], ['/about', 'How it works']];
+// Find work and My details are for the person; the rest are demo pages, folded into a menu.
+const NAV = [['/', 'Find work'], ['/me', 'My details']];
+const DEMO_NAV = [['/me?switch=1', 'Switch person'], ['/jobs', 'Jobs'], ['/outbox', 'Emails'], ['/about', 'How it works']];
 function page(title, inner, { current = '', scripts = '', description = 'HireBuddy: say what work you want in one sentence. An agent finds jobs that suit blind and low-vision people, applies, books interviews and checks its own work.' } = {}) {
-  const nav = NAV.map(([href, label]) => `<li><a href="${href}"${href === current ? ' aria-current="page"' : ''}${href === '/me' ? ' id="me-link"' : ''}>${label}</a></li>`).join('');
+  const link = ([href, label]) => `<li><a href="${href}"${href === current ? ' aria-current="page"' : ''}>${label}</a></li>`;
+  const nav = NAV.map(link).join('') + `<li><details class="menu"${DEMO_NAV.some(([h]) => h === current) ? ' data-current' : ''}><summary aria-label="Demo menu"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg> Demo</summary><ul>${DEMO_NAV.map(link).join('')}</ul></details></li>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · HireBuddy</title><meta name="description" content="${esc(description)}">
 <link rel="icon" href="/favicon.svg">
@@ -58,8 +64,7 @@ function page(title, inner, { current = '', scripts = '', description = 'HireBud
 <nav aria-label="Main"><ul>${nav}</ul></nav>
 <div class="textsize" role="group" aria-label="Text size"><span aria-hidden="true">Text size</span>
 <button type="button" class="secondary" data-size="normal" aria-label="Normal text">A</button><button type="button" class="secondary" data-size="large" aria-label="Large text">A+</button><button type="button" class="secondary" data-size="larger" aria-label="Largest text">A++</button></div>
-<button type="button" class="secondary" id="speak-toggle" aria-pressed="true" title="Turn off if you use a screen reader">Speak out loud</button>
-<button type="button" class="secondary" id="voice-command" aria-keyshortcuts="Alt+V" title="Alt+V, then say a button">Voice command</button>
+<button type="button" class="secondary" id="voice-command" aria-keyshortcuts="Alt+V" title="Alt+V, say a button, then Enter">Voice command</button>
 </div></header>
 <main id="main" tabindex="-1">${inner}</main>
 <footer><p>Built to work with screen readers (NVDA, JAWS, VoiceOver, TalkBack), with a keyboard alone, and at large text sizes. People and employers in this demo are fictional.</p></footer>
@@ -238,6 +243,49 @@ async function route(req, res) {
       businesses: businesses.map(b => ({ name: b, jobs: store.db.jobs.filter(j => j.business === b).length })),
     });
   }
+  // A job seeker edits their own description (the agent screens against it) and keeps one resume file.
+  if ((m = p.match(/^\/api\/me\/student\/([\w-]+)\/about$/)) && req.method === 'POST') {
+    const s = store.db.students.find(x => x.id === m[1]);
+    if (!s) return json(res, 404, { error: 'not found' });
+    const bio = String(JSON.parse(await readBody(req) || '{}').bio || '').trim().slice(0, 3000);
+    if (!bio) return json(res, 400, { error: 'Write something about yourself first.' });
+    s.bio = bio;
+    store.save();
+    return json(res, 200, { ok: true, bio });
+  }
+  if ((m = p.match(/^\/api\/me\/student\/([\w-]+)\/resume$/))) {
+    const s = store.db.students.find(x => x.id === m[1]);
+    if (!s) return json(res, 404, { error: 'not found' });
+    const file = path.join(RESUMES, `${s.id}`);
+    if (req.method === 'GET') {
+      if (!s.resume || !fs.existsSync(file)) return json(res, 404, { error: 'no resume' });
+      res.writeHead(200, { 'content-type': s.resume.type, 'content-disposition': `inline; filename="${s.resume.name.replace(/[^\w. -]/g, '_')}"` });
+      return fs.createReadStream(file).pipe(res);
+    }
+    if (req.method === 'DELETE') {
+      fs.rmSync(file, { force: true });
+      delete s.resume;
+      store.save();
+      return json(res, 200, { ok: true });
+    }
+    if (req.method === 'PUT') {
+      const fname = decodeURIComponent(String(req.headers['x-filename'] || ''));
+      // Some browsers send no type for Word files, so fall back to the file's extension.
+      let type = String(req.headers['content-type'] || '').split(';')[0];
+      if (!RESUME_TYPES[type]) type = Object.keys(RESUME_TYPES).find(t => fname.toLowerCase().endsWith(`.${RESUME_TYPES[t]}`)) || type;
+      if (!RESUME_TYPES[type]) return json(res, 415, { error: 'Use a PDF, Word or text file.' });
+      const chunks = []; let size = 0;
+      for await (const c of req) { size += c.length; if (size > RESUME_MAX) return json(res, 413, { error: 'The file is over 5 MB.' }); chunks.push(c); }
+      if (!size) return json(res, 400, { error: 'The file is empty.' });
+      fs.mkdirSync(RESUMES, { recursive: true });
+      fs.writeFileSync(file, Buffer.concat(chunks));
+      const name = (fname || `resume.${RESUME_TYPES[type]}`).slice(0, 120);
+      s.resume = { name, type, size, at: new Date().toISOString() };
+      store.save();
+      return json(res, 200, { ok: true, resume: s.resume });
+    }
+    return json(res, 405, { error: 'method not allowed' });
+  }
   if ((m = p.match(/^\/api\/me\/student\/([\w-]+)$/))) {
     const s = store.db.students.find(x => x.id === m[1]);
     if (!s) return json(res, 404, { error: 'not found' });
@@ -267,7 +315,7 @@ async function route(req, res) {
       .map(r => { const j = store.db.jobs.find(x => x.id === r.jobId); return { jobId: r.jobId, title: r.title, business: r.business, area: r.area, pay: r.pay,
         schedule: L.describeSchedule(j.schedule), distanceKm: L.distanceKm(j.area, s.area), score: r.score, url: `${base}/jobs/${r.jobId}`,
         workMode: r.workMode, access: s.needs ? r.access : null, suitable: r.suitable, whyNot: r.whyNot }; });
-    return json(res, 200, { student: { id: s.id, name: s.name, area: s.area, campus: s.campus, skills: s.skills, needs: s.needs || null, minPay: s.expectedRate || null, free: L.describeSchedule(s.availability || {}) }, mine, open });
+    return json(res, 200, { student: { id: s.id, name: s.name, bio: s.bio || '', resume: s.resume || null, area: s.area, campus: s.campus, skills: s.skills, needs: s.needs || null, minPay: s.expectedRate || null, free: L.describeSchedule(s.availability || {}) }, mine, open });
   }
   if (p === '/api/me/business') {
     const name = url.searchParams.get('name') || '';
