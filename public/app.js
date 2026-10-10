@@ -52,6 +52,47 @@ let outcome = {};
 let lastActive = -1;
 let telegramOn = false;
 
+// A quiet periodic tone reassures someone who cannot see the progress animation that
+// HireBuddy is still working. It begins from the user's submit action where possible,
+// and never creates more than one timer or AudioContext.
+const progressSound = (() => {
+  let context = null;
+  let timer = null;
+  const ping = async () => {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    try {
+      context ||= new AudioContext();
+      if (context.state === 'suspended') await context.resume();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 660;
+      gain.gain.setValueAtTime(0.035, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.12);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.12);
+    } catch (error) {
+      console.warn('[HireBuddy progress sound] could not play', error);
+    }
+  };
+  return {
+    start() {
+      if (timer) return;
+      console.info('[HireBuddy progress sound] started');
+      ping();
+      timer = setInterval(ping, 6000);
+    },
+    stop() {
+      if (!timer) return;
+      clearInterval(timer);
+      timer = null;
+      console.info('[HireBuddy progress sound] stopped');
+    }
+  };
+})();
+
 function setPersona(p) {
   persona = p;
   document.querySelectorAll('input[name="persona"]').forEach(r => { r.checked = r.value === p; });
@@ -146,6 +187,7 @@ $('#ask').onsubmit = async e => {
   err.hidden = true;
   $('#prompt').removeAttribute('aria-invalid');
   $('#go').disabled = true;
+  progressSound.start();
   const r = await fetch('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, persona }) }).then(r => r.json());
   history.pushState({}, '', `/runs/${r.id}`);
   openRun(r.id, true);
@@ -272,12 +314,14 @@ $('#handoff').onclick = async () => {
   // One hand-off at a time: a second press (or a stray Enter) while this one is under way does nothing.
   if ($('#handoff').getAttribute('aria-disabled') === 'true') return;
   $('#handoff').setAttribute('aria-disabled', 'true');
+  progressSound.start();
   setTimeout(() => $('#handoff').removeAttribute('aria-disabled'), 15000);
   if (tgKey()) announce('Sending to WorkBuddy through Telegram.');
   const url = intakeHandoff ? `/api/handoffs/${intakeHandoff.id}/details` : '/api/handoffs';
   const h = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, studentId,
     details: intakeDetails, revision: intakeHandoff?.revision, key: tgKey() || undefined }) }).then(r => r.json()).catch(() => null);
   if (!h?.task) {
+    progressSound.stop();
     $('#handoff').removeAttribute('aria-disabled');
     err.hidden = false;
     err.textContent = h?.error || 'Error: HireBuddy could not make the task. Check your internet connection and try again.';
@@ -342,6 +386,7 @@ async function followHandoff(id, notStarted, sentAt) {
     const st = await fetch(`/api/handoffs/${id}`).then(r => r.json()).catch(() => null);
     if (generation !== handoffFollowGeneration) return;
     if (st?.intake?.status === 'needs_details') {
+      progressSound.stop();
       intakeHandoff = { id, revision: st.intake.revision };
       intakeDetails = st.intake.answers || {};
       $('#applicant-intake').hidden = false;
@@ -361,12 +406,14 @@ async function followHandoff(id, notStarted, sentAt) {
       return openRun(st.runId, false);
     }
   }
+  progressSound.stop();
   $('#handoff-status').textContent = notStarted;
 }
 
 // ---------------------------------------------------------------------------
 
 function openRun(id, fresh) {
+  progressSound.start();
   window.HB.resultRunId = id;
   $('#composer').hidden = true;
   $('#handoff-panel').hidden = true;
@@ -380,10 +427,10 @@ function openRun(id, fresh) {
   const es = new EventSource(`/api/runs/${id}/stream`);
   es.onmessage = m => {
     const e = JSON.parse(m.data);
-    if (e.type === 'end') return es.close();
+    if (e.type === 'end') { progressSound.stop(); return es.close(); }
     render(e, fresh);
   };
-  es.onerror = () => es.close();
+  es.onerror = () => { progressSound.stop(); es.close(); };
 }
 
 const STATE = { done: 'done', active: 'in progress', retry: 'fixing a problem', skipped: 'skipped', pending: 'not started' };
@@ -515,6 +562,7 @@ function pretty(tool, r, ok) {
 }
 
 function showResult(e, live) {
+  progressSound.stop();
   const ok = e.status === 'done';
   const refused = /^I did not publish/.test(e.summary || '');
   $('#run-title').textContent = ok ? 'Done' : 'Stopped';
