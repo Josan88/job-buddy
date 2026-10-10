@@ -167,7 +167,7 @@ async function route(req, res) {
   // Hand Nadia's sentence to WorkBuddy. The website makes a task for the person's own WorkBuddy and follows
   // that run live when it starts. A browser paired through Telegram has the server send it; otherwise the
   // person pastes it.
-  const handoffTask = ho => `Use the HireBuddy skill to find me work. My request: "${ho.prompt}" Check JobStreet and Indeed too.`;
+  const handoffTask = ho => `Use the HireBuddy skill to find me work. My request: "${ho.prompt}"`;
   if (p === '/api/handoffs' && req.method === 'POST') {
     const body = JSON.parse(await readBody(req) || '{}');
     const prompt = String(body.prompt || '').trim().slice(0, 2000);
