@@ -86,6 +86,8 @@ Environment variables (all optional):
 
 WorkBuddy is Tencent's desktop AI agent. HireBuddy plugs into it in two ways:
 
+**Quickest:** from the repo root run `node workbuddy/setup.js`. It checks the live app, then prints the MCP entry below with your machine's path filled in, ready to paste.
+
 **A. MCP server (recommended).** Add HireBuddy to WorkBuddy's MCP servers (`mcp_servers.json` in WorkBuddy's config directory; see `workbuddy/mcp_servers.json`):
 
 ```json
