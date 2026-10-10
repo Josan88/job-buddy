@@ -222,6 +222,8 @@ function bridge() {
       if (allowed.has(origin)) Object.assign(h, { 'access-control-allow-origin': origin, 'access-control-allow-methods': 'GET, POST', 'access-control-allow-headers': 'content-type', 'access-control-allow-private-network': 'true' });
       res.writeHead(code, h); res.end(body ? JSON.stringify(body) : '');
     };
+    // HireBuddy running on this same computer (npm start) counts as HireBuddy too.
+    if (/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) allowed.add(origin);
     if (!hostOk || !allowed.has(origin)) { log('bridge: refused', req.method, req.url, 'from', origin || '(no origin)'); return send(403, { error: 'Only HireBuddy pages may use this bridge.' }); }
     if (req.method === 'OPTIONS') return send(204);
     if (req.method === 'GET' && req.url === '/status') return send(200, { ok: true, app: 'hirebuddy-bridge' });
