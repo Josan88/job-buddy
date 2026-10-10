@@ -214,12 +214,13 @@ async function route(req, res) {
         updatedAt: iv ? (store.db.emails.find(e => e.interviewId === iv.id)?.at || iv.start) : app?.at,
       };
     }).filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
-    const open = store.db.jobs.filter(j => j.status === 'open' && !jobIds.has(j.id) && L.checkWage(j.pay, j.payUnit).ok)
-      .map(j => ({ jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`,
-        schedule: L.describeSchedule(j.schedule), distanceKm: L.distanceKm(j.area, s.area), score: L.scoreMatch(j, s).total, url: `${base}/jobs/${j.id}`,
-        workMode: j.access?.workMode || 'on-site', access: s.needs ? L.accessFit(j, s) : null }))
-      .sort((a, b) => ((b.access?.fit !== 'not suitable') - (a.access?.fit !== 'not suitable')) || b.score - a.score);
-    return json(res, 200, { student: { id: s.id, name: s.name, area: s.area, campus: s.campus, skills: s.skills, needs: s.needs || null }, mine, open });
+    // Same matcher the agent uses, so "Suits you" here always agrees with what the agent would apply to.
+    const open = require('./src/tools').matchJobs(s, { minPay: s.expectedRate || 0, maxDistanceKm: 60, askAboutTech: true })
+      .filter(r => !jobIds.has(r.jobId) && r.legalPay)
+      .map(r => { const j = store.db.jobs.find(x => x.id === r.jobId); return { jobId: r.jobId, title: r.title, business: r.business, area: r.area, pay: r.pay,
+        schedule: L.describeSchedule(j.schedule), distanceKm: L.distanceKm(j.area, s.area), score: r.score, url: `${base}/jobs/${r.jobId}`,
+        workMode: r.workMode, access: s.needs ? r.access : null, suitable: r.suitable, whyNot: r.whyNot }; });
+    return json(res, 200, { student: { id: s.id, name: s.name, area: s.area, campus: s.campus, skills: s.skills, needs: s.needs || null, minPay: s.expectedRate || null, free: L.describeSchedule(s.availability || {}) }, mine, open });
   }
   if (p === '/api/me/business') {
     const name = url.searchParams.get('name') || '';

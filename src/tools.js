@@ -410,12 +410,18 @@ function matchJobs(s, { maxDistanceKm = 25, minPay = 0, maxWalkMin, askAboutTech
     const wage = L.checkWage(j.pay, j.payUnit);
     const access = L.accessFit(j, s, { maxWalkMin, askAboutTech });
     const applied = store.db.applications.some(a => a.jobId === j.id && a.studentId === s.id);
-    const suitable = wage.ok && L.hourlyRate(j) >= minPay && access.fit !== 'not suitable' && sc.total >= MINIMUM_MATCH && sc.requiredCoverage === 1;
+    const freeOverlap = L.overlapMinutes(j.schedule, s.availability || {});
+    const suitable = wage.ok && L.hourlyRate(j) >= minPay && freeOverlap > 0 && access.fit !== 'not suitable' && sc.total >= MINIMUM_MATCH && sc.requiredCoverage === 1;
+    const whyNot = suitable ? null : !wage.ok ? 'it pays below the legal minimum wage'
+      : access.fit === 'not suitable' ? access.blockers[0]
+      : L.hourlyRate(j) < minPay ? `it pays ${`RM${j.pay}/${j.payUnit}`}, below your RM${minPay} an hour`
+      : freeOverlap <= 0 ? `its hours (${L.describeSchedule(j.schedule)}) are outside your free time`
+      : sc.missing.length ? `it asks for ${sc.missing.join(' and ')}` : 'it is a weak match for your skills';
     out.push({
       jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`,
       score: sc.total, requiredCoverage: sc.requiredCoverage, why: L.explain(j, s, sc), evidence: sc.evidence, missing: sc.missing,
       legalPay: wage.ok, belowMinPay: L.hourlyRate(j) < minPay, warning: wage.ok ? null : wage.message,
-      access, suitable, applied, workMode: access.workMode,
+      access, suitable, whyNot, applied, workMode: access.workMode,
     });
   }
   return out.sort((a, b) => (b.suitable - a.suitable) || b.score - a.score);

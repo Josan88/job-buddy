@@ -357,6 +357,13 @@ async function autopilotStudent(ctx) {
 
   let opts = { maxDistanceKm: 25, minPay: p.minPay || 0, maxWalkMin: n?.maxWalkMin, askAboutTech: false };
   const booked = [];
+  // Run again (a rehearsal, or a second visit): interviews already booked still count toward the goal.
+  const existing = store.db.interviews.filter(i => i.studentId === s.id && i.status !== 'declined' && new Date(i.start) > new Date());
+  if (existing.length) {
+    booked.push(...existing.slice(0, goal));
+    ctx.run.interviews = booked.map(i => i.id);
+    say(ctx, `You already have ${booked.length} interview${booked.length === 1 ? '' : 's'} booked from before, so I keep ${booked.length === 1 ? 'it' : 'them'} and only look for more if needed.`);
+  }
   let found;
   for (let round = 1; round <= 6; round++) {
     found = await callTool(ctx, 'search_jobs', { studentId: s.id, ...opts });
@@ -398,10 +405,10 @@ async function autopilotStudent(ctx) {
   }
 
   const check = await callTool(ctx, 'verify_applications', { studentId: s.id });
-  const ivs = store.db.interviews.filter(i => (ctx.run.interviews || []).includes(i.id));
+  const ivs = store.db.interviews.filter(i => (ctx.run.interviews || []).includes(i.id)).sort((a, b) => a.start.localeCompare(b.start));
   const lines = ivs.map((iv, i) => { const j = store.db.jobs.find(x => x.id === iv.jobId); return `${i + 1}. ${j.title} at ${j.business}, ${iv.whenLong}, ${iv.format}${s.needs?.interviewFormat && iv.format !== s.needs.interviewFormat ? ` (they only offer ${(j.access?.interviewFormats || []).join(' or ')})` : ''}. ${iv.howToJoin}`; });
   const skipped = found.results.filter(r => r.legalPay && r.access.fit === 'not suitable' && r.score >= MINIMUM_MATCH).length;
-  const why = r => r.access.fit === 'not suitable' ? r.access.blockers[0] : r.missing?.length ? `the job asks for ${r.missing.join(' and ')}` : r.belowMinPay ? `it pays ${r.pay}, below what you asked` : 'it scored too low';
+  const why = r => r.whyNot;
   const closest = ivs.length < goal ? found.results.filter(r => r.legalPay && !r.suitable && !r.applied).slice(0, 2) : [];
   if (closest.length) ctx.run.suggestions = (ctx.run.suggestions || []).concat(`Closest other jobs: ${closest.map(r => `${r.title} at ${r.business}, not booked because ${why(r)}`).join('; ')}.`);
   await callTool(ctx, 'finish', { summary: ivs.length

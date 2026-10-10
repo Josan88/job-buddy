@@ -5,7 +5,7 @@ const seekers = [
   // Blind and low-vision job seekers (fictional people). needs = what the agent checks every job against.
   {
     id: 'stu-nadia', name: 'Nadia Rahim', email: 'nadia.rahim@example.com', area: 'Subang Jaya',
-    campus: '', expectedRate: 10,
+    campus: '', expectedRate: 12,
     skills: ['customer service', 'phone', 'typing', 'english', 'bahasa melayu', 'screen reader'],
     availability: { Mon: ['09:00-17:00'], Tue: ['09:00-17:00'], Wed: ['09:00-17:00'], Thu: ['09:00-17:00'], Fri: ['09:00-17:00'] },
     needs: { vision: 'blind', screenReader: true, tool: 'NVDA', maxWalkMin: 10, interviewFormat: 'phone', travel: 'LRT' },

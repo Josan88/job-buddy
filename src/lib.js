@@ -70,8 +70,16 @@ function totalMinutes(a) {
   return DAYS.reduce((n, d) => n + ranges(a?.[d]).reduce((m, [s, e]) => m + (e - s), 0), 0);
 }
 
+// Groups runs of days with the same hours, e.g. "Mon to Fri 09:00-17:00; Sat 10:00-14:00".
 function describeSchedule(s) {
-  return WEEK.filter(d => s?.[d]?.length).map(d => `${d} ${s[d].join(', ')}`).join('; ') || 'flexible';
+  const runs = [];
+  for (const d of WEEK) {
+    const hrs = s?.[d]?.length ? s[d].join(', ') : null;
+    const last = runs[runs.length - 1];
+    if (hrs && last && last.hrs === hrs && WEEK.indexOf(last.to) === WEEK.indexOf(d) - 1) last.to = d;
+    else if (hrs) runs.push({ from: d, to: d, hrs });
+  }
+  return runs.map(r => `${r.from}${r.to !== r.from ? `${WEEK.indexOf(r.to) - WEEK.indexOf(r.from) > 1 ? ' to ' : ' and '}${r.to}` : ''} ${r.hrs}`).join('; ') || 'flexible';
 }
 
 // Malaysia time is UTC+8 with no daylight saving.
@@ -256,7 +264,7 @@ function accessFit(job, person, relax = {}) {
   else if (!a.transit) out.blockers.push('no train or bus stop is listed near the workplace');
   else if (a.transit.walkMin > maxWalk) out.blockers.push(`it is a ${a.transit.walkMin}-minute walk from ${a.transit.station}, more than your ${maxWalk} minutes`);
   else out.reasons.push(`${mode === 'hybrid' ? 'hybrid, ' : ''}${a.transit.walkMin}-minute walk from ${a.transit.station}`);
-  for (const t of a.sightTasks || []) out.blockers.push(`the listing requires: ${t}`);
+  for (const t of a.sightTasks || []) out.blockers.push(`the job involves ${t}`);
   if (a.computerWork === false) out.reasons.push('no computer work, so no screen reader needed');
   else if (n.screenReader) {
     const at = (a.assistiveTech || []).filter(x => !/magnif|zoom/i.test(x));

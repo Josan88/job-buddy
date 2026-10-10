@@ -64,10 +64,10 @@ async function showStudent(me, focus) {
   const n = d.student.needs;
   const ivs = d.mine.filter(a => a.status === 'interview').sort((a, b) => a.interview.start.localeCompare(b.interview.start));
   const others = d.mine.filter(a => a.status !== 'interview');
-  const suits = d.open.filter(j => !j.access || j.access.fit !== 'not suitable');
-  const notFor = d.open.filter(j => j.access && j.access.fit === 'not suitable');
+  const suits = d.open.filter(j => j.suitable);
+  const notFor = d.open.filter(j => !j.suitable);
   document.title = `${me.name} · HireBuddy`;
-  $('#view').innerHTML = header(me, `${esc(d.student.area)}${n ? `. ${esc(n.vision.replace(/^\w/, c => c.toUpperCase()))}, uses ${esc(n.tool)}` : ''}`) + `
+  $('#view').innerHTML = header(me, `${esc(d.student.area)}${n ? `. ${esc(n.vision.replace(/^\w/, c => c.toUpperCase()))}, uses ${esc(n.tool)}` : ''}. Free ${esc(d.student.free)}${d.student.minPay ? `. At least RM${esc(d.student.minPay)} an hour` : ''}`) + `
     <p id="iv-msg" class="panel" hidden tabindex="-1"></p>
     <h2>Your interviews (${ivs.length})</h2>
     ${ivs.length ? `<ol class="interviews">${ivs.map(interviewCard).join('')}</ol>` : '<p>No interviews yet. <a href="/">Ask HireBuddy to find you work</a>.</p>'}
@@ -77,9 +77,9 @@ async function showStudent(me, focus) {
       ${a.status === 'declined' && a.interview?.replanRunId ? `<p><a href="/runs/${esc(a.interview.replanRunId)}">What HireBuddy did next</a></p>` : ''}</li>`).join('')}</ul>` : '<p>No other applications.</p>'}
     <h2>Jobs that suit you (${suits.length})</h2>
     <ul class="joblist">${suits.map(j => `<li><h3><a href="${esc(j.url)}">${esc(j.title)}</a></h3>
-      <p>${esc(j.business)}, ${esc(j.workMode)}. ${esc(j.pay)}. Match ${j.score} out of 100.</p>
-      ${j.access ? `<p>${j.access.fit === 'good' ? 'Suits you' : 'Ask first'}: ${esc([...j.access.reasons, ...j.access.asks].join('; '))}.</p>` : ''}</li>`).join('') || '<li>None right now.</li>'}</ul>
-    ${notFor.length ? `<details><summary>Jobs that don't suit your needs (${notFor.length})</summary><ul>${notFor.map(j => `<li>${esc(j.title)} at ${esc(j.business)}: ${esc(j.access.blockers.join('; '))}.</li>`).join('')}</ul></details>` : ''}`;
+      <p>${esc(j.business)}, ${esc(j.workMode)}. ${esc(j.pay)}. ${esc(j.schedule)}. Match ${j.score} out of 100.</p>
+      ${j.access ? `<p>${j.access.fit === 'good' ? 'Suits you' : 'Ask first'}: ${esc([...j.access.reasons, ...j.access.asks].join('; '))}.</p>` : ''}</li>`).join('') || (d.mine.length ? '<li>None left. HireBuddy has already applied to every job that suits you.</li>' : '<li>None right now.</li>')}</ul>
+    ${notFor.length ? `<details><summary>Other jobs, and why they don't suit you (${notFor.length})</summary><ul>${notFor.map(j => `<li>${esc(j.title)} at ${esc(j.business)}: ${esc(j.whyNot)}.</li>`).join('')}</ul></details>` : ''}`;
   bind(me);
   if (focus) $('#me-title').focus();
 }
