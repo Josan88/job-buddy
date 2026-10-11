@@ -149,7 +149,6 @@ All environment variables are optional:
 | `BREVO_API_KEY`, `DEMO_INBOX` | Send demo email through Brevo |
 | `RESEND_API_KEY` | Use Resend as the email provider |
 | `PUBLIC_URL` | Set the public base URL |
-| `RESET_TOKEN` | Protect the reset endpoint |
 | `DATA_DIR` | Choose where `db.json` is stored |
 
 ## Deploy on Render

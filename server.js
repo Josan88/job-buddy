@@ -430,22 +430,18 @@ async function route(req, res) {
   }
   // Before a demo: one button puts the demo data back to the start (fresh jobs, no applications or runs).
   if (p === '/reset') {
-    const token = process.env.RESET_TOKEN;
     let msg = '';
     if (req.method === 'POST') {
-      const form = new URLSearchParams(await readBody(req));
-      if (token && form.get('token') !== token) msg = '<p class="panel bad" role="alert" tabindex="-1" id="msg">Wrong reset code. Nothing was changed.</p>';
-      else { store.reset(); msg = `<p class="panel good" role="status" tabindex="-1" id="msg">Done. The demo data is back to the start: ${store.db.jobs.length} open jobs, no applications, no interviews.</p>`; }
+      store.reset();
+      msg = `<p class="panel good" role="status" tabindex="-1" id="msg">Done. The demo data is back to the start: ${store.db.jobs.length} open jobs, no applications, no interviews.</p>`;
     }
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'x-robots-tag': 'noindex' });
     return res.end(page('Reset the demo', `<h1>Reset the demo</h1>${msg}
       <p>This removes every application, interview, email and agent run, and puts the demo jobs and people back to the start. Use it just before a demo so the run starts fresh.</p>
-      <form method="post" action="/reset">${token ? '<label for="token">Reset code</label><input type="text" id="token" name="token" autocomplete="off">' : ''}
+      <form method="post" action="/reset">
       <p class="actions"><button type="submit">Reset the demo data</button></p></form>`, { scripts: msg ? '<script>document.getElementById("msg").focus()</script>' : '' }));
   }
   if (p === '/api/reset' && req.method === 'POST') {
-    const token = process.env.RESET_TOKEN;
-    if (token && url.searchParams.get('token') !== token) return json(res, 403, { error: 'bad token' });
     store.reset();
     return json(res, 200, { ok: true });
   }
