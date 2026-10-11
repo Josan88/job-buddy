@@ -579,7 +579,7 @@ function showResult(e, live) {
   const scoredJobs = jobs.length ? `<h3>Suitable jobs and match scores</h3><ol class="joblist">${jobs.map(j => `<li class="job-card" tabindex="0" data-result-card>
     <div class="person-top"><h4><a href="${esc(j.url)}">${esc(j.title)}</a> at ${esc(j.business)}</h4>${scoreCard(j.score)}</div>
     <p>${esc(j.pay)}. ${accessText(j.access)}</p><p>${esc(j.why || '')}</p>
-    <p><button type="button" data-job-apply="${esc(j.jobId)}" data-student-id="${esc(outcome.studentId || '')}">Apply for ${esc(j.title)} at ${esc(j.business)} through Telegram</button></p>
+    <p><button type="button" data-job-apply="${esc(j.jobId)}" data-student-id="${esc(outcome.studentId || '')}" aria-label="Apply for ${esc(j.title)} at ${esc(j.business)}">Apply</button></p>
     <p data-application-status role="status" tabindex="-1"></p></li>`).join('')}</ol>` : '';
   const out = outcome.outside || [];
   const others = out.length ? `<h3>Jobs WorkBuddy found on other sites</h3>
@@ -588,7 +588,7 @@ function showResult(e, live) {
       <p id="outside-detail-${i}">${esc(r.location || '')} ${esc(r.pay || '')} ${esc(r.hours || '')}</p>
       <p><span class="status-word ${r.verdict === 'not suitable' ? 'bad' : 'good'}">${r.verdict === 'not suitable' ? 'Not suitable' : 'Worth asking'}</span>
       ${esc(r.verdict === 'not suitable' ? r.blockers.join('; ') : r.reasons.join('; '))}.</p>
-      ${r.draft ? `<p><button type="button" data-result-apply="${i}">Apply for ${esc(r.title)} at ${esc(r.employer || 'this company')} through Telegram</button></p><p data-application-status role="status" tabindex="-1"></p><details><summary>Application ready to send, with ${(r.questions || r.asks || []).length} question${(r.questions || r.asks || []).length === 1 ? '' : 's'} for ${esc(r.employer || 'the employer')}</summary>
+      ${r.draft ? `<p><button type="button" data-result-apply="${i}" aria-label="Apply for ${esc(r.title)} at ${esc(r.employer || 'this company')}">Apply</button></p><p data-application-status role="status" tabindex="-1"></p><details><summary>Application ready to send, with ${(r.questions || r.asks || []).length} question${(r.questions || r.asks || []).length === 1 ? '' : 's'} for ${esc(r.employer || 'the employer')}</summary>
         <pre>${esc(r.draft)}</pre></details>` : ''}</li>`).join('')}</ol>` : '';
   const rest = lines.slice(1);
   const visibleLinks = (e.links || []).filter(link => link.label !== 'Agent run log');
