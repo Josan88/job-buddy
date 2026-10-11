@@ -10,7 +10,7 @@ function prepare(job, student, base) {
       description: job.description, requirements: job.requirements, location: job.area,
       pay: job.pay, payUnit: job.payUnit, hours: job.hours || L.describeSchedule(job.schedule || {}), startDate: job.startDate },
     applicant: { name: student.name, email: student.email, location: student.area, skills: student.skills,
-      experience: student.bio, availability: L.describeSchedule(student.availability),
+      experience: student.bio, availability: L.totalMinutes(student.availability) ? L.describeSchedule(student.availability) : 'Not provided',
       accessibilityNeeds: student.needs || null,
       resume: student.resume ? { name: student.resume.name, url: `${base}/api/me/student/${student.id}/resume` } : null },
   };

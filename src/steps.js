@@ -7,7 +7,7 @@ const L = require('./lib');
 const parse = require('./parse');
 const outside = require('./outside');
 const agent = require('./agent');
-const { matchJobs } = require('./tools');
+const { matchJobs, scheduleSchema } = require('./tools');
 
 const GOAL = agent.SEEKER_GOAL;
 
@@ -61,9 +61,12 @@ steps.hirebuddy_1_understand = {
     type: 'object',
     properties: {
       prompt: { type: 'string', description: 'The user\'s words, unchanged' },
-      applicantDetails: { type: 'object', description: 'Optional facts extracted from this applicant’s resume or explicitly supplied by the user. Never invent missing details.',
-        properties: { education: { type: 'string' },
-          age: { type: 'number' }, workExperience: { type: 'string' }, interestedPosition: { type: 'string' } }, additionalProperties: false },
+      applicantDetails: { type: 'object', description: 'Facts extracted from this applicant’s resume or explicitly supplied by the user. Fill every field the resume states (skills especially), since the profile is built from these plus the prompt. Never invent missing details; leave a field out if unknown.',
+        properties: { name: { type: 'string' }, email: { type: 'string' }, area: { type: 'string', description: 'Where they live or want to work, e.g. "Subang Jaya"' },
+          skills: { type: 'array', items: { type: 'string' }, description: 'Short lowercase phrases, e.g. "software development", "javascript", "customer service"' },
+          availability: { ...scheduleSchema, description: 'Only if stated. ' + scheduleSchema.description },
+          minPay: { type: 'number', description: 'Lowest pay they accept, in RM per minPayUnit' }, minPayUnit: { type: 'string', enum: ['hour', 'day', 'month'] },
+          education: { type: 'string' }, age: { type: 'number' }, workExperience: { type: 'string' }, interestedPosition: { type: 'string' } }, additionalProperties: false },
       daily: { type: 'boolean', description: 'true for the scheduled background check: look for new suitable jobs; a day with nothing new is a normal result' },
       listings: { type: 'array', maxItems: 20, description: 'Optional: jobs you found on real job sites, copied as written (title, employer, companyEmail, site, url, pay, location, hours, description). Leave out anything you did not see.', items: { type: 'object' } },
     },
@@ -89,11 +92,12 @@ steps.hirebuddy_1_understand = {
       { title: 'WorkBuddy: check everything again', tool: 'verify_applications' },
       { title: 'WorkBuddy: get the files to save on your computer', tool: 'finish' },
     ] });
-    const p = parse.student(run.prompt);
+    const p = parse.withDetails(parse.student(run.prompt), args.applicantDetails || {});
+    run.resumeArea = p.area || null;
+    const d = args.applicantDetails || {};
     const reg = await agent.callTool(ctx, 'register_student', { name: p.name, email: p.email || undefined, area: p.area, campus: p.campus || undefined, skills: p.skills,
       availability: p.availability, expectedRate: p.expectedRate || undefined, bio: p.bio, needs: p.needs || undefined,
-      education: args.applicantDetails?.education,
-      age: args.applicantDetails?.age, workExperience: args.applicantDetails?.workExperience, interestedPosition: args.applicantDetails?.interestedPosition });
+      education: d.education, age: d.age, workExperience: d.workExperience, interestedPosition: d.interestedPosition });
     if (!reg.ok) return bad((reg.problems || [reg.error]).join(' '), 'Tell the user what is missing in one sentence.');
     const s = student(ctx);
     run.search = { maxDistanceKm: 25, minPay: p.minPay || 0, maxWalkMin: p.needs?.maxWalkMin, askAboutTech: false };
@@ -103,7 +107,7 @@ steps.hirebuddy_1_understand = {
     const n = s.needs;
     return {
       ok: true, runId: run.id, liveLog: `${baseUrl}/runs/${run.id}`,
-      understood: `${s.name}, ${s.area || 'area not given'}, free ${L.describeSchedule(s.availability)}, skills ${s.skills.join(', ')}`
+      understood: `${s.name}, ${s.area || 'area not given'}, ${L.totalMinutes(s.availability) ? `free ${L.describeSchedule(s.availability)}` : 'free time not given'}, skills ${s.skills.join(', ') || 'not given'}`
         + `${n ? `. ${n.vision}, uses ${n.tool}${n.remoteOnly ? ', remote work only' : `, up to a ${n.maxWalkMin || L.DEFAULT_WALK}-minute walk from a stop`}` : ''}`
         + `${s.expectedRate ? `. At least RM${s.expectedRate} an hour` : ''}.`,
       goal: `${GOAL} suitable jobs`, jobsFromOtherSites: outside.clean(listings || []).length,

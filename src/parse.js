@@ -16,7 +16,7 @@ const ROLES = [
 const SKILL_WORDS = ['espresso', 'latte art', 'cashier', 'customer service', 'food handling', 'tutoring', 'mathematics', 'physics',
   'social media', 'canva', 'video editing', 'copywriting', 'data entry', 'excel', 'python', 'web development', 'event crew',
   'photography', 'warehouse', 'driving license', 'english', 'bahasa melayu', 'mandarin', 'cantonese', 'tamil',
-  'phone', 'typing', 'screen reader', 'massage'];
+  'phone', 'typing', 'screen reader', 'massage', 'software development', 'javascript', 'sql', 'computer science'];
 
 // What a blind or low-vision seeker needs, read from their own sentence. null if they mention none.
 function needs(prompt) {
@@ -49,16 +49,26 @@ function to24(h, m, ap) {
   return `${String(H).padStart(2, '0')}:${m || '00'}`;
 }
 
-function parseSchedule(text, defaultHours) {
+// With no day words, defaultDays is used: weekends for an employer's brief, nothing (unknown) for a seeker.
+function parseSchedule(text, defaultHours, defaultDays = ['Sat', 'Sun']) {
   const t = text.toLowerCase();
   let days = [];
   if (/weekend|sat(urday)?s? (and|&) sun|sat-sun/.test(t)) days.push('Sat', 'Sun');
   if (/weekday/.test(t)) days.push('Mon', 'Tue', 'Wed', 'Thu', 'Fri');
+  // "Mon-Fri", "Tuesday to Thursday": every day in the range, not just the two ends.
+  const W = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+  for (const [, x, y] of t.matchAll(/\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\s*(?:-|–|to|until)\s*(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/g)) {
+    const a = W.indexOf(x), b = W.indexOf(y);
+    for (const d of b >= a ? W.slice(a, b + 1) : [...W.slice(a), ...W.slice(0, b + 1)]) {
+      const v = d[0].toUpperCase() + d.slice(1);
+      if (!days.includes(v)) days.push(v);
+    }
+  }
   for (const [k, v] of Object.entries(DAY_WORDS)) if (new RegExp(`\\b${k}s?\\b`).test(t) && !days.includes(v)) days.push(v);
   let hours = /morning/.test(t) ? '08:00-12:00' : /afternoon/.test(t) ? '13:00-17:00' : /evening|night/.test(t) ? '18:00-22:00' : defaultHours;
   const m = t.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|–|to|until)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/);
   if (m) hours = `${to24(m[1], m[2], m[3] || m[6])}-${to24(m[4], m[5], m[6])}`;
-  if (!days.length) days = ['Sat', 'Sun'];
+  if (!days.length) days = defaultDays;
   return Object.fromEntries(days.map(d => [d, [hours]]));
 }
 
@@ -135,15 +145,34 @@ function student(prompt) {
   const skills = SKILL_WORDS.filter(s => L.termsFor(s).some(w => t.includes(w)));
   if (need?.screenReader && !skills.includes('screen reader')) skills.push('screen reader');
   if (/coffee|barista/.test(t) && !skills.includes('espresso')) skills.push('espresso');
-  const pay = parsePay(prompt);
+  // "RM3,000 a month" is a floor of RM3000/month; matching compares hourly.
+  const pay = parsePay(prompt.replace(/(\d),(\d{3})/g, '$1$2'));
+  const hourly = pay ? Math.round(L.hourlyRate(pay) * 100) / 100 : null;
   return {
     name, campus, area: L.findArea(prompt), email: parseEmail(prompt),
-    skills: skills.length ? skills : ['customer service'],
-    availability: parseSchedule(prompt, '09:00-18:00'),
-    expectedRate: pay ? pay.pay : null,
-    minPay: pay ? pay.pay : 0,
+    skills,
+    availability: parseSchedule(prompt, '09:00-18:00', []),
+    expectedRate: hourly,
+    minPay: hourly || 0,
     bio: prompt.trim(), needs: need,
   };
 }
 
-module.exports = { hirer, student, parseEmail, needs, parsePay, parseSchedule };
+// Resume facts WorkBuddy extracted fill in, and override, what the prompt alone says.
+function withDetails(p, d) {
+  const out = { ...p };
+  if (typeof d.name === 'string' && d.name.trim()) out.name = d.name.trim();
+  if (typeof d.email === 'string' && parseEmail(d.email)) out.email = parseEmail(d.email);
+  if (typeof d.area === 'string' && L.findArea(d.area)) out.area = L.findArea(d.area);
+  if (Array.isArray(d.skills)) out.skills = [...new Set([...p.skills, ...d.skills.filter(x => typeof x === 'string' && x.trim()).map(x => x.trim().toLowerCase())])];
+  if (d.availability && L.totalMinutes(d.availability)) out.availability = d.availability;
+  if (typeof d.minPay === 'number' && d.minPay > 0) {
+    out.minPay = out.expectedRate = Math.round(L.hourlyRate({ pay: d.minPay, payUnit: d.minPayUnit || 'hour' }) * 100) / 100;
+  }
+  // Experience and education go in the bio, where matching looks for quoted evidence.
+  out.bio = [p.bio, d.interestedPosition && `Looking for ${d.interestedPosition} roles.`, d.workExperience, d.education]
+    .filter(x => typeof x === 'string' && x.trim()).map(x => x.trim()).join(' ');
+  return out;
+}
+
+module.exports = { hirer, student, withDetails, parseEmail, needs, parsePay, parseSchedule };

@@ -39,7 +39,8 @@ const SIGHT = [
 const ACCESS_WORDS = /screen ?reader|\bnvda\b|\bjaws\b|voiceover|talkback|accessib|disabilit|\boku\b|\bpwd\b|inclusive (employer|workplace)/i;
 const SCORE_SKILLS = ['customer service', 'cashier', 'food handling', 'tutoring', 'mathematics', 'social media',
   'data entry', 'event crew', 'english', 'bahasa melayu', 'phone', 'typing', 'screen reader', 'massage',
-  'copywriting', 'mandarin', 'driving license', 'espresso', 'barista', 'latte art'];
+  'copywriting', 'mandarin', 'driving license', 'espresso', 'barista', 'latte art',
+  'software development', 'web development', 'javascript', 'python', 'sql', 'computer science'];
 
 // "Mon to Fri 9am-6pm", "weekdays 9-5", "full time". Without any day words the hours are unknown.
 function hoursOf(text) {
@@ -100,7 +101,8 @@ function assess(l, s) {
 
   const sched = hoursOf(l.hours || all);
   if (!sched) out.asks.push('What are the working hours?');
-  else if (s.availability && L.overlapMinutes(sched, s.availability) <= 0) out.blockers.push(`its hours (${L.describeSchedule(sched)}) are outside your free time`);
+  else if (!L.totalMinutes(s.availability)) out.reasons.push(`hours ${L.describeSchedule(sched)}`);
+  else if (L.overlapMinutes(sched, s.availability) <= 0) out.blockers.push(`its hours (${L.describeSchedule(sched)}) are outside your free time`);
   else out.reasons.push(`hours ${L.describeSchedule(sched)} overlap your free time`);
 
   // Score external listings with the same 100-point matcher as HireBuddy jobs. Unknown fields receive
@@ -132,7 +134,9 @@ function draft(l, s, asks) {
     '',
     `Dear ${l.employer ? `${l.employer} hiring team` : 'hiring team'},`,
     '',
-    `I would like to apply for the ${l.title} role I saw${l.site ? ` on ${l.site}` : ' advertised'}. My strengths are ${skills.length > 1 ? `${skills.slice(0, -1).join(', ')} and ${skills[skills.length - 1]}` : skills[0] || 'customer service'}, and I am free ${L.describeSchedule(s.availability || {})}.`,
+    `I would like to apply for the ${l.title} role I saw${l.site ? ` on ${l.site}` : ' advertised'}.`
+      + (skills.length ? ` My strengths are ${skills.length > 1 ? `${skills.slice(0, -1).join(', ')} and ${skills[skills.length - 1]}` : skills[0]}.` : '')
+      + (L.totalMinutes(s.availability) ? ` I am free ${L.describeSchedule(s.availability)}.` : ''),
   ];
   if (n.vision) lines.push('', `I am ${n.vision === 'blind' ? 'blind' : 'low vision'} and use ${n.tool || (n.screenReader ? 'a screen reader' : 'screen magnification')}.${n.interviewFormat ? ` A ${n.interviewFormat} interview would suit me best.` : ''} Please send any documents or tests as Word or plain text, not scanned images.`);
   if (asks.length) lines.push('', 'Could you tell me:', ...asks.map((a, i) => `${i + 1}. ${a}`));

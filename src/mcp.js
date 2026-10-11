@@ -23,6 +23,7 @@ const HIGH_LEVEL = [
         persona: { type: 'string', enum: ['student', 'hirer'], description: 'Optional: student = job seeker, hirer = employer. Detected from the prompt if omitted' },
         business: { type: 'string', description: 'Optional business name if the user gave one, e.g. "MIXUE"' },
         ownerEmail: { type: 'string', description: 'Optional owner email to receive the shortlist summary' },
+        applicantDetails: { ...steps.hirebuddy_1_understand.inputSchema.properties.applicantDetails },
         listings: {
           type: 'array', maxItems: 20,
           description: 'Optional, job seekers only: jobs you found on real job sites (JobStreet, Indeed, Hiredly, Maukerja and so on) for this person, read from the pages as they are. HireBuddy checks each one for legal pay, the person\'s pay floor, tasks that need sight, screen reader support, hours and travel, and drafts an application with the questions the listing leaves open. It cannot apply or book on those sites, so nothing is sent. Copy the listing text; do not invent details.',
@@ -70,7 +71,8 @@ const text = (obj, isError = false) => ({ content: [{ type: 'text', text: typeof
 async function callTool(name, args, sessionId, baseUrl) {
   if (name === 'hirebuddy_run') {
     const listings = Array.isArray(args.listings) && args.listings.length ? args.listings : null;
-    const run = agent.newRun(args.prompt, args.persona || (listings ? 'student' : undefined), 'mcp', { business: args.business, ownerEmail: args.ownerEmail, listings });
+    const run = agent.newRun(args.prompt, args.persona || (listings ? 'student' : undefined), 'mcp', { business: args.business, ownerEmail: args.ownerEmail, listings,
+      applicantDetails: args.applicantDetails && typeof args.applicantDetails === 'object' ? args.applicantDetails : null });
     await agent.execute(run, baseUrl);
     const checks = [...run.events].reverse().find(e => e.type === 'checks');
     return text({
@@ -135,7 +137,7 @@ async function handle(req, res, body, baseUrl, allTools = false) {
             protocolVersion: m.params?.protocolVersion || PROTOCOL,
             capabilities: { tools: { listChanged: false } },
             serverInfo: { name: 'hirebuddy', title: 'HireBuddy hiring agent', version: '1.0.0' },
-            instructions: 'For a job seeker: (optionally search real job sites first), then call hirebuddy_1_understand, hirebuddy_2_check_jobs, hirebuddy_3_apply_and_book and hirebuddy_4_verify in order, following each result\'s next field without asking the user, then save the files it returns. For an employer, call hirebuddy_run ONCE with the user\'s words. Never answer a job search with your own report instead: the request is only complete after hirebuddy_4_verify (or hirebuddy_run) returns. For a job seeker, if you can browse, first search real job sites (JobStreet, Indeed, Hiredly, Maukerja) and pass up to 5 listings you found, copied as written, as listings in that same call. It completes the whole job (publish, screen, verify) autonomously. Then report the outcome, self-checks and links. Never stop halfway or ask the user for the next step.',
+            instructions: 'For a job seeker: (optionally search real job sites first), then call hirebuddy_1_understand, hirebuddy_2_check_jobs, hirebuddy_3_apply_and_book and hirebuddy_4_verify in order, following each result\'s next field without asking the user, then save the files it returns. For an employer, call hirebuddy_run ONCE with the user\'s words. Never answer a job search with your own report instead: the request is only complete after hirebuddy_4_verify (or hirebuddy_run) returns. For a job seeker, if you can browse, first search real job sites (JobStreet, Indeed, Hiredly, Maukerja) and pass up to 20 listings you found, copied as written, as listings in that same call. It completes the whole job (publish, screen, verify) autonomously. Then report the outcome, self-checks and links. Never stop halfway or ask the user for the next step.',
           } });
           break;
         case 'ping': reply({ result: {} }); break;

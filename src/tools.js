@@ -359,19 +359,20 @@ tools.register_student = {
     needs: needsSchema,
   }, ['name', 'skills', 'availability', 'bio']),
   run: async (a, ctx) => {
-    // Only record an area the person actually named; never guess one (an LLM may try).
-    const named = typeof ctx.run?.prompt !== 'string' || L.findArea(ctx.run.prompt);
+    // Only record an area the person actually named or their resume states; never guess one (an LLM may try).
+    const named = typeof ctx.run?.prompt !== 'string' || L.findArea(ctx.run.prompt) || L.findArea(ctx.run.resumeArea || '');
     const area = a.area && named ? L.findArea(a.area) : null;
     const problems = [];
     if (a.area && named && !area) problems.push(`Unknown area "${a.area}".`);
-    if (!L.totalMinutes(a.availability)) problems.push('Availability has no hours. Use e.g. {"Mon":["09:00-17:00"]}.');
+    // {} means the seeker has not said when they are free; days listed without hours is a mistake.
+    if (Object.keys(a.availability || {}).length && !L.totalMinutes(a.availability)) problems.push('Availability has no hours. Use e.g. {"Mon":["09:00-17:00"]}, or {} if not given.');
     if (problems.length) return { ok: false, problems };
     const email = a.email || `${a.name.toLowerCase().replace(/[^a-z]+/g, '.').replace(/^\.|\.$/g, '')}@example.com`;
     let s = store.db.students.find(x => x.email === email || x.name.toLowerCase() === a.name.toLowerCase());
     const needs = a.needs && (a.needs.vision || a.needs.screenReader || a.needs.magnification) ? { maxWalkMin: L.DEFAULT_WALK, ...a.needs } : null;
     const skills = a.skills.map(x => x.toLowerCase());
     if (needs?.screenReader && !skills.includes('screen reader')) skills.push('screen reader');
-    const fields = { name: a.name, email, area, campus: a.campus || s?.campus || '', skills, availability: a.availability, expectedRate: a.expectedRate || null, bio: a.bio, needs };
+    const fields = { name: a.name, email, area, campus: a.campus || s?.campus || '', skills, availability: a.availability || {}, expectedRate: a.expectedRate || null, bio: a.bio, needs };
     for (const key of ['education', 'workExperience', 'interestedPosition']) {
       if (typeof a[key] === 'string') fields[key] = a[key].trim().slice(0, 1000);
     }
@@ -394,12 +395,13 @@ function matchJobs(s, { maxDistanceKm = 25, minPay = 0, maxWalkMin, askAboutTech
     const wage = L.checkWage(j.pay, j.payUnit);
     const access = L.accessFit(j, s, { maxWalkMin, askAboutTech });
     const applied = store.db.applications.some(a => a.jobId === j.id && a.studentId === s.id);
+    const freeKnown = L.totalMinutes(s.availability) > 0;
     const freeOverlap = L.overlapMinutes(j.schedule, s.availability || {});
-    const suitable = wage.ok && L.hourlyRate(j) >= minPay && freeOverlap > 0 && access.fit !== 'not suitable' && sc.total >= MINIMUM_MATCH && sc.requiredCoverage === 1;
+    const suitable = wage.ok && L.hourlyRate(j) >= minPay && (freeOverlap > 0 || !freeKnown) && access.fit !== 'not suitable' && sc.total >= MINIMUM_MATCH && sc.requiredCoverage === 1;
     const whyNot = suitable ? null : !wage.ok ? 'it pays below the legal minimum wage'
       : access.fit === 'not suitable' ? access.blockers[0]
       : L.hourlyRate(j) < minPay ? `it pays ${`RM${j.pay}/${j.payUnit}`}, below your RM${minPay} an hour`
-      : freeOverlap <= 0 ? `its hours (${L.describeSchedule(j.schedule)}) are outside your free time`
+      : freeKnown && freeOverlap <= 0 ? `its hours (${L.describeSchedule(j.schedule)}) are outside your free time`
       : sc.missing.length ? `it asks for ${sc.missing.join(' and ')}` : 'it is a weak match for your skills';
     out.push({
       jobId: j.id, title: j.title, business: j.business, area: j.area, pay: `RM${j.pay}/${j.payUnit}`,
@@ -452,7 +454,7 @@ tools.apply_to_job = {
     if (store.db.applications.some(a => a.jobId === jobId && a.studentId === studentId)) problems.push('Already applied to this job.');
     const note = coverNote.toLowerCase();
     if (!note.includes(j.title.toLowerCase()) && !note.includes(j.business.toLowerCase())) problems.push(`Cover note must name the job ("${j.title}") or the business.`);
-    if (!s.skills.some(k => note.includes(k))) problems.push(`Cover note must mention at least one skill from the profile: ${s.skills.join(', ')}.`);
+    if (s.skills.length && !s.skills.some(k => note.includes(k))) problems.push(`Cover note must mention at least one skill from the profile: ${s.skills.join(', ')}.`);
     if (problems.length) return { ok: false, problems };
     const app = { id: store.id('app'), jobId, studentId, coverNote, at: new Date().toISOString(), runId: ctx.run.id, score: L.scoreMatch(j, s).total, asks: fit.asks };
     store.db.applications.push(app);
@@ -603,4 +605,4 @@ const STUDENT_TOOLS = ['set_plan', 'register_student', 'search_jobs', 'check_out
 // Booking is disabled for every caller, including legacy clients.
 for (const name of ['book_interview', 'schedule_interviews']) tools[name].run = async () => ({ ok: false, problems: ['Interview booking has been removed.'] });
 
-module.exports = { tools, HIRER_TOOLS, STUDENT_TOOLS, MINIMUM_MATCH, jobUrl, matchJobs };
+module.exports = { tools, HIRER_TOOLS, STUDENT_TOOLS, MINIMUM_MATCH, jobUrl, matchJobs, scheduleSchema };

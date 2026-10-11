@@ -146,6 +146,9 @@ const SYNONYMS = {
   'massage': ['massage', 'reflexology'],
   'copywriting': ['copywriting', 'captions', 'articles', 'content writ'],
   'mandarin': ['mandarin', 'chinese'], 'driving license': ['driving license', 'driving licence', 'license'],
+  'software development': ['software development', 'software developer', 'software engineer', 'programmer', 'programming', 'developer'],
+  'web development': ['web development', 'web developer', 'front-end', 'frontend', 'back-end', 'backend', 'full stack', 'full-stack'],
+  'computer science': ['computer science'],
 };
 
 function termsFor(skill) {
@@ -196,9 +199,10 @@ function scoreMatch(job, person) {
   const skills = req.length ? Math.round((35 * reqHit) / req.length) : 35;
   const niceScore = nice.length ? Math.round((5 * niceHit) / nice.length) : 5;
 
+  // Free time the seeker never gave earns neutral partial credit, not a perfect or zero match.
   const jobMin = totalMinutes(job.schedule);
   const ov = overlapMinutes(job.schedule, person.availability);
-  const availability = jobMin ? Math.round(25 * Math.min(1, ov / jobMin)) : 25;
+  const availability = !totalMinutes(person.availability) ? 12 : jobMin ? Math.round(25 * Math.min(1, ov / jobMin)) : 25;
 
   const remote = job.access?.workMode === 'remote';
   const km = remote ? null : distanceKm(job.area, person.area);
@@ -239,7 +243,7 @@ function hourlyRate(job) {
 function explain(job, person, s) {
   const bits = [];
   bits.push(`${s.evidence.filter(e => e.required).length}/${(job.requirements || []).length} required skills`);
-  bits.push(`free ${Math.round(s.overlapMinutes / 60)}h of the ${Math.round(s.scheduleMinutes / 60)}h shift`);
+  bits.push(totalMinutes(person.availability) ? `free ${Math.round(s.overlapMinutes / 60)}h of the ${Math.round(s.scheduleMinutes / 60)}h shift` : 'free time not given');
   if (job.access?.workMode === 'remote') bits.push('remote'); else if (s.distanceKm != null) bits.push(`${s.distanceKm} km away`);
   if (s.missing.length) bits.push(`missing ${s.missing.join(', ')}`);
   if (person.expectedRate > hourlyRate(job)) bits.push(`asks RM${person.expectedRate}/h vs about RM${Math.round(hourlyRate(job) * 100) / 100}/h`);

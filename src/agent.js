@@ -268,11 +268,12 @@ function seekerOptions(s, opts, walkStated) {
 
 async function autopilotStudent(ctx) {
 
-  const p = parse.student(ctx.run.prompt);
+  const p = parse.withDetails(parse.student(ctx.run.prompt), ctx.run.options?.applicantDetails || {});
+  ctx.run.resumeArea = p.area || null;
   const goal = SEEKER_GOAL;
   ctx.run.goal = goal;
   const n = p.needs;
-  say(ctx, `Understood: ${p.name}, ${p.area ? `based in ${p.area}` : 'area not given'}, free ${L.describeSchedule(p.availability)}, skills ${p.skills.join(', ')}.`
+  say(ctx, `Understood: ${p.name}, ${p.area ? `based in ${p.area}` : 'area not given'}, ${L.totalMinutes(p.availability) ? `free ${L.describeSchedule(p.availability)}` : 'free time not given'}, skills ${p.skills.join(', ') || 'not given'}.`
     + `${n ? ` Needs: ${n.vision}, uses ${n.tool}${n.remoteOnly ? ', remote work only' : `, up to a ${n.maxWalkMin}-minute walk from a stop`}.` : ''}`
     + `${p.minPay ? ` At least RM${p.minPay}/h.` : ''} Goal: ${goal} suitable jobs.`);
   await callTool(ctx, 'set_plan', { steps: [
